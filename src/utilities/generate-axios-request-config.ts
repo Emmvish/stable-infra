@@ -6,7 +6,7 @@ export function generateAxiosRequestConfig(reqData: REQUEST_DATA) {
     method: reqData.method ?? REQUEST_METHODS.GET,
     url: reqData.path ?? '',
     baseURL: `${reqData.protocol ?? VALID_REQUEST_PROTOCOLS.HTTPS}://${
-      reqData.url
+      reqData.hostname
     }:${reqData.port ?? 443}`,
     headers: reqData.headers ?? {},
     params: reqData.query ?? {},

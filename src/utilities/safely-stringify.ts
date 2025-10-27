@@ -1,4 +1,6 @@
-export function safelyStringify(data: object, maxLength = 1000): string {
+import { JsonValue } from "../types/index.js";
+
+export function safelyStringify(data: Record<string, JsonValue>, maxLength = 1000): string {
   try {
     const str = JSON.stringify(data);
     if (maxLength < 0) {

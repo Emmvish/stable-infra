@@ -15,6 +15,15 @@ export interface ERROR_LOG {
   isRetryable: boolean;
 }
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+
 export interface ReqFnResponse {
   ok: boolean;
   isRetryable: boolean;
@@ -31,14 +40,14 @@ export type REQUEST_METHOD_TYPES =
   | REQUEST_METHODS.PUT;
 
 export interface REQUEST_DATA {
-  url: string;
+  hostname: string;
   protocol?: VALID_REQUEST_PROTOCOL_TYPES;
   method?: REQUEST_METHOD_TYPES;
   path?: `/${string}`;
   port?: number;
-  headers?: object;
-  body?: object;
-  query?: object;
+  headers?: Record<string, JsonValue>;
+  body?: Record<string, JsonValue> | string;
+  query?: Record<string, JsonValue>;
   timeout?: number;
   signal?: AbortSignal;
 }

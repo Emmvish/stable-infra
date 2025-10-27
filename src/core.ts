@@ -1,3 +1,5 @@
+import { AxiosRequestConfig } from 'axios';
+
 import {
   RETRY_STRATEGIES,
   RESPONSE_ERRORS
@@ -52,7 +54,7 @@ export async function sendStableRequest<T = any>(
     trialMode = { enabled: false }
   } = options;
   let attempts = givenAttempts;
-  let reqData = givenReqData;
+  const reqData: AxiosRequestConfig = generateAxiosRequestConfig(givenReqData);
   try {
     validateTrialModeProbabilities(trialMode);
     let res: ReqFnResponse = {
@@ -62,7 +64,6 @@ export async function sendStableRequest<T = any>(
     };
     const maxAttempts = attempts;
     let lastSuccessfulAttemptData: T = {} as T;
-    reqData = generateAxiosRequestConfig(reqData);
     do {
       attempts--;
       const currentAttempt = maxAttempts - attempts;
