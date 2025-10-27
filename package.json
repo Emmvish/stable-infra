@@ -1,0 +1,46 @@
+{
+  "name": "stable-request",
+  "version": "1.0.0",
+  "description": "Robust request wrapper with configurable retry strategies & full observability",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "./dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "watch": "tsc --watch",
+    "prepublishOnly": "npm run build",
+    "test": "jest"
+  },
+  "keywords": [
+    "axios",
+    "request",
+    "stable",
+    "robust",
+    "versatile",
+    "retry",
+    "typescript",
+    "http-client"
+  ],
+  "author": "Manish Varma",
+  "exports": {
+    ".": "./dist/index.js",
+    "enums": "./dist/enums/index.js",
+    "types": "./dist/types/index.js",
+    "utilities": "./dist/utilities/index.js"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.12.2"
+  }
+}
