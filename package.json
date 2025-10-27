@@ -25,12 +25,6 @@
     "http-client"
   ],
   "author": "Manish Varma",
-  "exports": {
-    ".": "./dist/index.js",
-    "enums": "./dist/enums/index.js",
-    "types": "./dist/types/index.js",
-    "utilities": "./dist/utilities/index.js"
-  },
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.0.0",
