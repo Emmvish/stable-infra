@@ -27,7 +27,7 @@ const data = await stableRequest<{ message: string }>({
     path: '/v1/ping',
     method: REQUEST_METHODS.GET,
     query: { lang: 'en' },
-    timeout: 10_000
+    timeout: 10000
   },
   resReq: true, // return response data instead of boolean
   responseAnalyzer: (data) => Boolean(data?.message)
