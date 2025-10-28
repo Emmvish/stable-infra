@@ -1,1 +1,1 @@
-export { sendStableRequest as stableRequest } from './core.js';
+export { stableRequest } from './core/index.js';
