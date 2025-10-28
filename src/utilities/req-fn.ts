@@ -9,7 +9,8 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
   maxSerializableChars = 1000,
   trialMode: TRIAL_MODE_OPTIONS = { enabled: false }
 ) {
-  const timestamp = new Date().toISOString();
+  const startTime = Date.now()
+  const timestamp = new Date(startTime).toISOString();
   try {
     if (trialMode.enabled) {
       const trialCondition =
@@ -25,6 +26,7 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
           ok: true,
           isRetryable: true,
           timestamp,
+          executionTime: Date.now() - startTime,
           ...(resReq && { data: { trialMode } }),
         };
       }
@@ -36,15 +38,22 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
           isRetryable: true,
           data: res?.data,
           timestamp,
+          executionTime: Date.now() - startTime
         }
-      : { ok: true, isRetryable: true, timestamp };
+      : { 
+          ok: true, 
+          isRetryable: true, 
+          timestamp,
+          executionTime: Date.now() - startTime 
+        };
   } catch (e: any) {
     if(axios.isCancel(e)) {
       return {
         ok: false,
         error: 'Request was cancelled.',
         isRetryable: false,
-        timestamp
+        timestamp,
+        executionTime: Date.now() - startTime
       };
     }
     return {
@@ -52,6 +61,7 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
       error: (e as AxiosError)?.response?.data ?? e?.message,
       isRetryable: isRetryableError(e as AxiosError, trialMode),
       timestamp,
+      executionTime: Date.now() - startTime
     };
   }
 }

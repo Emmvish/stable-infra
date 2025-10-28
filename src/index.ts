@@ -1,1 +1,4 @@
-export { stableRequest } from './core/index.js';
+export { 
+    stableRequest,
+    stableApiGateway 
+} from './core/index.js';

@@ -9,6 +9,7 @@ import {
 
 export interface ERROR_LOG {
   timestamp: string;
+  executionTime: number;
   attempt: string;
   error: string;
   type: RESPONSE_ERROR_TYPES;
@@ -20,6 +21,7 @@ export interface ReqFnResponse {
   ok: boolean;
   isRetryable: boolean;
   timestamp: string;
+  executionTime: number;
   error?: string;
   data?: any;
 }
@@ -76,6 +78,7 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
 export interface SUCCESSFUL_ATTEMPT_DATA {
   attempt: string;
   timestamp: string;
+  executionTime: number;
   data: any;
 }
 
