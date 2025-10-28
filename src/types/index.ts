@@ -15,14 +15,6 @@ export interface ERROR_LOG {
   isRetryable: boolean;
 }
 
-export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
-
 
 export interface ReqFnResponse {
   ok: boolean;
@@ -39,15 +31,15 @@ export type REQUEST_METHOD_TYPES =
   | REQUEST_METHODS.PATCH
   | REQUEST_METHODS.PUT;
 
-export interface REQUEST_DATA {
+export interface REQUEST_DATA<RequestDataType = any> {
   hostname: string;
   protocol?: VALID_REQUEST_PROTOCOL_TYPES;
   method?: REQUEST_METHOD_TYPES;
   path?: `/${string}`;
   port?: number;
-  headers?: Record<string, JsonValue>;
-  body?: Record<string, JsonValue> | string;
-  query?: Record<string, JsonValue>;
+  headers?: Record<string, any>;
+  body?: RequestDataType;
+  query?: Record<string, any>;
   timeout?: number;
   signal?: AbortSignal;
 }
@@ -56,9 +48,9 @@ type RESPONSE_ERROR_TYPES = RESPONSE_ERRORS.HTTP_ERROR | RESPONSE_ERRORS.INVALID
 
 export type RETRY_STRATEGY_TYPES = RETRY_STRATEGIES.FIXED | RETRY_STRATEGIES.LINEAR | RETRY_STRATEGIES.EXPONENTIAL;
 
-export interface STABLE_REQUEST<T = any> {
-  reqData: REQUEST_DATA;
-  responseAnalyzer?: (reqData: AxiosRequestConfig, data: T, trialMode?: TRIAL_MODE_OPTIONS) => boolean | Promise<boolean>;
+export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
+  reqData: REQUEST_DATA<RequestDataType>;
+  responseAnalyzer?: (reqData: AxiosRequestConfig<RequestDataType>, data: ResponseDataType, trialMode?: TRIAL_MODE_OPTIONS) => boolean | Promise<boolean>;
   resReq?: boolean;
   attempts?: number;
   performAllAttempts?: boolean;
@@ -66,18 +58,18 @@ export interface STABLE_REQUEST<T = any> {
   retryStrategy?: RETRY_STRATEGY_TYPES;
   logAllErrors?: boolean;
   handleErrors?: (
-    reqData: AxiosRequestConfig,
+    reqData: AxiosRequestConfig<RequestDataType>,
     error: ERROR_LOG,
     maxSerializableChars?: number
   ) => any | Promise<any>;
   logAllSuccessfulAttempts?: boolean;
   handleSuccessfulAttemptData?: (
-    reqData: AxiosRequestConfig,
+    reqData: AxiosRequestConfig<RequestDataType>,
     successfulAttemptData: SUCCESSFUL_ATTEMPT_DATA,
     maxSerializableChars?: number
   ) => any | Promise<any>;
   maxSerializableChars?: number;
-  finalErrorAnalyzer?: (reqData: AxiosRequestConfig, error: any, trialMode?: TRIAL_MODE_OPTIONS) => boolean | Promise<boolean>;
+  finalErrorAnalyzer?: (reqData: AxiosRequestConfig<RequestDataType>, error: any, trialMode?: TRIAL_MODE_OPTIONS) => boolean | Promise<boolean>;
   trialMode?: TRIAL_MODE_OPTIONS;
 }
 

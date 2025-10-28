@@ -22,9 +22,9 @@ import {
     validateTrialModeProbabilities
 } from './utilities/index.js';
 
-export async function sendStableRequest<T = any>(
-  options: STABLE_REQUEST<T>
-): Promise<T | boolean> {
+export async function sendStableRequest<RequestDataType = any, ResponseDataType = any>(
+  options: STABLE_REQUEST<RequestDataType, ResponseDataType>
+): Promise<ResponseDataType | boolean> {
   const {
     reqData: givenReqData,
     responseAnalyzer = (reqData, data, trialMode = { enabled: false }) => true,
@@ -54,7 +54,7 @@ export async function sendStableRequest<T = any>(
     trialMode = { enabled: false }
   } = options;
   let attempts = givenAttempts;
-  const reqData: AxiosRequestConfig = generateAxiosRequestConfig(givenReqData);
+  const reqData: AxiosRequestConfig<RequestDataType> = generateAxiosRequestConfig<RequestDataType>(givenReqData);
   try {
     validateTrialModeProbabilities(trialMode);
     let res: ReqFnResponse = {
@@ -63,11 +63,11 @@ export async function sendStableRequest<T = any>(
       timestamp: new Date().toISOString(),
     };
     const maxAttempts = attempts;
-    let lastSuccessfulAttemptData: T = {} as T;
+    let lastSuccessfulAttemptData: ResponseDataType = {} as ResponseDataType;
     do {
       attempts--;
       const currentAttempt = maxAttempts - attempts;
-      res = await reqFn<T>(reqData, resReq, maxSerializableChars, trialMode);
+      res = await reqFn<RequestDataType, ResponseDataType>(reqData, resReq, maxSerializableChars, trialMode);
       const originalResOk = res.ok;
       let performNextAttempt: boolean = false;
       if (res.ok) {
