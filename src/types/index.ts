@@ -7,6 +7,23 @@ import {
     VALID_REQUEST_PROTOCOLS
 } from '../enums/index.js';
 
+export interface API_GATEWAY_OPTIONS {
+  concurrentExecution?: boolean;
+  stopOnFirstError?: boolean;
+}
+
+export interface API_GATEWAY_REQUEST<RequestDataType = any, ResponseDataType = any> {
+  id: string;
+  requestOptions: STABLE_REQUEST<RequestDataType, ResponseDataType>;
+}
+
+export interface API_GATEWAY_RESPONSE<ResponseDataType = any> {
+  id: string;
+  success: boolean;
+  data?: ResponseDataType;
+  error?: string;
+}
+
 export interface ERROR_LOG {
   timestamp: string;
   executionTime: number;
