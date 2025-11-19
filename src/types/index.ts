@@ -91,11 +91,11 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   trialMode?: TRIAL_MODE_OPTIONS;
 }
 
-export interface SUCCESSFUL_ATTEMPT_DATA {
+export interface SUCCESSFUL_ATTEMPT_DATA<ResponseDataType = any> {
   attempt: string;
   timestamp: string;
   executionTime: number;
-  data: any;
+  data: ResponseDataType;
 }
 
 export interface TRIAL_MODE_OPTIONS {

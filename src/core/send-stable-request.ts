@@ -119,7 +119,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
       }
       if (res.ok && !performNextAttempt && logAllSuccessfulAttempts) {
         lastSuccessfulAttemptData = res?.data;
-        const successfulAttemptLog: SUCCESSFUL_ATTEMPT_DATA = {
+        const successfulAttemptLog: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType> = {
           attempt: `${currentAttempt}/${maxAttempts}`,
           timestamp: res.timestamp,
           data: res?.data,
