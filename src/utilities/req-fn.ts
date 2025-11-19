@@ -1,5 +1,5 @@
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
-import { TRIAL_MODE_OPTIONS } from '../types/index.js';
+import { ReqFnResponse ,TRIAL_MODE_OPTIONS } from '../types/index.js';
 import { safelyStringify } from './safely-stringify.js';
 import { isRetryableError } from './is-retryable-error.js';
 
@@ -8,8 +8,9 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
   resReq = false,
   maxSerializableChars = 1000,
   trialMode: TRIAL_MODE_OPTIONS = { enabled: false }
-) {
-  const startTime = Date.now()
+): Promise<ReqFnResponse<ResponseDataType>> {
+  const startTime = Date.now();
+  let stopTime = 0;
   const timestamp = new Date(startTime).toISOString();
   try {
     if (trialMode.enabled) {
@@ -32,28 +33,30 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
       }
     }
     const res = await axios.request<ResponseDataType>(reqData);
+    stopTime = Date.now();
     return resReq
       ? {
           ok: true,
           isRetryable: true,
           data: res?.data,
           timestamp,
-          executionTime: Date.now() - startTime
+          executionTime: stopTime - startTime
         }
       : { 
           ok: true, 
           isRetryable: true, 
           timestamp,
-          executionTime: Date.now() - startTime 
+          executionTime: stopTime - startTime 
         };
   } catch (e: any) {
+    stopTime = Date.now();
     if(axios.isCancel(e)) {
       return {
         ok: false,
         error: 'Request was cancelled.',
         isRetryable: false,
         timestamp,
-        executionTime: Date.now() - startTime
+        executionTime: stopTime - startTime
       };
     }
     return {
@@ -61,7 +64,7 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
       error: (e as AxiosError)?.response?.data ?? e?.message,
       isRetryable: isRetryableError(e as AxiosError, trialMode),
       timestamp,
-      executionTime: Date.now() - startTime
+      executionTime: stopTime - startTime
     };
   }
 }

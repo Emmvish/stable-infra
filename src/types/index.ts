@@ -33,14 +33,13 @@ export interface ERROR_LOG {
   isRetryable: boolean;
 }
 
-
-export interface ReqFnResponse {
+export interface ReqFnResponse<ResponseDataType = any> {
   ok: boolean;
   isRetryable: boolean;
   timestamp: string;
   executionTime: number;
   error?: string;
-  data?: any;
+  data?: ResponseDataType | { trialMode: TRIAL_MODE_OPTIONS };
 }
 
 export type REQUEST_METHOD_TYPES =
