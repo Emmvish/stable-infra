@@ -2,9 +2,6 @@
 
 A robust HTTP request wrapper built on top of Axios with intelligent retry strategies, content validation, batch processing, and comprehensive observability features.
 
-[![npm version](https://img.shields.io/npm/v/stable-request.svg)](https://www.npmjs.com/package/stable-request)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
 ## Why stable-request?
 
 Most HTTP client libraries only retry on network failures or specific HTTP status codes. **stable-request** goes further by providing:
@@ -923,15 +920,12 @@ console.log(user.id);
 7. **Enable logging in development** with `logAllErrors` and `logAllSuccessfulAttempts`
 8. **Use Trial Mode** to test your error handling without relying on actual failures
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
 ## License
 
 MIT © Manish Varma
-- [npm Package](https://www.npmjs.com/package/stable-request)
-- [Issue Tracker](https://github.com/yourusername/stable-request/issues)
+
+[![npm version](https://img.shields.io/npm/v/stable-request.svg)](https://www.npmjs.com/package/stable-request)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
 
