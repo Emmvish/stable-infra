@@ -1,4 +1,4 @@
-### stable-request
+## stable-request
 
 A robust HTTP request wrapper built on top of Axios with intelligent retry strategies, content validation, batch processing, and comprehensive observability features.
 
