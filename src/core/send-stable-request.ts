@@ -80,7 +80,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
           ));
         } catch (e) {
           console.log(
-            `Unable to analyze the response returned on attempt #${currentAttempt}. Response: ${safelyStringify(
+            `stable-request: Unable to analyze the response returned on attempt #${currentAttempt}. Response: ${safelyStringify(
               res?.data,
               maxSerializableChars
             )}`
@@ -94,7 +94,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
           attempt: `${currentAttempt}/${maxAttempts}`,
           error:
             res?.error ??
-            `The response did not match your expectations! Response: ${safelyStringify(
+            `stable-request: The response did not match your expectations! Response: ${safelyStringify(
               res?.data,
               maxSerializableChars
             )}`,
@@ -113,7 +113,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
           );
         } catch (e) {
           console.log(
-            'sendStableRequest: Unable to report errors due to issues with error handler!'
+            'stable-request: Unable to report errors due to issues with error handler!'
           );
         }
       }
@@ -134,7 +134,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
           );
         } catch (e) {
           console.log(
-            'sendStableRequest: Unable to report successful attempts due to issues with successful attempt data handler!'
+            'stable-request: Unable to report successful attempts due to issues with successful attempt data handler!'
           );
         }
       }

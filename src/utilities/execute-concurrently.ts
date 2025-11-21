@@ -1,16 +1,23 @@
+import { stableRequest } from "../core/index.js";
 import {
     API_GATEWAY_REQUEST,
-    API_GATEWAY_RESPONSE 
+    API_GATEWAY_RESPONSE ,
+    CONCURRENT_REQUEST_EXECUTION_OPTIONS
 } from '../types/index.js';
-import { stableRequest } from "../core/index.js";
+import { prepareApiRequestOptions } from "./prepare-api-request-options.js";
 
 export async function executeConcurrently<RequestDataType = any, ResponseDataType = any>(
-    requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[]
+    requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] = [],
+    requestExecutionOptions: CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType> = {}
 ): Promise<API_GATEWAY_RESPONSE<ResponseDataType>[]> {
     const responses: API_GATEWAY_RESPONSE<ResponseDataType>[] = [];
     const stableRequests: Promise<boolean | ResponseDataType>[] = [];
     for (const req of requests) {
-        stableRequests.push(stableRequest<RequestDataType, ResponseDataType>(req.requestOptions));
+        const finalRequestOptions = { 
+            reqData: req.requestOptions.reqData,
+            ...prepareApiRequestOptions<RequestDataType, ResponseDataType>(req, requestExecutionOptions) 
+        };
+        stableRequests.push(stableRequest<RequestDataType, ResponseDataType>(finalRequestOptions));
     }
     const settledResponses = await Promise.allSettled(stableRequests);
     for (let i = 0; i < settledResponses.length; i++) {

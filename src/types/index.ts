@@ -1,13 +1,34 @@
 import { AxiosRequestConfig } from 'axios';
 
 import { 
-    REQUEST_METHODS,
-    RESPONSE_ERRORS, 
-    RETRY_STRATEGIES,
-    VALID_REQUEST_PROTOCOLS
+  REQUEST_METHODS,
+  RESPONSE_ERRORS, 
+  RETRY_STRATEGIES,
+  VALID_REQUEST_PROTOCOLS
 } from '../enums/index.js';
 
-export interface API_GATEWAY_OPTIONS {
+export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any> {
+  commonAttempts?: number;
+  commonPerformAllAttempts?: boolean;
+  commonWait?: number;
+  commonRetryStrategy?: RETRY_STRATEGY_TYPES;
+  commonLogAllErrors?: boolean;
+  commonLogAllSuccessfulAttempts?: boolean;
+  commonMaxSerializableChars?: number;
+  commonTrialMode?: TRIAL_MODE_OPTIONS;
+  commonResponseAnalyzer?: (reqData: AxiosRequestConfig<RequestDataType>, data: ResponseDataType, trialMode?: TRIAL_MODE_OPTIONS) => boolean | Promise<boolean>;
+  commonResReq?: boolean;
+  commonFinalErrorAnalyzer?: (reqData: AxiosRequestConfig<RequestDataType>, error: any, trialMode?: TRIAL_MODE_OPTIONS) => boolean | Promise<boolean>;
+  commonHandleErrors?: (
+    reqData: AxiosRequestConfig<RequestDataType>,
+    error: ERROR_LOG,
+    maxSerializableChars?: number
+  ) => any | Promise<any>;
+  commonHandleSuccessfulAttemptData?: (
+    reqData: AxiosRequestConfig<RequestDataType>,
+    successfulAttemptData: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>,
+    maxSerializableChars?: number
+  ) => any | Promise<any>;
   concurrentExecution?: boolean;
   stopOnFirstError?: boolean;
 }
@@ -23,6 +44,8 @@ export interface API_GATEWAY_RESPONSE<ResponseDataType = any> {
   data?: ResponseDataType;
   error?: string;
 }
+
+export type CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, ResponseDataType = any> = Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, "concurrentExecution" | "stopOnFirstError">
 
 export interface ERROR_LOG {
   timestamp: string;
@@ -66,6 +89,8 @@ type RESPONSE_ERROR_TYPES = RESPONSE_ERRORS.HTTP_ERROR | RESPONSE_ERRORS.INVALID
 
 export type RETRY_STRATEGY_TYPES = RETRY_STRATEGIES.FIXED | RETRY_STRATEGIES.LINEAR | RETRY_STRATEGIES.EXPONENTIAL;
 
+export type SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, ResponseDataType = any> = Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, "concurrentExecution">
+
 export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   reqData: REQUEST_DATA<RequestDataType>;
   responseAnalyzer?: (reqData: AxiosRequestConfig<RequestDataType>, data: ResponseDataType, trialMode?: TRIAL_MODE_OPTIONS) => boolean | Promise<boolean>;
@@ -83,7 +108,7 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   logAllSuccessfulAttempts?: boolean;
   handleSuccessfulAttemptData?: (
     reqData: AxiosRequestConfig<RequestDataType>,
-    successfulAttemptData: SUCCESSFUL_ATTEMPT_DATA,
+    successfulAttemptData: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>,
     maxSerializableChars?: number
   ) => any | Promise<any>;
   maxSerializableChars?: number;
