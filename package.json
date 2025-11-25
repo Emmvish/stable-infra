@@ -11,8 +11,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/test.js"
+    "build": "tsc"
   },
   "keywords": [
     "axios",

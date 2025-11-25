@@ -29,7 +29,7 @@ export async function executeConcurrently<RequestDataType = any, ResponseDataTyp
                 id: req.id,
                 success: value ? true : false,
                 ...(value && { data: value as ResponseDataType }),
-                ...(!value && { error: 'Request was unsuccessful, but analyzed successfully!' })
+                ...(!value && { error: 'Request was unsuccessful, but the error was analyzed successfully!' })
             });
         } else {
             responses.push({
