@@ -24,19 +24,19 @@ npm install @mv/stable-request
 ### Single Request
 
 ```typescript
-import { stableRequest } from '@mv/stable-request';
+import { stableRequest, REQUEST_METHODS, RETRY_STRATEGIES } from '@mv/stable-request';
 
 // Simple GET request with automatic retries
 const response = await stableRequest({
   reqData: {
     hostname: 'api.example.com',
     path: '/users',
-    method: 'GET'
+    method: REQUEST_METHODS.GET
   },
   resReq: true,
   attempts: 3,
   wait: 1000,
-  retryStrategy: 'exponential'
+  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL
 });
 ```
 
@@ -104,7 +104,7 @@ Process multiple requests efficiently with shared configuration and execution st
 #### Concurrent Execution
 
 ```typescript
-import { stableApiGateway, RETRY_STRATEGIES } from '@mv/stable-request';
+import { stableApiGateway, RETRY_STRATEGIES, REQUEST_METHODS } from '@mv/stable-request';
 
 const requests = [
   {
@@ -113,7 +113,7 @@ const requests = [
       reqData: {
         hostname: 'api.example.com',
         path: '/users',
-        method: 'POST',
+        method: REQUEST_METHODS.POST,
         body: { name: 'John Doe', email: 'john@example.com' }
       }
     }
@@ -124,7 +124,7 @@ const requests = [
       reqData: {
         hostname: 'api.example.com',
         path: '/users',
-        method: 'POST',
+        method: REQUEST_METHODS.POST,
         body: { name: 'Jane Smith', email: 'jane@example.com' }
       }
     }
@@ -191,7 +191,7 @@ await stableRequest({
 Choose the backoff strategy that fits your use case.
 
 ```typescript
-import { RETRY_STRATEGIES } from '@mv/stable-request';
+import { stableRequest, RETRY_STRATEGIES } from '@mv/stable-request';
 
 // Fixed delay: 1s, 1s, 1s, 1s...
 await stableRequest({
@@ -243,7 +243,8 @@ await stableRequest({
       isRetryable: errorLog.isRetryable,
       type: errorLog.type, // 'HTTP_ERROR' or 'INVALID_CONTENT'
       timestamp: errorLog.timestamp,
-      executionTime: errorLog.executionTime
+      executionTime: errorLog.executionTime,
+      statusCode: errorLog.statusCode
     });
   },
   logAllSuccessfulAttempts: true,
@@ -252,7 +253,8 @@ await stableRequest({
     analytics.track('request_success', {
       endpoint: reqConfig.url,
       attempt: successData.attempt,
-      executionTime: successData.executionTime
+      executionTime: successData.executionTime,
+      statusCode: successData.statusCode
     });
   }
 });
@@ -277,7 +279,7 @@ await stableRequest({
   resReq: true,
   attempts: 5,
   wait: 2000,
-  retryStrategy: 'exponential'
+  retryStrategy: RETRY_STRATEGIES.LINEAR
   // Automatically retries on transient failures
 });
 ```
@@ -451,7 +453,7 @@ const jobResult = await stableRequest({
   resReq: true,
   attempts: 20,
   wait: 3000,
-  retryStrategy: 'fixed',
+  retryStrategy: RETRY_STRATEGIES.FIXED,
   responseAnalyzer: async (reqConfig, data) => {
     return data.status === 'completed';
   },
@@ -474,7 +476,7 @@ const weatherData = await stableRequest({
   resReq: true,
   attempts: 5,
   wait: 2000,
-  retryStrategy: 'exponential',
+  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
   logAllErrors: true,
   handleErrors: async (reqConfig, error) => {
     logger.warn('Weather API retry', { 
@@ -496,7 +498,7 @@ const consistentData = await stableRequest({
   resReq: true,
   attempts: 10,
   wait: 500,
-  retryStrategy: 'linear',
+  retryStrategy: RETRY_STRATEGIES.LINEAR,
   responseAnalyzer: async (reqConfig, data) => {
     // Wait until replica has the latest version
     return data.version >= expectedVersion;
@@ -519,7 +521,7 @@ const requests = users.map((user, index) => ({
     reqData: {
       hostname: 'api.example.com',
       path: '/users',
-      method: 'POST',
+      method: REQUEST_METHODS.POST,
       body: user
     },
     resReq: true
@@ -530,7 +532,7 @@ const results = await stableApiGateway(requests, {
   concurrentExecution: true,
   commonAttempts: 3,
   commonWait: 1000,
-  commonRetryStrategy: 'exponential',
+  commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
   commonLogAllErrors: true,
   commonHandleErrors: async (reqConfig, error) => {
     console.log(`Failed to create user: ${error.error}`);
@@ -556,7 +558,7 @@ const searchResults = await stableRequest({
   resReq: true,
   attempts: 10,
   wait: 1000,
-  retryStrategy: 'exponential', // Exponential backoff for rate limits
+  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL, // Exponential backoff for rate limits
   handleErrors: async (reqConfig, error) => {
     if (error.type === 'HTTP_ERROR' && error.error.includes('429')) {
       console.log('Rate limited, backing off...');
@@ -585,7 +587,7 @@ const healthChecks = services.map(service => ({
 
 const results = await stableApiGateway(healthChecks, {
   concurrentExecution: true,
-  commonRetryStrategy: 'linear'
+  commonRetryStrategy: RETRY_STRATEGIES.LINEAR
 });
 
 const healthStatus = results.reduce((acc, result) => {
@@ -604,7 +606,7 @@ const payment = await stableRequest({
   reqData: {
     hostname: 'payment-gateway.com',
     path: '/charge',
-    method: 'POST',
+    method: REQUEST_METHODS.POST,
     headers: { 'Idempotency-Key': uniqueId },
     body: { amount: 1000, currency: 'USD' }
   },
@@ -633,7 +635,7 @@ const migrationRequests = records.map((record, index) => ({
     reqData: {
       hostname: 'new-system.example.com',
       path: '/import',
-      method: 'POST',
+      method: REQUEST_METHODS.POST,
       body: record
     },
     resReq: true,
@@ -641,7 +643,7 @@ const migrationRequests = records.map((record, index) => ({
     ...(record.critical && { 
       attempts: 5,
       wait: 2000,
-      retryStrategy: 'exponential'
+      retryStrategy: RETRY_STRATEGIES.EXPONENTIAL
     })
   }
 }));
@@ -650,7 +652,7 @@ const results = await stableApiGateway(migrationRequests, {
   concurrentExecution: true,
   commonAttempts: 3,
   commonWait: 1000,
-  commonRetryStrategy: 'linear',
+  commonRetryStrategy: RETRY_STRATEGIES.LINEAR,
   commonHandleErrors: async (reqConfig, error) => {
     await logMigrationError(reqConfig.data.id, error);
   }
@@ -682,7 +684,7 @@ const requests = sources.map(source => ({
 const results = await stableApiGateway(requests, {
   concurrentExecution: true,
   commonWait: 1000,
-  commonRetryStrategy: 'exponential'
+  commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
 });
 
 const aggregatedData = results
@@ -702,7 +704,7 @@ const workflowSteps = [
       reqData: {
         hostname: 'workflow.example.com',
         path: '/init',
-        method: 'POST',
+        method: REQUEST_METHODS.POST,
         body: { workflowId: 'wf-123' }
       },
       resReq: true
@@ -714,7 +716,7 @@ const workflowSteps = [
       reqData: {
         hostname: 'workflow.example.com',
         path: '/process',
-        method: 'POST',
+        method: REQUEST_METHODS.POST,
         body: { workflowId: 'wf-123' }
       },
       resReq: true,
@@ -729,7 +731,7 @@ const workflowSteps = [
       reqData: {
         hostname: 'workflow.example.com',
         path: '/finalize',
-        method: 'POST',
+        method: REQUEST_METHODS.POST,
         body: { workflowId: 'wf-123' }
       },
       resReq: true
@@ -742,7 +744,7 @@ const results = await stableApiGateway(workflowSteps, {
   stopOnFirstError: true,     // Stop if any step fails
   commonAttempts: 5,
   commonWait: 2000,
-  commonRetryStrategy: 'exponential'
+  commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
 });
 
 if (results.every(r => r.success)) {
@@ -804,7 +806,7 @@ const requests = endpoints.map(endpoint => ({
     },
     resReq: true,
     attempts: endpoint.critical ? 5 : 3,
-    retryStrategy: endpoint.critical ? 'exponential' : 'fixed'
+    retryStrategy: endpoint.critical ? RETRY_STRATEGIES.EXPONENTIAL : RETRY_STRATEGIES.FIXED
   }
 }));
 
@@ -862,7 +864,7 @@ const user = await stableRequest<CreateUserRequest, UserResponse>({
   reqData: {
     hostname: 'api.example.com',
     path: '/users',
-    method: 'POST',
+    method: REQUEST_METHODS.POST,
     body: {
       name: 'John Doe',
       email: 'john@example.com'
