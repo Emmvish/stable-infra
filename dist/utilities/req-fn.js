@@ -18,6 +18,7 @@ export async function reqFn(reqData, resReq = false, maxSerializableChars = 1000
                     isRetryable: true,
                     timestamp,
                     executionTime: Date.now() - startTime,
+                    statusCode: 200,
                     ...(resReq && { data: { trialMode } }),
                 };
             }
@@ -30,13 +31,15 @@ export async function reqFn(reqData, resReq = false, maxSerializableChars = 1000
                 isRetryable: true,
                 data: res?.data,
                 timestamp,
-                executionTime: stopTime - startTime
+                executionTime: stopTime - startTime,
+                statusCode: res?.status || 200
             }
             : {
                 ok: true,
                 isRetryable: true,
                 timestamp,
-                executionTime: stopTime - startTime
+                executionTime: stopTime - startTime,
+                statusCode: res?.status || 200
             };
     }
     catch (e) {
@@ -47,7 +50,8 @@ export async function reqFn(reqData, resReq = false, maxSerializableChars = 1000
                 error: 'Request was cancelled.',
                 isRetryable: false,
                 timestamp,
-                executionTime: stopTime - startTime
+                executionTime: stopTime - startTime,
+                statusCode: e?.response?.status || 0
             };
         }
         return {
@@ -55,7 +59,8 @@ export async function reqFn(reqData, resReq = false, maxSerializableChars = 1000
             error: e?.response?.data ?? e?.message,
             isRetryable: isRetryableError(e, trialMode),
             timestamp,
-            executionTime: stopTime - startTime
+            executionTime: stopTime - startTime,
+            statusCode: e?.response?.status || 0
         };
     }
 }

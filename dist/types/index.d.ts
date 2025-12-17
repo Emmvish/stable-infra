@@ -31,6 +31,7 @@ export type CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, Response
 export interface ERROR_LOG {
     timestamp: string;
     executionTime: number;
+    statusCode: number;
     attempt: string;
     error: string;
     type: RESPONSE_ERROR_TYPES;
@@ -42,6 +43,7 @@ export interface ReqFnResponse<ResponseDataType = any> {
     timestamp: string;
     executionTime: number;
     error?: string;
+    statusCode: number;
     data?: ResponseDataType | {
         trialMode: TRIAL_MODE_OPTIONS;
     };
@@ -83,6 +85,7 @@ export interface SUCCESSFUL_ATTEMPT_DATA<ResponseDataType = any> {
     timestamp: string;
     executionTime: number;
     data: ResponseDataType;
+    statusCode: number;
 }
 export interface TRIAL_MODE_OPTIONS {
     enabled: boolean;
