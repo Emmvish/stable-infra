@@ -931,4 +931,4 @@ MIT © Manish Varma
 
 ---
 
-**Made with ❤️ for developers who are sick of integrating with unreliable APIs**
+**Made with ❤️ for developers who are sick of integrating apps with unreliable APIs**
