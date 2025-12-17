@@ -24,7 +24,7 @@ npm install stable-request
 ### Single Request
 
 ```typescript
-import { stableRequest } from 'stable-request';
+import { stableRequest } from '@mv/stable-request';
 
 // Simple GET request with automatic retries
 const response = await stableRequest({
@@ -43,7 +43,7 @@ const response = await stableRequest({
 ### Batch Requests
 
 ```typescript
-import { stableApiGateway } from 'stable-request';
+import { stableApiGateway } from '@mv/stable-request';
 
 const requests = [
   {
@@ -104,7 +104,7 @@ Process multiple requests efficiently with shared configuration and execution st
 #### Concurrent Execution
 
 ```typescript
-import { stableApiGateway, RETRY_STRATEGIES } from 'stable-request';
+import { stableApiGateway, RETRY_STRATEGIES } from '@mv/stable-request';
 
 const requests = [
   {
@@ -191,7 +191,7 @@ await stableRequest({
 Choose the backoff strategy that fits your use case.
 
 ```typescript
-import { RETRY_STRATEGIES } from 'stable-request';
+import { RETRY_STRATEGIES } from '@mv/stable-request';
 
 // Fixed delay: 1s, 1s, 1s, 1s...
 await stableRequest({
@@ -929,4 +929,4 @@ MIT © Manish Varma
 
 ---
 
-**Made with ❤️ for developers who need reliable HTTP requests**
+**Made with ❤️ for developers who are sick of integrating with unreliable APIs**
