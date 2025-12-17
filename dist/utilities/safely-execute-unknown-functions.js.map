@@ -1,0 +1,1 @@
+{"version":3,"file":"safely-execute-unknown-functions.js","sourceRoot":"","sources":["../../src/utilities/safely-execute-unknown-functions.ts"],"names":[],"mappings":"AAAA,MAAM,CAAC,KAAK,UAAU,6BAA6B,CAAC,CAAW,EAAE,GAAG,IAAW;IAC7E,MAAM,MAAM,GAAG,CAAC,CAAC,GAAG,IAAI,CAAC,CAAC;IAC1B,IAAI,MAAM,YAAY,OAAO,EAAE,CAAC;QAC9B,MAAM,MAAM,CAAC;IACf,CAAC;IACD,OAAO,MAAM,CAAC;AAChB,CAAC"}

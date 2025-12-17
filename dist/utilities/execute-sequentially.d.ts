@@ -1,0 +1,3 @@
+import { API_GATEWAY_REQUEST, API_GATEWAY_RESPONSE, SEQUENTIAL_REQUEST_EXECUTION_OPTIONS } from '../types/index.js';
+export declare function executeSequentially<RequestDataType = any, ResponseDataType = any>(requests?: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[], requestExecutionOptions?: SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>): Promise<API_GATEWAY_RESPONSE<ResponseDataType>[]>;
+//# sourceMappingURL=execute-sequentially.d.ts.map

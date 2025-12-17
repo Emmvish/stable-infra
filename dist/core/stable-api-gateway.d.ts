@@ -1,0 +1,3 @@
+import { API_GATEWAY_OPTIONS, API_GATEWAY_REQUEST } from '../types/index.js';
+export declare function stableApiGateway<RequestDataType = any, ResponseDataType = any>(requests?: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[], options?: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>): Promise<import("../types/index.js").API_GATEWAY_RESPONSE<ResponseDataType>[]>;
+//# sourceMappingURL=stable-api-gateway.d.ts.map

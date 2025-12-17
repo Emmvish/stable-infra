@@ -1,0 +1,1 @@
+{"version":3,"file":"send-stable-request.d.ts","sourceRoot":"","sources":["../../src/core/send-stable-request.ts"],"names":[],"mappings":"AAOA,OAAO,EAGH,cAAc,EAEjB,MAAM,mBAAmB,CAAC;AAY3B,wBAAsB,iBAAiB,CAAC,eAAe,GAAG,GAAG,EAAE,gBAAgB,GAAG,GAAG,EACnF,OAAO,EAAE,cAAc,CAAC,eAAe,EAAE,gBAAgB,CAAC,GACzD,OAAO,CAAC,gBAAgB,GAAG,OAAO,CAAC,CAsKrC"}

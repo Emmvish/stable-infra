@@ -1,0 +1,3 @@
+import { API_GATEWAY_REQUEST, CONCURRENT_REQUEST_EXECUTION_OPTIONS, SEQUENTIAL_REQUEST_EXECUTION_OPTIONS, STABLE_REQUEST } from "../types/index.js";
+export declare function prepareApiRequestOptions<RequestDataType = any, ResponseDataType = any>(request: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>, commonRequestExecutionOptions: CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType> | SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>): Omit<STABLE_REQUEST<RequestDataType, ResponseDataType>, 'reqData'>;
+//# sourceMappingURL=prepare-api-request-options.d.ts.map

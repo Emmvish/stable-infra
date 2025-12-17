@@ -1,0 +1,3 @@
+import { API_GATEWAY_REQUEST, API_GATEWAY_RESPONSE, CONCURRENT_REQUEST_EXECUTION_OPTIONS } from '../types/index.js';
+export declare function executeConcurrently<RequestDataType = any, ResponseDataType = any>(requests?: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[], requestExecutionOptions?: CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>): Promise<API_GATEWAY_RESPONSE<ResponseDataType>[]>;
+//# sourceMappingURL=execute-concurrently.d.ts.map
