@@ -28,6 +28,7 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
           isRetryable: true,
           timestamp,
           executionTime: Date.now() - startTime,
+          statusCode: 200,
           ...(resReq && { data: { trialMode } }),
         };
       }
@@ -40,13 +41,15 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
           isRetryable: true,
           data: res?.data,
           timestamp,
-          executionTime: stopTime - startTime
+          executionTime: stopTime - startTime,
+          statusCode: res?.status || 200
         }
       : { 
           ok: true, 
           isRetryable: true, 
           timestamp,
-          executionTime: stopTime - startTime 
+          executionTime: stopTime - startTime,
+          statusCode: res?.status || 200
         };
   } catch (e: any) {
     stopTime = Date.now();
@@ -56,7 +59,8 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
         error: 'Request was cancelled.',
         isRetryable: false,
         timestamp,
-        executionTime: stopTime - startTime
+        executionTime: stopTime - startTime,
+        statusCode: (e as AxiosError)?.response?.status || 0
       };
     }
     return {
@@ -64,7 +68,8 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
       error: (e as AxiosError)?.response?.data ?? e?.message,
       isRetryable: isRetryableError(e as AxiosError, trialMode),
       timestamp,
-      executionTime: stopTime - startTime
+      executionTime: stopTime - startTime,
+      statusCode: (e as AxiosError)?.response?.status || 0
     };
   }
 }

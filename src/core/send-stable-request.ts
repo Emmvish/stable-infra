@@ -61,7 +61,8 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
       ok: false,
       isRetryable: true,
       timestamp: new Date().toISOString(),
-      executionTime: 0
+      executionTime: 0,
+      statusCode: 0
     };
     const maxAttempts = attempts;
     let lastSuccessfulAttemptData: ResponseDataType = {} as ResponseDataType;
@@ -103,7 +104,8 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
             ? RESPONSE_ERRORS.HTTP_ERROR
             : RESPONSE_ERRORS.INVALID_CONTENT,
           isRetryable: res.isRetryable,
-          executionTime: res.executionTime
+          executionTime: res.executionTime,
+          statusCode: res.statusCode
         };
         try {
           await safelyExecuteUnknownFunction(
@@ -124,7 +126,8 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
           attempt: `${currentAttempt}/${maxAttempts}`,
           timestamp: res.timestamp,
           data: res?.data,
-          executionTime: res.executionTime
+          executionTime: res.executionTime,
+          statusCode: res.statusCode
         };
         try {
           await safelyExecuteUnknownFunction(
