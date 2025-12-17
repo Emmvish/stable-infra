@@ -75,6 +75,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
         try {
           performNextAttempt = !(await safelyExecuteUnknownFunction(
             responseAnalyzer,
+            reqData,
             res?.data,
             trialMode
           ));
