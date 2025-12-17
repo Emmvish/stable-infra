@@ -926,7 +926,7 @@ console.log(user.id);
 
 MIT © Manish Varma
 
-[![npm version](https://img.shields.io/npm/v/stable-request.svg)](https://www.npmjs.com/package/stable-request)
+[![npm version](https://img.shields.io/npm/v/stable-request.svg)](https://www.npmjs.com/package/@mv/stable-request)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
