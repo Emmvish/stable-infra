@@ -16,7 +16,7 @@ Most HTTP client libraries only retry on network failures or specific HTTP statu
 ## Installation
 
 ```bash
-npm install stable-request
+npm install @mv/stable-request
 ```
 
 ## Quick Start
