@@ -41,5 +41,10 @@
   },
   "dependencies": {
     "axios": "^1.12.2"
+  },
+  "repository": "github:Emmvish/stable-request",
+  "homepage": "https://github.com/Emmvish/stable-request#readme",
+  "bugs": {
+    "url": "https://github.com/Emmvish/stable-request/issues"
   }
 }
