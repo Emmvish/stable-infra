@@ -33,6 +33,7 @@ export {
     delay,
     executeConcurrently,
     executeSequentially,
+    extractCommonRequestConfigOptions,
     generateAxiosRequestConfig,
     getNewDelayTime,
     isRetryableError,

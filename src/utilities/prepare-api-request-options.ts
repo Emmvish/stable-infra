@@ -5,26 +5,43 @@ import {
     STABLE_REQUEST
 } from "../types/index.js";
 
+type OptionMapping = {
+    localKey: string;
+    commonKey: string;
+    targetKey: string;
+};
+
+const OPTION_MAPPINGS: OptionMapping[] = [
+    { localKey: 'resReq', commonKey: 'commonResReq', targetKey: 'resReq' },
+    { localKey: 'attempts', commonKey: 'commonAttempts', targetKey: 'attempts' },
+    { localKey: 'performAllAttempts', commonKey: 'commonPerformAllAttempts', targetKey: 'performAllAttempts' },
+    { localKey: 'wait', commonKey: 'commonWait', targetKey: 'wait' },
+    { localKey: 'retryStrategy', commonKey: 'commonRetryStrategy', targetKey: 'retryStrategy' },
+    { localKey: 'logAllErrors', commonKey: 'commonLogAllErrors', targetKey: 'logAllErrors' },
+    { localKey: 'logAllSuccessfulAttempts', commonKey: 'commonLogAllSuccessfulAttempts', targetKey: 'logAllSuccessfulAttempts' },
+    { localKey: 'maxSerializableChars', commonKey: 'commonMaxSerializableChars', targetKey: 'maxSerializableChars' },
+    { localKey: 'trialMode', commonKey: 'commonTrialMode', targetKey: 'trialMode' },
+    { localKey: 'responseAnalyzer', commonKey: 'commonResponseAnalyzer', targetKey: 'responseAnalyzer' },
+    { localKey: 'handleErrors', commonKey: 'commonHandleErrors', targetKey: 'handleErrors' },
+    { localKey: 'handleSuccessfulAttemptData', commonKey: 'commonHandleSuccessfulAttemptData', targetKey: 'handleSuccessfulAttemptData' },
+    { localKey: 'finalErrorAnalyzer', commonKey: 'commonFinalErrorAnalyzer', targetKey: 'finalErrorAnalyzer' },
+];
+
 export function prepareApiRequestOptions<RequestDataType = any, ResponseDataType = any>(
     request: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>,
     commonRequestExecutionOptions: CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType> | 
                                 SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>
 ): Omit<STABLE_REQUEST<RequestDataType, ResponseDataType>, 'reqData'> {
     const { requestOptions: localOptions } = request;
+    const result: Record<string, any> = {};
 
-    return {
-        ...(localOptions.hasOwnProperty('resReq') ? { resReq: localOptions.resReq } : { resReq: commonRequestExecutionOptions.commonResReq }),
-        ...(localOptions.hasOwnProperty('attempts') ? { attempts: localOptions.attempts } : { attempts: commonRequestExecutionOptions.commonAttempts }),
-        ...(localOptions.hasOwnProperty('performAllAttempts') ? { performAllAttempts: localOptions.performAllAttempts } : { performAllAttempts: commonRequestExecutionOptions.commonPerformAllAttempts }),
-        ...(localOptions.hasOwnProperty('wait') ? { wait: localOptions.wait } : { wait: commonRequestExecutionOptions.commonWait }),
-        ...(localOptions.hasOwnProperty('retryStrategy') ? { retryStrategy: localOptions.retryStrategy } : { retryStrategy: commonRequestExecutionOptions.commonRetryStrategy }),
-        ...(localOptions.hasOwnProperty('logAllErrors') ? { logAllErrors: localOptions.logAllErrors } : { logAllErrors: commonRequestExecutionOptions.commonLogAllErrors }),
-        ...(localOptions.hasOwnProperty('logAllSuccessfulAttempts') ? { logAllSuccessfulAttempts: localOptions.logAllSuccessfulAttempts } : { logAllSuccessfulAttempts: commonRequestExecutionOptions.commonLogAllSuccessfulAttempts }),
-        ...(localOptions.hasOwnProperty('maxSerializableChars') ? { maxSerializableChars: localOptions.maxSerializableChars } : { maxSerializableChars: commonRequestExecutionOptions.commonMaxSerializableChars }),
-        ...(localOptions.hasOwnProperty('trialMode') ? { trialMode: localOptions.trialMode } : { trialMode: commonRequestExecutionOptions.commonTrialMode }),
-        ...(localOptions.hasOwnProperty('responseAnalyzer') ? { responseAnalyzer: localOptions.responseAnalyzer } : { responseAnalyzer: commonRequestExecutionOptions.commonResponseAnalyzer }),
-        ...(localOptions.hasOwnProperty('handleErrors') ? { handleErrors: localOptions.handleErrors } : { handleErrors: commonRequestExecutionOptions.commonHandleErrors }),
-        ...(localOptions.hasOwnProperty('handleSuccessfulAttemptData') ? { handleSuccessfulAttemptData: localOptions.handleSuccessfulAttemptData } : { handleSuccessfulAttemptData: commonRequestExecutionOptions.commonHandleSuccessfulAttemptData }),
-        ...(localOptions.hasOwnProperty('finalErrorAnalyzer') ? { finalErrorAnalyzer: localOptions.finalErrorAnalyzer } : { finalErrorAnalyzer: commonRequestExecutionOptions.commonFinalErrorAnalyzer }),
-    };
+    for (const mapping of OPTION_MAPPINGS) {
+        if (localOptions.hasOwnProperty(mapping.localKey)) {
+            result[mapping.targetKey] = (localOptions as any)[mapping.localKey];
+        } else if (commonRequestExecutionOptions.hasOwnProperty(mapping.commonKey)) {
+            result[mapping.targetKey] = (commonRequestExecutionOptions as any)[mapping.commonKey];
+        }
+    }
+
+    return result as Omit<STABLE_REQUEST<RequestDataType, ResponseDataType>, 'reqData'>;
 }
