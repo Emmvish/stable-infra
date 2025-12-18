@@ -112,9 +112,6 @@ const requests = [
     id: 'create-user-1',
     requestOptions: {
       reqData: {
-        hostname: 'api.example.com',
-        path: '/users',
-        method: REQUEST_METHODS.POST,
         body: { name: 'John Doe', email: 'john@example.com' }
       }
     }
@@ -123,9 +120,6 @@ const requests = [
     id: 'create-user-2',
     requestOptions: {
       reqData: {
-        hostname: 'api.example.com',
-        path: '/users',
-        method: REQUEST_METHODS.POST,
         body: { name: 'Jane Smith', email: 'jane@example.com' }
       }
     }
@@ -134,6 +128,11 @@ const requests = [
 
 const results = await stableApiGateway(requests, {
   concurrentExecution: true,
+  commonRequestData: {
+    hostname: 'api.example.com',
+    path: '/users',
+    method: REQUEST_METHODS.POST
+  },
   commonResReq: true,
   commonAttempts: 3,
   commonWait: 1000,
@@ -582,7 +581,6 @@ const healthChecks = services.map(service => ({
   requestOptions: {
     reqData: {
       hostname: `${service}.internal.example.com`,
-      path: '/health'
     },
     resReq: true,
     attempts: 3,
@@ -592,6 +590,9 @@ const healthChecks = services.map(service => ({
 
 const results = await stableApiGateway(healthChecks, {
   concurrentExecution: true,
+  commonRequestData: {
+    path: '/health'
+  },
   commonRetryStrategy: RETRY_STRATEGIES.LINEAR
 });
 
@@ -638,9 +639,6 @@ const migrationRequests = records.map((record, index) => ({
   id: `migrate-${record.id}`,
   requestOptions: {
     reqData: {
-      hostname: 'new-system.example.com',
-      path: '/import',
-      method: REQUEST_METHODS.POST,
       body: record
     },
     resReq: true,
@@ -655,6 +653,11 @@ const migrationRequests = records.map((record, index) => ({
 
 const results = await stableApiGateway(migrationRequests, {
   concurrentExecution: true,
+  commonRequestData: {
+      hostname: 'new-system.example.com',
+      path: '/import',
+      method: REQUEST_METHODS.POST,
+  }
   commonAttempts: 3,
   commonWait: 1000,
   commonRetryStrategy: RETRY_STRATEGIES.LINEAR,
@@ -707,10 +710,7 @@ const workflowSteps = [
     id: 'step-1-init',
     requestOptions: {
       reqData: {
-        hostname: 'workflow.example.com',
         path: '/init',
-        method: REQUEST_METHODS.POST,
-        body: { workflowId: 'wf-123' }
       },
       resReq: true
     }
@@ -719,10 +719,7 @@ const workflowSteps = [
     id: 'step-2-process',
     requestOptions: {
       reqData: {
-        hostname: 'workflow.example.com',
         path: '/process',
-        method: REQUEST_METHODS.POST,
-        body: { workflowId: 'wf-123' }
       },
       resReq: true,
       responseAnalyzer: async (reqConfig, data) => {
@@ -734,10 +731,7 @@ const workflowSteps = [
     id: 'step-3-finalize',
     requestOptions: {
       reqData: {
-        hostname: 'workflow.example.com',
         path: '/finalize',
-        method: REQUEST_METHODS.POST,
-        body: { workflowId: 'wf-123' }
       },
       resReq: true
     }
@@ -747,6 +741,11 @@ const workflowSteps = [
 const results = await stableApiGateway(workflowSteps, {
   concurrentExecution: false, // Execute sequentially
   stopOnFirstError: true,     // Stop if any step fails
+  commonRequestData: {
+    hostname: 'workflow.example.com',
+    method: REQUEST_METHODS.POST,
+    body: { workflowId: 'wf-123' }
+  }
   commonAttempts: 5,
   commonWait: 2000,
   commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
