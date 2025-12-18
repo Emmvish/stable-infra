@@ -1,5 +1,5 @@
 export { stableRequest, stableApiGateway } from './core/index.js';
 export { INVALID_AXIOS_RESPONSES, REQUEST_METHODS, RESPONSE_ERRORS, RETRY_STRATEGIES, VALID_REQUEST_PROTOCOLS } from './enums/index.js';
 export type { API_GATEWAY_OPTIONS, API_GATEWAY_REQUEST, API_GATEWAY_REQUEST_OPTIONS_TYPE, API_GATEWAY_RESPONSE, CONCURRENT_REQUEST_EXECUTION_OPTIONS, ERROR_LOG, ReqFnResponse, REQUEST_DATA, REQUEST_METHOD_TYPES, RETRY_STRATEGY_TYPES, SEQUENTIAL_REQUEST_EXECUTION_OPTIONS, STABLE_REQUEST, SUCCESSFUL_ATTEMPT_DATA, VALID_REQUEST_PROTOCOL_TYPES, TRIAL_MODE_OPTIONS } from './types/index.js';
-export { delay, executeConcurrently, executeSequentially, generateAxiosRequestConfig, getNewDelayTime, isRetryableError, prepareApiRequestOptions, reqFn, safelyExecuteUnknownFunction, safelyStringify, validateTrialModeProbabilities } from './utilities/index.js';
+export { delay, executeConcurrently, executeSequentially, extractCommonRequestConfigOptions, generateAxiosRequestConfig, getNewDelayTime, isRetryableError, prepareApiRequestOptions, reqFn, safelyExecuteUnknownFunction, safelyStringify, validateTrialModeProbabilities } from './utilities/index.js';
 //# sourceMappingURL=index.d.ts.map

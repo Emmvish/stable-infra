@@ -1,6 +1,7 @@
 export { delay } from './delay.js';
 export { executeConcurrently } from './execute-concurrently.js';
 export { executeSequentially } from './execute-sequentially.js';
+export { extractCommonRequestConfigOptions } from './extract-common-request-config-options.js';
 export { generateAxiosRequestConfig } from './generate-axios-request-config.js';
 export { getNewDelayTime } from './get-new-delay-time.js';
 export { isRetryableError } from './is-retryable-error.js';
