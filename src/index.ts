@@ -37,6 +37,7 @@ export {
     generateAxiosRequestConfig,
     getNewDelayTime,
     isRetryableError,
+    prepareApiRequestData,
     prepareApiRequestOptions,
     reqFn,
     safelyExecuteUnknownFunction,
