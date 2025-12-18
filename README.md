@@ -49,14 +49,14 @@ const requests = [
   {
     id: 'user-1',
     requestOptions: {
-      reqData: { hostname: 'api.example.com', path: '/users/1' },
+      reqData: { path: '/users/1' },
       resReq: true
     }
   },
   {
     id: 'user-2',
     requestOptions: {
-      reqData: { hostname: 'api.example.com', path: '/users/2' },
+      reqData: { path: '/users/2' },
       resReq: true
     }
   }
@@ -65,7 +65,8 @@ const requests = [
 const results = await stableApiGateway(requests, {
   concurrentExecution: true,
   commonAttempts: 3,
-  commonWait: 1000
+  commonWait: 1000,
+  commonRequestData: { hostname: 'api.example.com' }
 });
 ```
 
@@ -417,13 +418,15 @@ Execute multiple HTTP requests with shared configuration.
 | `commonFinalErrorAnalyzer` | `function` | `() => false` | Default final error analyzer for all requests |
 | `commonHandleErrors` | `function` | console.log | Default error handler for all requests |
 | `commonHandleSuccessfulAttemptData` | `function` | console.log | Default success handler for all requests |
+| `commonRequestData` | `Partial REQUEST_DATA` | { hostname: '' } | Common set of axios options for each request |
+
 
 #### Request Format
 
 ```typescript
 interface API_GATEWAY_REQUEST<RequestDataType, ResponseDataType> {
   id: string;                          // Unique identifier for the request
-  requestOptions: STABLE_REQUEST<RequestDataType, ResponseDataType>;
+  requestOptions: API_GATEWAY_REQUEST_OPTIONS_TYPE<RequestDataType, ResponseDataType>;
 }
 ```
 
@@ -519,9 +522,6 @@ const requests = users.map((user, index) => ({
   id: `create-user-${index}`,
   requestOptions: {
     reqData: {
-      hostname: 'api.example.com',
-      path: '/users',
-      method: REQUEST_METHODS.POST,
       body: user
     },
     resReq: true
@@ -536,6 +536,11 @@ const results = await stableApiGateway(requests, {
   commonLogAllErrors: true,
   commonHandleErrors: async (reqConfig, error) => {
     console.log(`Failed to create user: ${error.error}`);
+  },
+  commonRequestData: {
+      hostname: 'api.example.com',
+      path: '/users',
+      method: REQUEST_METHODS.POST
   }
 });
 
