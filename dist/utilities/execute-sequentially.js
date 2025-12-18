@@ -1,11 +1,12 @@
 import { stableRequest } from "../core/index.js";
-import { prepareApiRequestOptions } from './index.js';
+import { prepareApiRequestData } from "./prepare-api-request-data.js";
+import { prepareApiRequestOptions } from './prepare-api-request-options.js';
 export async function executeSequentially(requests = [], requestExecutionOptions = {}) {
     const responses = [];
     for (const req of requests) {
         try {
             const finalRequestOptions = {
-                reqData: req.requestOptions.reqData,
+                reqData: prepareApiRequestData(req, requestExecutionOptions),
                 ...prepareApiRequestOptions(req, requestExecutionOptions)
             };
             const res = await stableRequest(finalRequestOptions);

@@ -6,6 +6,7 @@ export async function stableApiGateway(requests = [], options = {}) {
     }
     const requestExecutionOptions = {
         stopOnFirstError,
+        ...(options.hasOwnProperty('commonRequestData') && { commonRequestData: options.commonRequestData }),
         ...(options.hasOwnProperty('commonResponseAnalyzer') && { commonResponseAnalyzer: options.commonResponseAnalyzer }),
         ...(options.hasOwnProperty('commonHandleErrors') && { commonHandleErrors: options.commonHandleErrors }),
         ...(options.hasOwnProperty('commonHandleSuccessfulAttemptData') && { commonHandleSuccessfulAttemptData: options.commonHandleSuccessfulAttemptData }),

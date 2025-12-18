@@ -1,11 +1,12 @@
 import { stableRequest } from "../core/index.js";
+import { prepareApiRequestData } from "./prepare-api-request-data.js";
 import { prepareApiRequestOptions } from "./prepare-api-request-options.js";
 export async function executeConcurrently(requests = [], requestExecutionOptions = {}) {
     const responses = [];
     const stableRequests = [];
     for (const req of requests) {
         const finalRequestOptions = {
-            reqData: req.requestOptions.reqData,
+            reqData: prepareApiRequestData(req, requestExecutionOptions),
             ...prepareApiRequestOptions(req, requestExecutionOptions)
         };
         stableRequests.push(stableRequest(finalRequestOptions));
