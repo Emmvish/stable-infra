@@ -1,7 +1,7 @@
 {
   "name": "@emmvish/stable-request",
-  "version": "1.0.2",
-  "description": "Robust request wrapper with configurable retry strategies & full observability. Also comes with API Gateway functionality to send multiple customized STABLE requests.",
+  "version": "1.0.3",
+  "description": "stable-request is a TypeScript-first HTTP reliability framework that goes beyond status-code retries by validating response content, handling eventual consistency, coordinating batch workflows, and providing deep observability into every request attempt. It is designed for real-world distributed systems where HTTP success does not guarantee business success.",
   "type": "module",
   "main": "dist/index.js",
   "module": "./dist/index.js",
