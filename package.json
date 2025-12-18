@@ -1,6 +1,6 @@
 {
   "name": "@emmvish/stable-request",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Robust request wrapper with configurable retry strategies & full observability. Also comes with API Gateway functionality to send multiple customized STABLE requests.",
   "type": "module",
   "main": "dist/index.js",
@@ -15,22 +15,28 @@
     "prepublishOnly": "npm run build"
   },
   "keywords": [
+    "stable-request",
+    "request",
+    "request-retry",
+    "retry",
+    "http",
+    "http-request",
+    "apis",
+    "api-integrations",
+    "unstable-apis",
+    "http-client",
+    "client",
+    "timeout",
+    "observability",
+    "circuit-breaker",
+    "api-gateway",
+    "workflows",
+    "stable",
+    "reliable",
     "axios",
     "axios-wrapper",
     "axios-retry",
-    "request",
-    "request-retry",
-    "request-wrapper",
-    "http-requests",
-    "api-gateway",
-    "stable-request",
-    "unstable-api",
-    "stable",
-    "robust",
-    "versatile",
-    "retry",
-    "typescript",
-    "http-client"
+    "typescript"
   ],
   "author": "Manish Varma",
   "license": "MIT",
@@ -46,5 +52,9 @@
   "homepage": "https://github.com/Emmvish/stable-request#readme",
   "bugs": {
     "url": "https://github.com/Emmvish/stable-request/issues"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=16"
   }
 }
