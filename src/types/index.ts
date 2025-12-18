@@ -8,6 +8,7 @@ import {
 } from '../enums/index.js';
 
 export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any> {
+  commonRequestData?: Partial<REQUEST_DATA<RequestDataType>>;
   commonAttempts?: number;
   commonPerformAllAttempts?: boolean;
   commonWait?: number;
@@ -33,9 +34,11 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
   stopOnFirstError?: boolean;
 }
 
+export type API_GATEWAY_REQUEST_OPTIONS_TYPE<RequestDataType, ResponseDataType> = Omit<STABLE_REQUEST<RequestDataType, ResponseDataType>, 'reqData'> & Partial<Pick<STABLE_REQUEST<RequestDataType, ResponseDataType>, 'reqData'>>;
+
 export interface API_GATEWAY_REQUEST<RequestDataType = any, ResponseDataType = any> {
   id: string;
-  requestOptions: STABLE_REQUEST<RequestDataType, ResponseDataType>;
+  requestOptions: API_GATEWAY_REQUEST_OPTIONS_TYPE<RequestDataType, ResponseDataType>;
 }
 
 export interface API_GATEWAY_RESPONSE<ResponseDataType = any> {

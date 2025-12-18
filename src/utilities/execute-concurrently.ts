@@ -4,6 +4,7 @@ import {
     API_GATEWAY_RESPONSE ,
     CONCURRENT_REQUEST_EXECUTION_OPTIONS
 } from '../types/index.js';
+import { prepareApiRequestData } from "./prepare-api-request-data.js";
 import { prepareApiRequestOptions } from "./prepare-api-request-options.js";
 
 export async function executeConcurrently<RequestDataType = any, ResponseDataType = any>(
@@ -14,7 +15,7 @@ export async function executeConcurrently<RequestDataType = any, ResponseDataTyp
     const stableRequests: Promise<boolean | ResponseDataType>[] = [];
     for (const req of requests) {
         const finalRequestOptions = { 
-            reqData: req.requestOptions.reqData,
+            reqData: prepareApiRequestData<RequestDataType, ResponseDataType>(req, requestExecutionOptions),
             ...prepareApiRequestOptions<RequestDataType, ResponseDataType>(req, requestExecutionOptions) 
         };
         stableRequests.push(stableRequest<RequestDataType, ResponseDataType>(finalRequestOptions));

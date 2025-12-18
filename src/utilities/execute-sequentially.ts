@@ -1,5 +1,6 @@
 import { stableRequest } from "../core/index.js";
-import { prepareApiRequestOptions } from './index.js';
+import { prepareApiRequestData } from "./prepare-api-request-data.js";
+import { prepareApiRequestOptions } from './prepare-api-request-options.js';
 import {
     API_GATEWAY_REQUEST,
     API_GATEWAY_RESPONSE,
@@ -14,7 +15,7 @@ export async function executeSequentially<RequestDataType = any, ResponseDataTyp
     for (const req of requests) {
         try {
             const finalRequestOptions = { 
-                reqData: req.requestOptions.reqData,
+                reqData: prepareApiRequestData<RequestDataType, ResponseDataType>(req, requestExecutionOptions),
                 ...prepareApiRequestOptions<RequestDataType, ResponseDataType>(req, requestExecutionOptions) 
             };
             const res = await stableRequest<RequestDataType, ResponseDataType>(finalRequestOptions);
