@@ -1,4 +1,4 @@
-## @mv/stable-request
+## @emmvish/stable-request
 
 A robust HTTP request wrapper built on top of Axios with intelligent retry strategies, content validation, batch processing, and comprehensive observability features.
 
@@ -16,7 +16,7 @@ Most HTTP client libraries only retry on network failures or specific HTTP statu
 ## Installation
 
 ```bash
-npm install @mv/stable-request
+npm install @emmvish/stable-request
 ```
 
 ## Quick Start
@@ -24,7 +24,7 @@ npm install @mv/stable-request
 ### Single Request
 
 ```typescript
-import { stableRequest, REQUEST_METHODS, RETRY_STRATEGIES } from '@mv/stable-request';
+import { stableRequest, REQUEST_METHODS, RETRY_STRATEGIES } from '@emmvish/stable-request';
 
 // Simple GET request with automatic retries
 const response = await stableRequest({
@@ -43,7 +43,7 @@ const response = await stableRequest({
 ### Batch Requests
 
 ```typescript
-import { stableApiGateway } from '@mv/stable-request';
+import { stableApiGateway } from '@emmvish/stable-request';
 
 const requests = [
   {
@@ -104,7 +104,7 @@ Process multiple requests efficiently with shared configuration and execution st
 #### Concurrent Execution
 
 ```typescript
-import { stableApiGateway, RETRY_STRATEGIES, REQUEST_METHODS } from '@mv/stable-request';
+import { stableApiGateway, RETRY_STRATEGIES, REQUEST_METHODS } from '@emmvish/stable-request';
 
 const requests = [
   {
@@ -191,7 +191,7 @@ await stableRequest({
 Choose the backoff strategy that fits your use case.
 
 ```typescript
-import { stableRequest, RETRY_STRATEGIES } from '@mv/stable-request';
+import { stableRequest, RETRY_STRATEGIES } from '@emmvish/stable-request';
 
 // Fixed delay: 1s, 1s, 1s, 1s...
 await stableRequest({
@@ -926,7 +926,7 @@ console.log(user.id);
 
 MIT © Manish Varma
 
-[![npm version](https://img.shields.io/npm/v/stable-request.svg)](https://www.npmjs.com/package/@mv/stable-request)
+[![npm version](https://img.shields.io/npm/v/stable-request.svg)](https://www.npmjs.com/package/@emmvish/stable-request)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
