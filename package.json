@@ -1,5 +1,5 @@
 {
-  "name": "@mv/stable-request",
+  "name": "@emmvish/stable-request",
   "version": "1.0.0",
   "description": "Robust request wrapper with configurable retry strategies & full observability. Also comes with API Gateway functionality to send multiple customized STABLE requests.",
   "type": "module",
