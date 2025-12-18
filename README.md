@@ -1,6 +1,6 @@
 ## stable-request
 
-A robust HTTP request wrapper built on top of Axios with intelligent retry strategies, content validation, batch processing, and comprehensive observability features.
+`stable-request` is a TypeScript-first HTTP reliability framework that goes beyond status-code retries by validating response content, handling eventual consistency, coordinating batch workflows, and providing deep observability into every request attempt. It is designed for real-world distributed systems where HTTP success does not guarantee business success.
 
 ## Why stable-request?
 
