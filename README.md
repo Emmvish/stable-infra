@@ -1,6 +1,6 @@
 ## stable-request
 
-`stable-request` is a TypeScript-first HTTP reliability framework that goes beyond status-code retries by validating response content, handling eventual consistency, coordinating batch workflows with intelligent grouping, and providing deep observability into every request attempt. It is designed for real-world distributed systems where HTTP success does not guarantee business success.
+`stable-request` is a TypeScript-first HTTP reliability toolkit for workflow-driven API integrations, that goes beyond status-code retries by validating response content, handling eventual consistency, coordinating batch workflows with intelligent grouping, and providing deep observability into every request attempt. It is designed for real-world distributed systems where HTTP success does not guarantee business success.
 
 ## Why stable-request?
 
