@@ -1,7 +1,7 @@
 {
   "name": "@emmvish/stable-request",
-  "version": "1.0.9",
-  "description": "stable-request is a TypeScript-first HTTP reliability framework that goes beyond status-code retries by validating response content, handling eventual consistency, coordinating batch workflows, and providing deep observability into every request attempt. It is designed for real-world distributed systems where HTTP success does not guarantee business success.",
+  "version": "1.1.0",
+  "description": "stable-request is a TypeScript-first HTTP reliability framework that goes beyond status-code retries by validating response content, handling eventual consistency, coordinating batch workflows, and providing deep observability into every request attempt. It is designed for real-world distributed systems where HTTP success does not guarantee business success. It also provides extensive support for managing multiple requests so as to achieve workflow automation.",
   "type": "module",
   "main": "dist/index.js",
   "module": "./dist/index.js",
@@ -31,6 +31,7 @@
     "circuit-breaker",
     "api-gateway",
     "workflows",
+    "request-groups",
     "stable",
     "reliable",
     "axios",
