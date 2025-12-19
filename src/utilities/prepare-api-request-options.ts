@@ -1,3 +1,5 @@
+import { PrepareApiRequestOptionsMapping } from "../constants/index.js";
+
 import { 
     API_GATEWAY_REQUEST,
     CONCURRENT_REQUEST_EXECUTION_OPTIONS,
@@ -5,27 +7,6 @@ import {
     STABLE_REQUEST
 } from "../types/index.js";
 
-type OptionMapping = {
-    localKey: string;
-    commonKey: string;
-    targetKey: string;
-};
-
-const OPTION_MAPPINGS: OptionMapping[] = [
-    { localKey: 'resReq', commonKey: 'commonResReq', targetKey: 'resReq' },
-    { localKey: 'attempts', commonKey: 'commonAttempts', targetKey: 'attempts' },
-    { localKey: 'performAllAttempts', commonKey: 'commonPerformAllAttempts', targetKey: 'performAllAttempts' },
-    { localKey: 'wait', commonKey: 'commonWait', targetKey: 'wait' },
-    { localKey: 'retryStrategy', commonKey: 'commonRetryStrategy', targetKey: 'retryStrategy' },
-    { localKey: 'logAllErrors', commonKey: 'commonLogAllErrors', targetKey: 'logAllErrors' },
-    { localKey: 'logAllSuccessfulAttempts', commonKey: 'commonLogAllSuccessfulAttempts', targetKey: 'logAllSuccessfulAttempts' },
-    { localKey: 'maxSerializableChars', commonKey: 'commonMaxSerializableChars', targetKey: 'maxSerializableChars' },
-    { localKey: 'trialMode', commonKey: 'commonTrialMode', targetKey: 'trialMode' },
-    { localKey: 'responseAnalyzer', commonKey: 'commonResponseAnalyzer', targetKey: 'responseAnalyzer' },
-    { localKey: 'handleErrors', commonKey: 'commonHandleErrors', targetKey: 'handleErrors' },
-    { localKey: 'handleSuccessfulAttemptData', commonKey: 'commonHandleSuccessfulAttemptData', targetKey: 'handleSuccessfulAttemptData' },
-    { localKey: 'finalErrorAnalyzer', commonKey: 'commonFinalErrorAnalyzer', targetKey: 'finalErrorAnalyzer' },
-];
 
 export function prepareApiRequestOptions<RequestDataType = any, ResponseDataType = any>(
     request: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>,
@@ -33,11 +14,14 @@ export function prepareApiRequestOptions<RequestDataType = any, ResponseDataType
                                 SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>
 ): Omit<STABLE_REQUEST<RequestDataType, ResponseDataType>, 'reqData'> {
     const { requestOptions: localOptions } = request;
-    const result: Record<string, any> = {};
+    const reqGroup = request.groupId ? commonRequestExecutionOptions.requestGroups?.find(group => group.id === request.groupId) : undefined;
+    const result: Record<string, Omit<STABLE_REQUEST<RequestDataType, ResponseDataType>, 'reqData'>> = {};
 
-    for (const mapping of OPTION_MAPPINGS) {
+    for (const mapping of PrepareApiRequestOptionsMapping) {
         if (localOptions.hasOwnProperty(mapping.localKey)) {
             result[mapping.targetKey] = (localOptions as any)[mapping.localKey];
+        } else if(reqGroup && (reqGroup).hasOwnProperty(mapping.groupCommonKey)) {
+            result[mapping.targetKey] = (reqGroup?.commonConfig as any)[mapping.groupCommonKey];
         } else if (commonRequestExecutionOptions.hasOwnProperty(mapping.commonKey)) {
             result[mapping.targetKey] = (commonRequestExecutionOptions as any)[mapping.commonKey];
         }

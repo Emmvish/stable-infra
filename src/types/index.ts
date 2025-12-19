@@ -31,6 +31,7 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
     maxSerializableChars?: number
   ) => any | Promise<any>;
   concurrentExecution?: boolean;
+  requestGroups?: RequestGroup[];
   stopOnFirstError?: boolean;
 }
 
@@ -38,15 +39,24 @@ export type API_GATEWAY_REQUEST_OPTIONS_TYPE<RequestDataType, ResponseDataType> 
 
 export interface API_GATEWAY_REQUEST<RequestDataType = any, ResponseDataType = any> {
   id: string;
+  groupId?: string;
   requestOptions: API_GATEWAY_REQUEST_OPTIONS_TYPE<RequestDataType, ResponseDataType>;
 }
 
 export interface API_GATEWAY_RESPONSE<ResponseDataType = any> {
-  id: string;
+  requestId: string;
+  groupId?: string;
   success: boolean;
   data?: ResponseDataType;
   error?: string;
 }
+
+export type ApiRequestOptionsMapping = {
+  localKey: string;
+  commonKey: string;
+  groupCommonKey: string;
+  targetKey: string;
+};
 
 export type CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, ResponseDataType = any> = Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, "concurrentExecution" | "stopOnFirstError">
 
@@ -58,6 +68,11 @@ export interface ERROR_LOG {
   error: string;
   type: RESPONSE_ERROR_TYPES;
   isRetryable: boolean;
+}
+
+export interface RequestGroup {
+  id: string;
+  commonConfig?: Omit<API_GATEWAY_OPTIONS, "concurrentExecution" | "stopOnFirstError">
 }
 
 export interface ReqFnResponse<ResponseDataType = any> {

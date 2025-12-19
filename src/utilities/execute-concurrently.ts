@@ -2,7 +2,7 @@ import { stableRequest } from "../core/index.js";
 import {
     API_GATEWAY_REQUEST,
     API_GATEWAY_RESPONSE ,
-    CONCURRENT_REQUEST_EXECUTION_OPTIONS
+    CONCURRENT_REQUEST_EXECUTION_OPTIONS,
 } from '../types/index.js';
 import { prepareApiRequestData } from "./prepare-api-request-data.js";
 import { prepareApiRequestOptions } from "./prepare-api-request-options.js";
@@ -27,14 +27,16 @@ export async function executeConcurrently<RequestDataType = any, ResponseDataTyp
         if(res.status === 'fulfilled') {
             const value = res.value;
             responses.push({
-                id: req.id,
+                requestId: req.id,
+                ...(req.groupId && { groupId: req.groupId }),
                 success: value ? true : false,
                 ...(value && { data: value as ResponseDataType }),
                 ...(!value && { error: 'Request was unsuccessful, but the error was analyzed successfully!' })
             });
         } else {
             responses.push({
-                id: req.id,
+                requestId: req.id,
+                ...(req.groupId && { groupId: req.groupId }),
                 success: false,
                 error: res.reason?.message || 'An error occurred! Error description is unavailable.'
             });

@@ -17,6 +17,7 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
     const {
         concurrentExecution = true,
         stopOnFirstError = false,
+        requestGroups = []
     } = options;
 
     if (!Array.isArray(requests) || requests.length === 0) {
@@ -25,6 +26,7 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
 
     const requestExecutionOptions: CONCURRENT_REQUEST_EXECUTION_OPTIONS | SEQUENTIAL_REQUEST_EXECUTION_OPTIONS = {
         stopOnFirstError,
+        requestGroups,
         ...extractCommonOptions<RequestDataType, ResponseDataType>(options)
     }
 

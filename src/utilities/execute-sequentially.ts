@@ -20,14 +20,16 @@ export async function executeSequentially<RequestDataType = any, ResponseDataTyp
             };
             const res = await stableRequest<RequestDataType, ResponseDataType>(finalRequestOptions);
             responses.push({
-                id: req.id,
+                requestId: req.id,
+                ...(req.groupId && { groupId: req.groupId }),
                 success: res ? true : false,
                 ...(res && { data: res as ResponseDataType }),
                 ...(!res && { error: 'Request was unsuccessful, but analyzed successfully!' })
             })
         } catch(e: any) {
             responses.push({
-                id: req.id,
+                requestId: req.id,
+                ...(req.groupId && { groupId: req.groupId }),
                 success: false,
                 error: e?.message || 'An error occurred! Error description is unavailable.'
             });
