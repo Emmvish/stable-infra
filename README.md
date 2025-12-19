@@ -1,18 +1,20 @@
 ## stable-request
 
-`stable-request` is a TypeScript-first HTTP reliability toolkit for workflow-driven API integrations, that goes beyond status-code retries by validating response content, handling eventual consistency, coordinating batch workflows with intelligent grouping, and providing deep observability into every request attempt. It is designed for real-world distributed systems where HTTP success does not guarantee business success.
+`stable-request` is a TypeScript-first HTTP reliability toolkit for workflow-driven API integrations, that goes beyond status-code retries by validating response content, handling eventual consistency, coordinating batch workflows with intelligent grouping, and providing deep observability into every request attempt. 
+
+It is designed for real-world distributed systems where HTTP success (200) does not guarantee business success.
 
 ## Why stable-request?
 
 Most HTTP client libraries only retry on network failures or specific HTTP status codes. **stable-request** goes further by providing:
 
-- ✅ **Content-aware retries** - Validate response content and retry even on successful HTTP responses
-- 🚀 **Batch processing with groups** - Execute multiple requests with hierarchical configuration (global → group → request)
-- 🎯 **Request grouping** - Organize related requests with shared settings and logical boundaries
-- 🧪 **Trial mode** - Simulate failures to test your retry logic without depending on real network instability
-- 📊 **Granular observability** - Monitor every attempt with detailed hooks
-- ⚡ **Multiple retry strategies** - Fixed, linear, or exponential backoff
-- 🔧 **Flexible error handling** - Custom error analysis and graceful degradation
+- ✅ **Content-aware Retries** - Validate response content and retry even on successful HTTP responses
+- 🚀 **Batch Processing** - Execute multiple requests with hierarchical configuration (global → group → request)
+- 🎯 **Request Groups** - Organize related requests with shared settings and logical boundaries
+- 🧪 **Trial Mode** - Simulate failures to test your retry logic without depending on real network instability
+- 📊 **Granular Observability** - Monitor every attempt with detailed hooks
+- ⚡ **Multiple Retry Strategies** - Fixed, linear, or exponential backoff
+- 🔧 **Flexible Error Handling** - Custom error analysis and graceful degradation
 
 ## Installation
 
@@ -22,26 +24,381 @@ npm install @emmvish/stable-request
 
 ## Quick Start
 
-### Single Request
+### 1. Basic Request (No Retries)
 
 ```typescript
-import { stableRequest, REQUEST_METHODS, RETRY_STRATEGIES } from '@emmvish/stable-request';
+import { stableRequest } from '@emmvish/stable-request';
 
-// Simple GET request with automatic retries
-const response = await stableRequest({
+const data = await stableRequest({
   reqData: {
     hostname: 'api.example.com',
-    path: '/users',
-    method: REQUEST_METHODS.GET
+    path: '/users/123'
+  },
+  resReq: true  // Return the response data
+});
+
+console.log(data); // { id: 123, name: 'John' }
+```
+
+### 2. Add Simple Retries
+
+```typescript
+import { stableRequest, RETRY_STRATEGIES } from '@emmvish/stable-request';
+
+const data = await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    path: '/users/123'
   },
   resReq: true,
-  attempts: 3,
-  wait: 1000,
-  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+  attempts: 3,              // Retry up to 3 times
+  wait: 1000,               // Wait 1 second between retries
+  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL  // 1s, 2s, 4s, 8s...
 });
 ```
 
-### Batch Requests
+**Retry Strategies:**
+- `RETRY_STRATEGIES.FIXED` - Same delay every time (1s, 1s, 1s...)
+- `RETRY_STRATEGIES.LINEAR` - Increasing delay (1s, 2s, 3s...)
+- `RETRY_STRATEGIES.EXPONENTIAL` - Exponential backoff (1s, 2s, 4s, 8s...)
+
+### 3. Validate Response Content (Content-Aware Retries)
+
+Sometimes an API returns HTTP 200 but the data isn't ready yet. Use `responseAnalyzer`:
+
+```typescript
+const data = await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    path: '/jobs/456/status'
+  },
+  resReq: true,
+  attempts: 10,
+  wait: 2000,
+  
+  // This hook validates the response content
+  responseAnalyzer: async ({ reqData, data, trialMode, params }) => {
+    // Return true if response is valid, false to retry
+    if (data.status === 'completed') {
+      return true;  // Success! Don't retry
+    }
+    
+    console.log(`Job still processing... (${data.percentComplete}%)`);
+    return false;  // Retry this request
+  }
+});
+
+console.log('Job completed:', data);
+```
+
+**Hook Signature:**
+```typescript
+responseAnalyzer?: (options: {
+  reqData: AxiosRequestConfig;     // Request configuration
+  data: ResponseDataType;           // Response data from API
+  trialMode?: TRIAL_MODE_OPTIONS;   // Trial mode settings (if enabled)
+  params?: any;                     // Custom parameters (via hookParams)
+}) => boolean | Promise<boolean>;
+```
+
+### 4. Monitor Errors (Observability)
+
+Track every failed attempt with `handleErrors`:
+
+```typescript
+const data = await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    path: '/data'
+  },
+  resReq: true,
+  attempts: 5,
+  logAllErrors: true,  // Enable error logging
+  
+  // This hook is called on every failed attempt
+  handleErrors: async ({ reqData, errorLog, maxSerializableChars }) => {
+    // Log to your monitoring service
+    await monitoring.logError({
+      url: reqData.url,
+      attempt: errorLog.attempt,        // e.g., "3/5"
+      error: errorLog.error,            // Error message
+      isRetryable: errorLog.isRetryable,  // Can we retry?
+      type: errorLog.type,              // 'HTTP_ERROR' or 'INVALID_CONTENT'
+      statusCode: errorLog.statusCode,  // HTTP status code
+      timestamp: errorLog.timestamp,    // ISO timestamp
+      executionTime: errorLog.executionTime  // ms
+    });
+  }
+});
+```
+
+**Hook Signature:**
+```typescript
+handleErrors?: (options: {
+  reqData: AxiosRequestConfig;       // Request configuration
+  errorLog: ERROR_LOG;               // Detailed error information
+  maxSerializableChars?: number;     // Max chars for stringification
+}) => any | Promise<any>;
+```
+
+**ERROR_LOG Structure:**
+```typescript
+interface ERROR_LOG {
+  timestamp: string;        // ISO timestamp
+  executionTime: number;    // Request duration in ms
+  statusCode: number;       // HTTP status code (0 if network error)
+  attempt: string;          // e.g., "3/5"
+  error: string;            // Error message
+  type: 'HTTP_ERROR' | 'INVALID_CONTENT';
+  isRetryable: boolean;     // Can this error be retried?
+}
+```
+
+### 5. Monitor Successful Attempts
+
+Track successful requests with `handleSuccessfulAttemptData`:
+
+```typescript
+const data = await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    path: '/data'
+  },
+  resReq: true,
+  attempts: 3,
+  logAllSuccessfulAttempts: true,  // Enable success logging
+  
+  // This hook is called on every successful attempt
+  handleSuccessfulAttemptData: async ({ reqData, successfulAttemptData, maxSerializableChars }) => {
+    // Track metrics
+    await analytics.track('api_success', {
+      url: reqData.url,
+      attempt: successfulAttemptData.attempt,  // e.g., "2/3"
+      duration: successfulAttemptData.executionTime,  // ms
+      statusCode: successfulAttemptData.statusCode,   // 200, 201, etc.
+      timestamp: successfulAttemptData.timestamp
+    });
+  }
+});
+```
+
+**Hook Signature:**
+```typescript
+handleSuccessfulAttemptData?: (options: {
+  reqData: AxiosRequestConfig;              // Request configuration
+  successfulAttemptData: SUCCESSFUL_ATTEMPT_DATA;  // Success details
+  maxSerializableChars?: number;            // Max chars for stringification
+}) => any | Promise<any>;
+```
+
+**SUCCESSFUL_ATTEMPT_DATA Structure:**
+```typescript
+interface SUCCESSFUL_ATTEMPT_DATA<ResponseDataType> {
+  attempt: string;          // e.g., "2/3"
+  timestamp: string;        // ISO timestamp
+  executionTime: number;    // Request duration in ms
+  data: ResponseDataType;   // Response data
+  statusCode: number;       // HTTP status code
+}
+```
+
+### 6. Handle Final Errors Gracefully
+
+Decide what to do when all retries fail using `finalErrorAnalyzer`:
+
+```typescript
+const data = await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    path: '/optional-feature'
+  },
+  resReq: true,
+  attempts: 3,
+  
+  // This hook is called when all retries are exhausted
+  finalErrorAnalyzer: async ({ reqData, error, trialMode, params }) => {
+    // Check if this is a non-critical error
+    if (error.message.includes('404')) {
+      console.log('Feature not available, continuing without it');
+      return true;  // Suppress error, return false instead of throwing
+    }
+    
+    // For critical errors
+    await alerting.sendAlert('Critical API failure', error);
+    return false;  // Throw the error
+  }
+});
+
+if (data === false) {
+  console.log('Optional feature unavailable, using default');
+}
+```
+
+**Hook Signature:**
+```typescript
+finalErrorAnalyzer?: (options: {
+  reqData: AxiosRequestConfig;     // Request configuration
+  error: any;                      // The final error object
+  trialMode?: TRIAL_MODE_OPTIONS;  // Trial mode settings (if enabled)
+  params?: any;                    // Custom parameters (via hookParams)
+}) => boolean | Promise<boolean>;
+```
+
+**Return value:**
+- `true` - Suppress the error, function returns `false` instead of throwing
+- `false` - Throw the error
+
+### 7. Pass Custom Parameters to Hooks
+
+You can pass custom data to `responseAnalyzer` and `finalErrorAnalyzer`:
+
+```typescript
+const expectedVersion = 42;
+
+const data = await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    path: '/data'
+  },
+  resReq: true,
+  attempts: 5,
+  
+  // Pass custom parameters
+  hookParams: {
+    responseAnalyzerParams: { expectedVersion, minItems: 10 },
+    finalErrorAnalyzerParams: { alertTeam: true }
+  },
+  
+  responseAnalyzer: async ({ data, params }) => {
+    // Access custom parameters
+    return data.version >= params.expectedVersion && 
+           data.items.length >= params.minItems;
+  },
+  
+  finalErrorAnalyzer: async ({ error, params }) => {
+    if (params.alertTeam) {
+      await pagerDuty.alert('API failure', error);
+    }
+    return false;
+  }
+});
+```
+
+## Intermediate Concepts
+
+### Making POST/PUT/PATCH Requests
+
+```typescript
+import { stableRequest, REQUEST_METHODS } from '@emmvish/stable-request';
+
+const newUser = await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    path: '/users',
+    method: REQUEST_METHODS.POST,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer your-token'
+    },
+    body: {
+      name: 'John Doe',
+      email: 'john@example.com'
+    }
+  },
+  resReq: true,
+  attempts: 3
+});
+```
+
+### Query Parameters
+
+```typescript
+const users = await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    path: '/users',
+    query: {
+      page: 1,
+      limit: 10,
+      sort: 'createdAt'
+    }
+  },
+  resReq: true
+});
+// Requests: https://api.example.com:443/users?page=1&limit=10&sort=createdAt
+```
+
+### Custom Timeout and Port
+
+```typescript
+const data = await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    path: '/slow-endpoint',
+    port: 8080,
+    protocol: 'http',
+    timeout: 30000  // 30 seconds
+  },
+  resReq: true,
+  attempts: 2
+});
+```
+
+### Request Cancellation
+
+```typescript
+const controller = new AbortController();
+
+// Cancel after 5 seconds
+setTimeout(() => controller.abort(), 5000);
+
+try {
+  await stableRequest({
+    reqData: {
+      hostname: 'api.example.com',
+      path: '/data',
+      signal: controller.signal
+    },
+    resReq: true
+  });
+} catch (error) {
+  if (error.message.includes('cancelled')) {
+    console.log('Request was cancelled');
+  }
+}
+```
+
+### Trial Mode (Testing Your Retry Logic)
+
+Simulate failures without depending on actual API issues:
+
+```typescript
+await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    path: '/data'
+  },
+  resReq: true,
+  attempts: 5,
+  logAllErrors: true,
+  
+  trialMode: {
+    enabled: true,
+    reqFailureProbability: 0.3,    // 30% chance each request fails
+    retryFailureProbability: 0.2   // 20% chance error is non-retryable
+  }
+});
+```
+
+**Use cases:**
+- Test your error handling logic
+- Verify monitoring alerts work
+- Chaos engineering experiments
+- Integration testing
+
+## Batch Processing - Multiple Requests
+
+### Basic Batch Request
 
 ```typescript
 import { stableApiGateway } from '@emmvish/stable-request';
@@ -60,134 +417,24 @@ const requests = [
       reqData: { path: '/users/2' },
       resReq: true
     }
-  }
-];
-
-const results = await stableApiGateway(requests, {
-  concurrentExecution: true,
-  commonAttempts: 3,
-  commonWait: 1000,
-  commonRequestData: { hostname: 'api.example.com' }
-});
-```
-
-### Grouped Requests
-
-```typescript
-import { stableApiGateway, RETRY_STRATEGIES } from '@emmvish/stable-request';
-
-const results = await stableApiGateway(
-  [
-    {
-      id: 'auth-check',
-      groupId: 'critical-services',
-      requestOptions: {
-        reqData: { path: '/auth/verify' },
-        resReq: true
-      }
-    },
-    {
-      id: 'analytics-track',
-      groupId: 'optional-services',
-      requestOptions: {
-        reqData: { path: '/analytics/event' },
-        resReq: true
-      }
-    }
-  ],
-  {
-    // Global defaults
-    commonAttempts: 2,
-    commonRequestData: { hostname: 'api.example.com' },
-    
-    // Define groups with their own configurations
-    requestGroups: [
-      {
-        id: 'critical-services',
-        commonConfig: {
-          commonAttempts: 10,
-          commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
-        }
-      },
-      {
-        id: 'optional-services',
-        commonConfig: {
-          commonAttempts: 1,
-          commonFinalErrorAnalyzer: async () => true // Don't throw on failure
-        }
-      }
-    ]
-  }
-);
-```
-
-## Core Features
-
-### 1. Content-Aware Retries with `stableRequest`
-
-Unlike traditional retry mechanisms, `stableRequest` validates the **content** of successful responses and retries if needed.
-
-```typescript
-await stableRequest({
-  reqData: {
-    hostname: 'api.example.com',
-    path: '/data',
-  },
-  resReq: true,
-  attempts: 5,
-  wait: 2000,
-  // Retry even on HTTP 200 if data is invalid
-  responseAnalyzer: async (reqConfig, data) => {
-    return data?.status === 'ready' && data?.items?.length > 0;
-  }
-});
-```
-
-**Use Cases:**
-- Wait for async processing to complete
-- Ensure data quality before proceeding
-- Handle eventually-consistent systems
-- Validate complex business rules in responses
-
-### 2. Batch Processing with `stableApiGateway`
-
-Process multiple requests efficiently with shared configuration and execution strategies.
-
-#### Concurrent Execution
-
-```typescript
-import { stableApiGateway, RETRY_STRATEGIES, REQUEST_METHODS } from '@emmvish/stable-request';
-
-const requests = [
-  {
-    id: 'create-user-1',
-    requestOptions: {
-      reqData: {
-        body: { name: 'John Doe', email: 'john@example.com' }
-      }
-    }
   },
   {
-    id: 'create-user-2',
+    id: 'user-3',
     requestOptions: {
-      reqData: {
-        body: { name: 'Jane Smith', email: 'jane@example.com' }
-      }
+      reqData: { path: '/users/3' },
+      resReq: true
     }
   }
 ];
 
 const results = await stableApiGateway(requests, {
-  concurrentExecution: true,
+  // Common options applied to ALL requests
   commonRequestData: {
-    hostname: 'api.example.com',
-    path: '/users',
-    method: REQUEST_METHODS.POST
+    hostname: 'api.example.com'
   },
-  commonResReq: true,
   commonAttempts: 3,
   commonWait: 1000,
-  commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+  concurrentExecution: true  // Run all requests in parallel
 });
 
 // Process results
@@ -200,326 +447,524 @@ results.forEach(result => {
 });
 ```
 
-#### Sequential Execution
-
+**Response Format:**
 ```typescript
-const results = await stableApiGateway(requests, {
-  concurrentExecution: false,
-  stopOnFirstError: true,
-  commonAttempts: 3
-});
+interface API_GATEWAY_RESPONSE<ResponseDataType> {
+  requestId: string;     // The ID you provided
+  groupId?: string;      // Group ID (if request was grouped)
+  success: boolean;      // Did the request succeed?
+  data?: ResponseDataType;  // Response data (if success)
+  error?: string;        // Error message (if failed)
+}
 ```
 
-### 3. Request Grouping - Hierarchical Configuration
+### Sequential Execution (With Dependencies)
 
-Organize requests into logical groups with their own configuration. The configuration priority is:
+```typescript
+const steps = [
+  {
+    id: 'step-1-create',
+    requestOptions: {
+      reqData: { 
+        path: '/orders',
+        method: REQUEST_METHODS.POST,
+        body: { item: 'Widget' }
+      },
+      resReq: true
+    }
+  },
+  {
+    id: 'step-2-process',
+    requestOptions: {
+      reqData: { 
+        path: '/orders/123/process',
+        method: REQUEST_METHODS.POST
+      },
+      resReq: true
+    }
+  },
+  {
+    id: 'step-3-ship',
+    requestOptions: {
+      reqData: { path: '/orders/123/ship' },
+      resReq: true
+    }
+  }
+];
 
-**Individual Request Options** (highest) → **Group Common Options** (middle) → **Global Common Options** (lowest)
+const results = await stableApiGateway(steps, {
+  concurrentExecution: false,  // Run one at a time
+  stopOnFirstError: true,      // Stop if any step fails
+  commonRequestData: {
+    hostname: 'api.example.com'
+  },
+  commonAttempts: 3
+});
+
+if (results.every(r => r.success)) {
+  console.log('Workflow completed successfully');
+} else {
+  const failedStep = results.findIndex(r => !r.success);
+  console.error(`Workflow failed at step ${failedStep + 1}`);
+}
+```
+
+### Shared Configuration (Common Options)
+
+Instead of repeating configuration for each request:
 
 ```typescript
 const results = await stableApiGateway(
   [
-    {
-      id: 'payment-stripe',
-      groupId: 'payment-providers',
-      requestOptions: {
-        reqData: { path: '/stripe/charge' },
-        resReq: true,
-        // Individual override: even more attempts for Stripe
-        attempts: 15
-      }
+    { id: 'req-1', requestOptions: { reqData: { path: '/users/1' } } },
+    { id: 'req-2', requestOptions: { reqData: { path: '/users/2' } } },
+    { id: 'req-3', requestOptions: { reqData: { path: '/users/3' } } }
+  ],
+  {
+    // Applied to ALL requests
+    commonRequestData: {
+      hostname: 'api.example.com',
+      headers: { 'Authorization': `Bearer ${token}` }
     },
+    commonResReq: true,
+    commonAttempts: 5,
+    commonWait: 2000,
+    commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+    commonLogAllErrors: true,
+    
+    // Shared hooks
+    commonHandleErrors: async ({ reqData, errorLog }) => {
+      console.log(`Request to ${reqData.url} failed (${errorLog.attempt})`);
+    },
+    
+    commonResponseAnalyzer: async ({ data }) => {
+      return data?.success === true;
+    }
+  }
+);
+```
+
+## Advanced: Request Grouping
+
+Group related requests with different configurations. Configuration priority:
+
+**Individual Request** > **Group Config** > **Global Common Config**
+
+### Example: Service Tiers
+
+```typescript
+const results = await stableApiGateway(
+  [
+    // Critical services - need high reliability
     {
-      id: 'payment-paypal',
-      groupId: 'payment-providers',
+      id: 'auth-check',
+      groupId: 'critical',
       requestOptions: {
-        reqData: { path: '/paypal/charge' },
+        reqData: { path: '/auth/verify' },
         resReq: true
       }
     },
     {
-      id: 'analytics-event',
+      id: 'payment-process',
+      groupId: 'critical',
+      requestOptions: {
+        reqData: { path: '/payments/charge' },
+        resReq: true,
+        // Individual override: even MORE attempts for payments
+        attempts: 15
+      }
+    },
+    
+    // Analytics - failures are acceptable
+    {
+      id: 'track-event',
       groupId: 'analytics',
       requestOptions: {
-        reqData: { path: '/track' },
+        reqData: { path: '/analytics/track' },
         resReq: true
       }
     }
   ],
   {
-    // Global configuration - applies to all ungrouped requests
+    // Global defaults (lowest priority)
+    commonRequestData: {
+      hostname: 'api.example.com'
+    },
     commonAttempts: 2,
     commonWait: 500,
-    commonRequestData: {
-      hostname: 'api.example.com',
-      method: REQUEST_METHODS.POST
-    },
     
-    // Group-specific configurations
+    // Define groups with their own configs
     requestGroups: [
       {
-        id: 'payment-providers',
+        id: 'critical',
         commonConfig: {
-          // Payment group: aggressive retries
+          // Critical services: aggressive retries
           commonAttempts: 10,
           commonWait: 2000,
           commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
-          commonRequestData: {
-            headers: { 'X-Idempotency-Key': crypto.randomUUID() }
+          
+          commonHandleErrors: async ({ errorLog }) => {
+            // Alert on critical failures
+            await pagerDuty.alert('Critical service failure', errorLog);
           },
-          commonHandleErrors: async (reqData, error) => {
-            await alertPagerDuty('Payment failure', error);
+          
+          commonResponseAnalyzer: async ({ data }) => {
+            // Strict validation
+            return data?.status === 'success' && !data?.errors;
           }
         }
       },
       {
         id: 'analytics',
         commonConfig: {
-          // Analytics group: minimal retries, failures acceptable
+          // Analytics: minimal retries, don't throw on failure
           commonAttempts: 1,
-          commonFinalErrorAnalyzer: async () => true // Don't throw
+          
+          commonFinalErrorAnalyzer: async () => {
+            return true;  // Suppress errors
+          }
         }
       }
     ]
   }
 );
 
-// Filter results by group
-const paymentResults = results.filter(r => r.groupId === 'payment-providers');
-const analyticsResults = results.filter(r => r.groupId === 'analytics');
+// Analyze by group
+const criticalOk = results
+  .filter(r => r.groupId === 'critical')
+  .every(r => r.success);
 
-console.log('Payment success rate:', 
-  paymentResults.filter(r => r.success).length / paymentResults.length);
+const analyticsCount = results
+  .filter(r => r.groupId === 'analytics' && r.success)
+  .length;
+
+console.log('Critical services:', criticalOk ? 'HEALTHY' : 'DEGRADED');
+console.log('Analytics events tracked:', analyticsCount);
 ```
 
-**Key Benefits of Request Grouping:**
-
-1. **Service Tiering** - Different retry strategies for critical vs. optional services
-2. **Regional Configuration** - Customize timeouts and retries per geographic region
-3. **Priority Management** - Handle high-priority requests more aggressively
-4. **Organized Configuration** - Group related requests with shared settings
-5. **Simplified Maintenance** - Update group config instead of individual requests
-6. **Better Monitoring** - Track metrics and failures by logical groups
-
-### 4. Trial Mode - Test Your Retry Logic
-
-Simulate request and retry failures with configurable probabilities.
+### Example: Multi-Region Configuration
 
 ```typescript
-await stableRequest({
+const results = await stableApiGateway(
+  [
+    { id: 'us-data', groupId: 'us-east', requestOptions: { reqData: { path: '/data' }, resReq: true } },
+    { id: 'eu-data', groupId: 'eu-west', requestOptions: { reqData: { path: '/data' }, resReq: true } },
+    { id: 'ap-data', groupId: 'ap-southeast', requestOptions: { reqData: { path: '/data' }, resReq: true } }
+  ],
+  {
+    commonAttempts: 3,
+    
+    requestGroups: [
+      {
+        id: 'us-east',
+        commonConfig: {
+          commonRequestData: {
+            hostname: 'api-us.example.com',
+            timeout: 5000,  // Low latency expected
+            headers: { 'X-Region': 'us-east-1' }
+          },
+          commonAttempts: 3
+        }
+      },
+      {
+        id: 'eu-west',
+        commonConfig: {
+          commonRequestData: {
+            hostname: 'api-eu.example.com',
+            timeout: 8000,  // Medium latency
+            headers: { 'X-Region': 'eu-west-1' }
+          },
+          commonAttempts: 5
+        }
+      },
+      {
+        id: 'ap-southeast',
+        commonConfig: {
+          commonRequestData: {
+            hostname: 'api-ap.example.com',
+            timeout: 12000,  // Higher latency expected
+            headers: { 'X-Region': 'ap-southeast-1' }
+          },
+          commonAttempts: 7,
+          commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+        }
+      }
+    ]
+  }
+);
+```
+
+## Real-World Examples
+
+### 1. Polling for Job Completion
+
+```typescript
+const jobResult = await stableRequest({
   reqData: {
     hostname: 'api.example.com',
-    path: '/test',
+    path: '/jobs/abc123/status'
   },
   resReq: true,
-  attempts: 5,
-  trialMode: {
-    enabled: true,
-    reqFailureProbability: 0.3,    // 30% chance each request fails
-    retryFailureProbability: 0.2    // 20% chance retry is marked non-retryable
+  attempts: 20,             // Poll up to 20 times
+  wait: 3000,               // Wait 3 seconds between polls
+  retryStrategy: RETRY_STRATEGIES.FIXED,
+  
+  responseAnalyzer: async ({ data }) => {
+    if (data.status === 'completed') {
+      console.log('Job completed!');
+      return true;  // Success
+    }
+    
+    if (data.status === 'failed') {
+      throw new Error(`Job failed: ${data.error}`);
+    }
+    
+    console.log(`Job ${data.status}... ${data.progress}%`);
+    return false;  // Keep polling
   },
-  logAllErrors: true
+  
+  handleErrors: async ({ errorLog }) => {
+    console.log(`Poll attempt ${errorLog.attempt}`);
+  }
 });
+
+console.log('Final result:', jobResult);
 ```
 
-**Use Cases:**
-- Integration testing
-- Chaos engineering
-- Validating monitoring and alerting
-- Testing circuit breaker patterns
-
-### 5. Multiple Retry Strategies
-
-Choose the backoff strategy that fits your use case.
+### 2. Database Replication Lag
 
 ```typescript
-import { stableRequest, RETRY_STRATEGIES } from '@emmvish/stable-request';
+const expectedVersion = 42;
 
-// Fixed delay: 1s, 1s, 1s, 1s...
-await stableRequest({
-  reqData: { hostname: 'api.example.com', path: '/data' },
-  resReq: true,
-  attempts: 5,
-  wait: 1000,
-  retryStrategy: RETRY_STRATEGIES.FIXED
-});
-
-// Linear backoff: 1s, 2s, 3s, 4s...
-await stableRequest({
-  reqData: { hostname: 'api.example.com', path: '/data' },
-  resReq: true,
-  attempts: 5,
-  wait: 1000,
-  retryStrategy: RETRY_STRATEGIES.LINEAR
-});
-
-// Exponential backoff: 1s, 2s, 4s, 8s...
-await stableRequest({
-  reqData: { hostname: 'api.example.com', path: '/data' },
-  resReq: true,
-  attempts: 5,
-  wait: 1000,
-  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL
-});
-```
-
-### 6. Comprehensive Observability
-
-Monitor every request attempt with detailed logging hooks.
-
-```typescript
-await stableRequest({
+const data = await stableRequest({
   reqData: {
-    hostname: 'api.example.com',
-    path: '/critical-endpoint',
+    hostname: 'replica.db.example.com',
+    path: '/records/123'
   },
   resReq: true,
-  attempts: 3,
-  logAllErrors: true,
-  handleErrors: async (reqConfig, errorLog) => {
-    // Custom error handling - send to monitoring service
-    await monitoringService.logError({
-      endpoint: reqConfig.url,
-      attempt: errorLog.attempt,
-      error: errorLog.error,
-      isRetryable: errorLog.isRetryable,
-      type: errorLog.type, // 'HTTP_ERROR' or 'INVALID_CONTENT'
-      timestamp: errorLog.timestamp,
-      executionTime: errorLog.executionTime,
-      statusCode: errorLog.statusCode
-    });
+  attempts: 10,
+  wait: 500,
+  retryStrategy: RETRY_STRATEGIES.LINEAR,
+  
+  hookParams: {
+    responseAnalyzerParams: { expectedVersion }
   },
-  logAllSuccessfulAttempts: true,
-  handleSuccessfulAttemptData: async (reqConfig, successData) => {
-    // Track successful attempts
-    analytics.track('request_success', {
-      endpoint: reqConfig.url,
-      attempt: successData.attempt,
-      executionTime: successData.executionTime,
-      statusCode: successData.statusCode
-    });
+  
+  responseAnalyzer: async ({ data, params }) => {
+    // Wait until replica catches up
+    if (data.version >= params.expectedVersion) {
+      return true;
+    }
+    
+    console.log(`Replica at version ${data.version}, waiting for ${params.expectedVersion}`);
+    return false;
   }
 });
 ```
 
-### 7. Smart Retry Logic
-
-Automatically retries on common transient errors:
-
-- HTTP 5xx (Server Errors)
-- HTTP 408 (Request Timeout)
-- HTTP 429 (Too Many Requests)
-- HTTP 409 (Conflict)
-- Network errors: `ECONNRESET`, `ETIMEDOUT`, `ECONNREFUSED`, `ENOTFOUND`, `EAI_AGAIN`
+### 3. Idempotent Payment Processing
 
 ```typescript
-await stableRequest({
+const paymentResult = await stableRequest({
   reqData: {
-    hostname: 'unreliable-api.com',
-    path: '/data',
+    hostname: 'api.stripe.com',
+    path: '/v1/charges',
+    method: REQUEST_METHODS.POST,
+    headers: {
+      'Authorization': 'Bearer sk_...',
+      'Idempotency-Key': crypto.randomUUID()  // Ensure idempotency
+    },
+    body: {
+      amount: 1000,
+      currency: 'usd',
+      source: 'tok_visa'
+    }
   },
   resReq: true,
   attempts: 5,
   wait: 2000,
-  retryStrategy: RETRY_STRATEGIES.LINEAR
-  // Automatically retries on transient failures
+  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+  
+  logAllErrors: true,
+  logAllSuccessfulAttempts: true,
+  
+  handleErrors: async ({ errorLog }) => {
+    await paymentLogger.error({
+      attempt: errorLog.attempt,
+      error: errorLog.error,
+      isRetryable: errorLog.isRetryable
+    });
+  },
+  
+  responseAnalyzer: async ({ data }) => {
+    // Validate payment succeeded
+    return data.status === 'succeeded' && data.paid === true;
+  },
+  
+  finalErrorAnalyzer: async ({ error }) => {
+    // Alert team on payment failure
+    await alerting.critical('Payment processing failed', error);
+    return false;  // Throw error
+  }
 });
 ```
 
-### 8. Final Error Analysis
-
-Decide whether to throw or return false based on error analysis.
+### 4. Batch User Creation with Error Handling
 
 ```typescript
-const result = await stableRequest({
-  reqData: {
+const users = [
+  { name: 'Alice', email: 'alice@example.com' },
+  { name: 'Bob', email: 'bob@example.com' },
+  { name: 'Charlie', email: 'charlie@example.com' }
+];
+
+const requests = users.map((user, index) => ({
+  id: `user-${index}`,
+  requestOptions: {
+    reqData: {
+      body: user
+    },
+    resReq: true
+  }
+}));
+
+const results = await stableApiGateway(requests, {
+  concurrentExecution: true,
+  
+  commonRequestData: {
     hostname: 'api.example.com',
-    path: '/optional-data',
-  },
-  resReq: true,
-  attempts: 3,
-  finalErrorAnalyzer: async (reqConfig, error) => {
-    // Return true to suppress error and return false instead of throwing
-    if (error.message.includes('404')) {
-      console.log('Resource not found, treating as non-critical');
-      return true; // Don't throw, return false
+    path: '/users',
+    method: REQUEST_METHODS.POST,
+    headers: {
+      'Content-Type': 'application/json'
     }
-    return false; // Throw the error
+  },
+  
+  commonAttempts: 3,
+  commonWait: 1000,
+  commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+  commonResReq: true,
+  commonLogAllErrors: true,
+  
+  commonHandleErrors: async ({ reqData, errorLog }) => {
+    const user = reqData.data;
+    console.error(`Failed to create user ${user.name}: ${errorLog.error}`);
+  },
+  
+  commonResponseAnalyzer: async ({ data }) => {
+    // Ensure user was created with an ID
+    return data?.id && data?.email;
   }
 });
 
-// result will be false if finalErrorAnalyzer returned true
-if (result === false) {
-  console.log('Request failed but was handled gracefully');
-}
-```
+const successful = results.filter(r => r.success);
+const failed = results.filter(r => !r.success);
 
-### 9. Request Cancellation Support
+console.log(`✓ Created ${successful.length} users`);
+console.log(`✗ Failed to create ${failed.length} users`);
 
-Support for AbortController to cancel requests.
-
-```typescript
-const controller = new AbortController();
-
-setTimeout(() => controller.abort(), 5000);
-
-try {
-  await stableRequest({
-    reqData: {
-      hostname: 'api.example.com',
-      path: '/slow-endpoint',
-      signal: controller.signal
-    },
-    resReq: true,
-    attempts: 3
-  });
-} catch (error) {
-  // Request was cancelled
-}
-```
-
-### 10. Perform All Attempts Mode
-
-Execute all retry attempts regardless of success, useful for warm-up scenarios.
-
-```typescript
-await stableRequest({
-  reqData: {
-    hostname: 'api.example.com',
-    path: '/cache-warmup',
-  },
-  attempts: 5,
-  performAllAttempts: true, // Always performs all 5 attempts
-  wait: 1000
+failed.forEach(r => {
+  console.error(`  - ${r.requestId}: ${r.error}`);
 });
 ```
 
-## API Reference
+### 5. Health Check Monitoring System
 
-### `stableRequest<RequestDataType, ResponseDataType>(options)`
+```typescript
+const healthChecks = await stableApiGateway(
+  [
+    // Core services - must be healthy
+    { id: 'auth', groupId: 'core', requestOptions: { reqData: { hostname: 'auth.internal', path: '/health' } } },
+    { id: 'database', groupId: 'core', requestOptions: { reqData: { hostname: 'db.internal', path: '/health' } } },
+    { id: 'api', groupId: 'core', requestOptions: { reqData: { hostname: 'api.internal', path: '/health' } } },
+    
+    // Optional services
+    { id: 'cache', groupId: 'optional', requestOptions: { reqData: { hostname: 'cache.internal', path: '/health' } } },
+    { id: 'search', groupId: 'optional', requestOptions: { reqData: { hostname: 'search.internal', path: '/health' } } }
+  ],
+  {
+    commonResReq: true,
+    concurrentExecution: true,
+    
+    requestGroups: [
+      {
+        id: 'core',
+        commonConfig: {
+          commonAttempts: 5,
+          commonWait: 2000,
+          commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+          
+          commonResponseAnalyzer: async ({ data }) => {
+            // Core services need strict validation
+            return data?.status === 'healthy' && 
+                   data?.uptime > 0 &&
+                   data?.dependencies?.every(d => d.healthy);
+          },
+          
+          commonHandleErrors: async ({ reqData, errorLog }) => {
+            // Alert on core service issues
+            await pagerDuty.trigger({
+              severity: 'critical',
+              service: reqData.baseURL,
+              message: errorLog.error
+            });
+          }
+        }
+      },
+      {
+        id: 'optional',
+        commonConfig: {
+          commonAttempts: 2,
+          
+          commonResponseAnalyzer: async ({ data }) => {
+            // Optional services: basic check
+            return data?.status === 'ok';
+          },
+          
+          commonFinalErrorAnalyzer: async ({ reqData, error }) => {
+            // Log but don't alert
+            console.warn(`Optional service ${reqData.baseURL} unhealthy`);
+            return true;  // Don't throw
+          }
+        }
+      }
+    ]
+  }
+);
 
-Execute a single HTTP request with retry logic.
+const report = {
+  timestamp: new Date().toISOString(),
+  core: healthChecks.filter(r => r.groupId === 'core').every(r => r.success),
+  optional: healthChecks.filter(r => r.groupId === 'optional').every(r => r.success),
+  overall: healthChecks.every(r => r.success) ? 'HEALTHY' : 'DEGRADED'
+};
 
-#### Configuration Options
+console.log('System Health:', report);
+```
+
+## Complete API Reference
+
+### `stableRequest(options)`
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `reqData` | `REQUEST_DATA` | **required** | Request configuration (hostname, path, method, etc.) |
-| `resReq` | `boolean` | `false` | Return response data instead of just success boolean |
-| `attempts` | `number` | `1` | Maximum number of retry attempts |
-| `wait` | `number` | `1000` | Base delay in milliseconds between retries |
-| `retryStrategy` | `RETRY_STRATEGY_TYPES` | `'fixed'` | Retry strategy: `'fixed'`, `'linear'`, or `'exponential'` |
-| `responseAnalyzer` | `function` | `() => true` | Validates response content, return false to retry |
-| `performAllAttempts` | `boolean` | `false` | Execute all attempts regardless of success |
-| `logAllErrors` | `boolean` | `false` | Enable error logging for all failed attempts |
-| `handleErrors` | `function` | console.log | Custom error handler |
-| `logAllSuccessfulAttempts` | `boolean` | `false` | Log all successful attempts |
-| `handleSuccessfulAttemptData` | `function` | console.log | Custom success handler |
-| `maxSerializableChars` | `number` | `1000` | Max characters for serialized logs |
-| `finalErrorAnalyzer` | `function` | `() => false` | Analyze final error, return true to suppress throwing |
-| `trialMode` | `TRIAL_MODE_OPTIONS` | `{ enabled: false }` | Simulate failures for testing |
+| `reqData` | `REQUEST_DATA` | **required** | Request configuration |
+| `resReq` | `boolean` | `false` | Return response data vs. just boolean |
+| `attempts` | `number` | `1` | Max retry attempts |
+| `wait` | `number` | `1000` | Base delay between retries (ms) |
+| `retryStrategy` | `RETRY_STRATEGY_TYPES` | `'fixed'` | Retry backoff strategy |
+| `performAllAttempts` | `boolean` | `false` | Execute all attempts regardless |
+| `logAllErrors` | `boolean` | `false` | Enable error logging |
+| `logAllSuccessfulAttempts` | `boolean` | `false` | Enable success logging |
+| `maxSerializableChars` | `number` | `1000` | Max chars for logs |
+| `trialMode` | `TRIAL_MODE_OPTIONS` | `{ enabled: false }` | Failure simulation |
+| `hookParams` | `HookParams` | `{}` | Custom parameters for hooks |
+| `responseAnalyzer` | `function` | `() => true` | Validate response content |
+| `handleErrors` | `function` | `console.log` | Error handler |
+| `handleSuccessfulAttemptData` | `function` | `console.log` | Success handler |
+| `finalErrorAnalyzer` | `function` | `() => false` | Final error handler |
 
-#### Request Data Configuration
+### REQUEST_DATA
 
 ```typescript
 interface REQUEST_DATA<RequestDataType = any> {
@@ -532,15 +977,11 @@ interface REQUEST_DATA<RequestDataType = any> {
   body?: RequestDataType;              // Request body
   query?: Record<string, any>;         // Query parameters
   timeout?: number;                    // Default: 15000ms
-  signal?: AbortSignal;                // For request cancellation
+  signal?: AbortSignal;                // For cancellation
 }
 ```
 
-### `stableApiGateway<RequestDataType, ResponseDataType>(requests, options)`
-
-Execute multiple HTTP requests with shared configuration and optional grouping.
-
-#### Gateway Configuration Options
+### `stableApiGateway(requests, options)`
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -561,630 +1002,66 @@ Execute multiple HTTP requests with shared configuration and optional grouping.
 | `commonHandleErrors` | `function` | console.log | Default error handler for all requests |
 | `commonHandleSuccessfulAttemptData` | `function` | console.log | Default success handler for all requests |
 | `commonRequestData` | `Partial<REQUEST_DATA>` | `{ hostname: '' }` | Common set of request options for each request |
+| `commonHookParams` | `HookParams` | `{ }` | Common options for each request hook |
 
-#### Request Group Configuration
+### Hooks Reference
+
+#### responseAnalyzer
+
+**Purpose:** Validate response content, retry even on HTTP 200
 
 ```typescript
-interface RequestGroup {
-  id: string;                          // Unique group identifier
-  commonConfig?: {
-    // Any common* option can be specified here
-    commonAttempts?: number;
-    commonWait?: number;
-    commonRetryStrategy?: RETRY_STRATEGY_TYPES;
-    commonRequestData?: Partial<REQUEST_DATA>;
-    commonResponseAnalyzer?: function;
-    commonHandleErrors?: function;
-    // ... all other common* options
-  };
+responseAnalyzer: async ({ reqData, data, trialMode, params }) => {
+  // Return true if valid, false to retry
+  return data.status === 'ready';
 }
 ```
 
-#### Request Format
+#### handleErrors
+
+**Purpose:** Monitor and log failed attempts
 
 ```typescript
-interface API_GATEWAY_REQUEST<RequestDataType, ResponseDataType> {
-  id: string;                          // Unique identifier for the request
-  groupId?: string;                    // Optional group identifier
-  requestOptions: API_GATEWAY_REQUEST_OPTIONS_TYPE<RequestDataType, ResponseDataType>;
+handleErrors: async ({ reqData, errorLog, maxSerializableChars }) => {
+  await logger.error({
+    url: reqData.url,
+    attempt: errorLog.attempt,
+    error: errorLog.error
+  });
 }
 ```
 
-**Configuration Priority:** Individual request options override group options, which override global common options.
+#### handleSuccessfulAttemptData
 
-#### Response Format
+**Purpose:** Monitor and log successful attempts
 
 ```typescript
-interface API_GATEWAY_RESPONSE<ResponseDataType> {
-  requestId: string;                   // Request identifier
-  groupId?: string;                    // Group identifier (if request was grouped)
-  success: boolean;                    // Whether the request succeeded
-  data?: ResponseDataType;             // Response data (if success is true)
-  error?: string;                      // Error message (if success is false)
+handleSuccessfulAttemptData: async ({ reqData, successfulAttemptData, maxSerializableChars }) => {
+  await analytics.track({
+    url: reqData.url,
+    duration: successfulAttemptData.executionTime
+  });
 }
 ```
 
-## Real-World Use Cases
+#### finalErrorAnalyzer
 
-### 1. Environment-Based Service Tiers with Groups
-
-Organize API calls by criticality with different retry strategies per tier.
+**Purpose:** Handle final error after all retries exhausted
 
 ```typescript
-const results = await stableApiGateway(
-  [
-    // Critical services
-    { id: 'auth-validate', groupId: 'critical', requestOptions: { reqData: { path: '/auth/validate' }, resReq: true } },
-    { id: 'db-primary', groupId: 'critical', requestOptions: { reqData: { path: '/db/health' }, resReq: true } },
-    
-    // Payment services
-    { id: 'stripe-charge', groupId: 'payments', requestOptions: { reqData: { path: '/stripe/charge', body: { amount: 1000 } }, resReq: true } },
-    { id: 'paypal-charge', groupId: 'payments', requestOptions: { reqData: { path: '/paypal/charge', body: { amount: 1000 } }, resReq: true } },
-    
-    // Analytics services
-    { id: 'track-event', groupId: 'analytics', requestOptions: { reqData: { path: '/track' }, resReq: true } }
-  ],
-  {
-    // Global defaults
-    commonAttempts: 2,
-    commonWait: 500,
-    commonRequestData: { hostname: 'api.example.com', method: REQUEST_METHODS.POST },
-    
-    requestGroups: [
-      {
-        id: 'critical',
-        commonConfig: {
-          commonAttempts: 10,
-          commonWait: 2000,
-          commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
-          commonHandleErrors: async (reqData, error) => {
-            await pagerDuty.alert('CRITICAL', error);
-          }
-        }
-      },
-      {
-        id: 'payments',
-        commonConfig: {
-          commonAttempts: 5,
-          commonWait: 1500,
-          commonRetryStrategy: RETRY_STRATEGIES.LINEAR,
-          commonRequestData: {
-            headers: { 'X-Idempotency-Key': crypto.randomUUID() }
-          },
-          commonResponseAnalyzer: async (reqData, data) => {
-            return data?.status === 'succeeded' && data?.transactionId;
-          }
-        }
-      },
-      {
-        id: 'analytics',
-        commonConfig: {
-          commonAttempts: 1,
-          commonFinalErrorAnalyzer: async () => true // Don't throw
-        }
-      }
-    ]
+finalErrorAnalyzer: async ({ reqData, error, trialMode, params }) => {
+  // Return true to suppress error (return false)
+  // Return false to throw error
+  if (error.message.includes('404')) {
+    return true;  // Treat as non-critical
   }
-);
-
-// Analyze results by group
-const criticalHealth = results.filter(r => r.groupId === 'critical').every(r => r.success);
-const paymentSuccess = results.filter(r => r.groupId === 'payments').filter(r => r.success).length;
-
-if (!criticalHealth) {
-  console.error('CRITICAL SERVICES DEGRADED');
+  return false;  // Throw
 }
-console.log(`Payments: ${paymentSuccess} successful`);
-```
-
-### 2. Multi-Region API Deployment with Groups
-
-Handle requests to different geographic regions with region-specific configurations.
-
-```typescript
-const results = await stableApiGateway(
-  [
-    { id: 'us-user-profile', groupId: 'us-east', requestOptions: { reqData: { path: '/users/profile' }, resReq: true } },
-    { id: 'us-orders', groupId: 'us-east', requestOptions: { reqData: { path: '/orders' }, resReq: true } },
-    
-    { id: 'eu-user-profile', groupId: 'eu-west', requestOptions: { reqData: { path: '/users/profile' }, resReq: true } },
-    { id: 'eu-orders', groupId: 'eu-west', requestOptions: { reqData: { path: '/orders' }, resReq: true } },
-    
-    { id: 'ap-user-profile', groupId: 'ap-southeast', requestOptions: { reqData: { path: '/users/profile' }, resReq: true } },
-    { id: 'ap-orders', groupId: 'ap-southeast', requestOptions: { reqData: { path: '/orders' }, resReq: true } }
-  ],
-  {
-    commonAttempts: 3,
-    commonWait: 1000,
-    
-    requestGroups: [
-      {
-        id: 'us-east',
-        commonConfig: {
-          commonRequestData: {
-            hostname: 'api-us-east.example.com',
-            headers: { 'X-Region': 'us-east-1' },
-            timeout: 5000 // Lower latency expected
-          },
-          commonAttempts: 3,
-          commonRetryStrategy: RETRY_STRATEGIES.LINEAR
-        }
-      },
-      {
-        id: 'eu-west',
-        commonConfig: {
-          commonRequestData: {
-            hostname: 'api-eu-west.example.com',
-            headers: { 'X-Region': 'eu-west-1' },
-            timeout: 8000
-          },
-          commonAttempts: 5,
-          commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
-        }
-      },
-      {
-        id: 'ap-southeast',
-        commonConfig: {
-          commonRequestData: {
-            hostname: 'api-ap-southeast.example.com',
-            headers: { 'X-Region': 'ap-southeast-1' },
-            timeout: 10000 // Higher latency expected
-          },
-          commonAttempts: 7,
-          commonWait: 1500,
-          commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
-        }
-      }
-    ]
-  }
-);
-
-// Regional performance analysis
-const regionPerformance = results.reduce((acc, result) => {
-  if (!acc[result.groupId!]) acc[result.groupId!] = { success: 0, failed: 0 };
-  result.success ? acc[result.groupId!].success++ : acc[result.groupId!].failed++;
-  return acc;
-}, {} as Record<string, { success: number; failed: number }>);
-
-console.log('Regional performance:', regionPerformance);
-```
-
-### 3. Microservices Health Monitoring with Groups
-
-Monitor different microservices with service-specific health check configurations.
-
-```typescript
-const healthChecks = await stableApiGateway(
-  [
-    // Core services
-    { id: 'auth-health', groupId: 'core', requestOptions: { reqData: { hostname: 'auth.internal.example.com', path: '/health' } } },
-    { id: 'user-health', groupId: 'core', requestOptions: { reqData: { hostname: 'users.internal.example.com', path: '/health' } } },
-    { id: 'order-health', groupId: 'core', requestOptions: { reqData: { hostname: 'orders.internal.example.com', path: '/health' } } },
-    
-    // Auxiliary services
-    { id: 'cache-health', groupId: 'auxiliary', requestOptions: { reqData: { hostname: 'cache.internal.example.com', path: '/health' } } },
-    { id: 'search-health', groupId: 'auxiliary', requestOptions: { reqData: { hostname: 'search.internal.example.com', path: '/health' } } },
-    
-    // Third-party
-    { id: 'stripe-health', groupId: 'third-party', requestOptions: { reqData: { hostname: 'api.stripe.com', path: '/v1/health' } } }
-  ],
-  {
-    commonResReq: true,
-    concurrentExecution: true,
-    
-    requestGroups: [
-      {
-        id: 'core',
-        commonConfig: {
-          commonAttempts: 5,
-          commonWait: 2000,
-          commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
-          commonResponseAnalyzer: async (reqData, data) => {
-            return data?.status === 'healthy' && 
-                   data?.dependencies?.every(d => d.status === 'healthy');
-          },
-          commonHandleErrors: async (reqData, error) => {
-            await pagerDuty.trigger({ severity: 'critical', message: `Core service down: ${error.error}` });
-          }
-        }
-      },
-      {
-        id: 'auxiliary',
-        commonConfig: {
-          commonAttempts: 2,
-          commonResponseAnalyzer: async (reqData, data) => data?.status === 'ok',
-          commonFinalErrorAnalyzer: async () => true // Don't fail on auxiliary issues
-        }
-      },
-      {
-        id: 'third-party',
-        commonConfig: {
-          commonAttempts: 3,
-          commonWait: 3000,
-          commonRequestData: { timeout: 15000 },
-          commonHandleErrors: async (reqData, error) => {
-            logger.warn('Third-party health check failed', { error });
-          },
-          commonFinalErrorAnalyzer: async () => true
-        }
-      }
-    ]
-  }
-);
-
-const healthReport = {
-  timestamp: new Date().toISOString(),
-  core: healthChecks.filter(r => r.groupId === 'core').every(r => r.success),
-  auxiliary: healthChecks.filter(r => r.groupId === 'auxiliary').every(r => r.success),
-  thirdParty: healthChecks.filter(r => r.groupId === 'third-party').every(r => r.success),
-  overall: healthChecks.every(r => r.success) ? 'HEALTHY' : 'DEGRADED'
-};
-
-console.log('Health Report:', healthReport);
-```
-
-### 4. Polling for Async Job Completion
-
-```typescript
-const jobResult = await stableRequest({
-  reqData: {
-    hostname: 'api.example.com',
-    path: '/jobs/123/status',
-  },
-  resReq: true,
-  attempts: 20,
-  wait: 3000,
-  retryStrategy: RETRY_STRATEGIES.FIXED,
-  responseAnalyzer: async (reqConfig, data) => {
-    return data.status === 'completed';
-  },
-  handleErrors: async (reqConfig, error) => {
-    console.log(`Job not ready yet (attempt ${error.attempt})`);
-  }
-});
-```
-
-### 5. Resilient External API Integration
-
-```typescript
-const weatherData = await stableRequest({
-  reqData: {
-    hostname: 'api.weather.com',
-    path: '/current',
-    query: { city: 'London' },
-    headers: { 'Authorization': `Bearer ${token}` }
-  },
-  resReq: true,
-  attempts: 5,
-  wait: 2000,
-  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
-  logAllErrors: true,
-  handleErrors: async (reqConfig, error) => {
-    logger.warn('Weather API retry', { 
-      attempt: error.attempt,
-      isRetryable: error.isRetryable 
-    });
-  }
-});
-```
-
-### 6. Database Replication Consistency Check
-
-```typescript
-const consistentData = await stableRequest({
-  reqData: {
-    hostname: 'replica.db.example.com',
-    path: '/records/456',
-  },
-  resReq: true,
-  attempts: 10,
-  wait: 500,
-  retryStrategy: RETRY_STRATEGIES.LINEAR,
-  responseAnalyzer: async (reqConfig, data) => {
-    // Wait until replica has the latest version
-    return data.version >= expectedVersion;
-  }
-});
-```
-
-### 7. Batch User Creation
-
-```typescript
-const users = [
-  { name: 'John Doe', email: 'john@example.com' },
-  { name: 'Jane Smith', email: 'jane@example.com' },
-  { name: 'Bob Johnson', email: 'bob@example.com' }
-];
-
-const requests = users.map((user, index) => ({
-  id: `create-user-${index}`,
-  requestOptions: {
-    reqData: {
-      body: user
-    },
-    resReq: true
-  }
-}));
-
-const results = await stableApiGateway(requests, {
-  concurrentExecution: true,
-  commonAttempts: 3,
-  commonWait: 1000,
-  commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
-  commonLogAllErrors: true,
-  commonHandleErrors: async (reqConfig, error) => {
-    console.log(`Failed to create user: ${error.error}`);
-  },
-  commonRequestData: {
-    hostname: 'api.example.com',
-    path: '/users',
-    method: REQUEST_METHODS.POST
-  }
-});
-
-const successful = results.filter(r => r.success);
-const failed = results.filter(r => !r.success);
-
-console.log(`Created ${successful.length} users`);
-console.log(`Failed to create ${failed.length} users`);
-```
-
-### 8. Batch Data Processing with Tiered Priority Groups
-
-```typescript
-const dataItems = [
-  { id: 1, data: 'critical-transaction', priority: 'high' },
-  { id: 2, data: 'user-action', priority: 'medium' },
-  { id: 3, data: 'analytics-event', priority: 'low' }
-];
-
-const requests = dataItems.map(item => ({
-  id: `item-${item.id}`,
-  groupId: item.priority === 'high' ? 'high-priority' :
-           item.priority === 'medium' ? 'medium-priority' : 'low-priority',
-  requestOptions: {
-    reqData: { body: item },
-    resReq: true
-  }
-}));
-
-const results = await stableApiGateway(requests, {
-  concurrentExecution: true,
-  commonRequestData: {
-    hostname: 'processing.example.com',
-    path: '/process',
-    method: REQUEST_METHODS.POST
-  },
-  
-  requestGroups: [
-    {
-      id: 'high-priority',
-      commonConfig: {
-        commonAttempts: 10,
-        commonWait: 2000,
-        commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
-        commonRequestData: { headers: { 'X-Priority': 'high' } },
-        commonResponseAnalyzer: async (reqData, data) => {
-          return data?.processed && !data?.errors?.length && data?.validationStatus === 'passed';
-        }
-      }
-    },
-    {
-      id: 'medium-priority',
-      commonConfig: {
-        commonAttempts: 5,
-        commonWait: 1000,
-        commonRetryStrategy: RETRY_STRATEGIES.LINEAR,
-        commonRequestData: { headers: { 'X-Priority': 'medium' } }
-      }
-    },
-    {
-      id: 'low-priority',
-      commonConfig: {
-        commonAttempts: 2,
-        commonRequestData: { headers: { 'X-Priority': 'low' } },
-        commonFinalErrorAnalyzer: async () => true // Accept failures
-      }
-    }
-  ]
-});
-
-// Report by priority
-const report = {
-  high: results.filter(r => r.groupId === 'high-priority'),
-  medium: results.filter(r => r.groupId === 'medium-priority'),
-  low: results.filter(r => r.groupId === 'low-priority')
-};
-
-console.log(`High: ${report.high.filter(r => r.success).length}/${report.high.length}`);
-console.log(`Medium: ${report.medium.filter(r => r.success).length}/${report.medium.length}`);
-console.log(`Low: ${report.low.filter(r => r.success).length}/${report.low.length}`);
-```
-
-### 9. Rate-Limited API with Backoff
-
-```typescript
-const searchResults = await stableRequest({
-  reqData: {
-    hostname: 'api.ratelimited-service.com',
-    path: '/search',
-    query: { q: 'nodejs' }
-  },
-  resReq: true,
-  attempts: 10,
-  wait: 1000,
-  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
-  handleErrors: async (reqConfig, error) => {
-    if (error.type === 'HTTP_ERROR' && error.error.includes('429')) {
-      console.log('Rate limited, backing off...');
-    }
-  }
-});
-```
-
-### 10. Sequential Workflow with Dependencies
-
-```typescript
-const workflowSteps = [
-  {
-    id: 'step-1-init',
-    requestOptions: {
-      reqData: { path: '/init' },
-      resReq: true
-    }
-  },
-  {
-    id: 'step-2-process',
-    requestOptions: {
-      reqData: { path: '/process' },
-      resReq: true,
-      responseAnalyzer: async (reqConfig, data) => {
-        return data.status === 'completed';
-      }
-    }
-  },
-  {
-    id: 'step-3-finalize',
-    requestOptions: {
-      reqData: { path: '/finalize' },
-      resReq: true
-    }
-  }
-];
-
-const results = await stableApiGateway(workflowSteps, {
-  concurrentExecution: false,
-  stopOnFirstError: true,
-  commonRequestData: {
-    hostname: 'workflow.example.com',
-    method: REQUEST_METHODS.POST,
-    body: { workflowId: 'wf-123' }
-  },
-  commonAttempts: 5,
-  commonWait: 2000,
-  commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
-});
-
-if (results.every(r => r.success)) {
-  console.log('Workflow completed successfully');
-} else {
-  console.error('Workflow failed at step:', results.findIndex(r => !r.success) + 1);
-}
-```
-
-## Advanced Patterns
-
-### Circuit Breaker Pattern
-
-```typescript
-let failureCount = 0;
-const CIRCUIT_THRESHOLD = 5;
-
-async function resilientRequest(endpoint: string) {
-  if (failureCount >= CIRCUIT_THRESHOLD) {
-    throw new Error('Circuit breaker open');
-  }
-
-  try {
-    const result = await stableRequest({
-      reqData: { hostname: 'api.example.com', path: endpoint },
-      resReq: true,
-      attempts: 3,
-      handleErrors: async () => {
-        failureCount++;
-      }
-    });
-    failureCount = 0;
-    return result;
-  } catch (error) {
-    if (failureCount >= CIRCUIT_THRESHOLD) {
-      console.log('Circuit breaker activated');
-      setTimeout(() => { failureCount = 0; }, 60000);
-    }
-    throw error;
-  }
-}
-```
-
-### Dynamic Request Configuration with Groups
-
-```typescript
-const endpoints = await getEndpointsFromConfig();
-
-const requests = endpoints.map(endpoint => ({
-  id: endpoint.id,
-  groupId: endpoint.tier, // 'critical', 'standard', or 'optional'
-  requestOptions: {
-    reqData: {
-      hostname: endpoint.hostname,
-      path: endpoint.path,
-      method: endpoint.method,
-      ...(endpoint.auth && { 
-        headers: { Authorization: `Bearer ${endpoint.auth}` }
-      })
-    },
-    resReq: true
-  }
-}));
-
-const results = await stableApiGateway(requests, {
-  concurrentExecution: true,
-  commonWait: 1000,
-  
-  requestGroups: [
-    {
-      id: 'critical',
-      commonConfig: {
-        commonAttempts: 10,
-        commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
-      }
-    },
-    {
-      id: 'standard',
-      commonConfig: {
-        commonAttempts: 5,
-        commonRetryStrategy: RETRY_STRATEGIES.LINEAR
-      }
-    },
-    {
-      id: 'optional',
-      commonConfig: {
-        commonAttempts: 2,
-        commonFinalErrorAnalyzer: async () => true
-      }
-    }
-  ]
-});
-```
-
-### Conditional Retry Based on Response
-
-```typescript
-await stableRequest({
-  reqData: {
-    hostname: 'api.example.com',
-    path: '/data',
-  },
-  resReq: true,
-  attempts: 5,
-  responseAnalyzer: async (reqConfig, data) => {
-    if (!data.complete) {
-      console.log('Data incomplete, retrying...');
-      return false;
-    }
-    
-    if (data.error) {
-      throw new Error('Invalid data, cannot retry');
-    }
-    
-    return true;
-  }
-});
 ```
 
 ## TypeScript Support
 
-Full TypeScript support with generic types for request and response data:
+Fully typed with generics:
 
 ```typescript
 interface CreateUserRequest {
@@ -1209,71 +1086,33 @@ const user = await stableRequest<CreateUserRequest, UserResponse>({
       email: 'john@example.com'
     }
   },
-  resReq: true,
-  attempts: 3
+  resReq: true
 });
 
-// user is fully typed as UserResponse
-console.log(user.id);
+// user is typed as UserResponse
+console.log(user.id);  // TypeScript knows this exists
 ```
-
-## Comparison with Similar Libraries
-
-### vs. axios-retry
-
-| Feature | stable-request | axios-retry |
-|---------|----------------|-------------|
-| **Content validation** | ✅ Full support with `responseAnalyzer` | ❌ Only HTTP status codes |
-| **Batch processing** | ✅ Built-in `stableApiGateway` | ❌ Manual implementation needed |
-| **Request grouping** | ✅ Hierarchical configuration | ❌ No grouping support |
-| **Trial mode** | ✅ Built-in failure simulation | ❌ No testing utilities |
-| **Retry strategies** | ✅ Fixed, Linear, Exponential | ✅ Exponential only |
-| **Observability** | ✅ Granular hooks for every attempt | ⚠️ Limited |
-| **Final error analysis** | ✅ Custom error handling | ❌ No |
-
-### vs. got
-
-| Feature | stable-request | got |
-|---------|----------------|-----|
-| **Built on Axios** | ✅ Leverages Axios ecosystem | ❌ Standalone client |
-| **Content validation** | ✅ Response analyzer | ❌ Only HTTP errors |
-| **Batch processing** | ✅ Built-in gateway with grouping | ❌ Manual implementation |
-| **Request grouping** | ✅ Multi-tier configuration | ❌ No grouping |
-| **Trial mode** | ✅ Simulation for testing | ❌ No |
-| **Retry strategies** | ✅ 3 configurable strategies | ✅ Exponential with jitter |
-
-### vs. p-retry + axios
-
-| Feature | stable-request | p-retry + axios |
-|---------|----------------|-----------------|
-| **All-in-one** | ✅ Single package | ❌ Requires multiple packages |
-| **HTTP-aware** | ✅ Built for HTTP | ❌ Generic retry wrapper |
-| **Content validation** | ✅ Built-in | ❌ Manual implementation |
-| **Batch processing** | ✅ Built-in with groups | ❌ Manual implementation |
-| **Request grouping** | ✅ Native support | ❌ No grouping |
-| **Observability** | ✅ Request-specific hooks | ⚠️ Generic callbacks |
 
 ## Best Practices
 
-1. **Use exponential backoff for rate-limited APIs** to avoid overwhelming the server
-2. **Organize related requests into groups** for easier configuration management
-3. **Set reasonable timeout values** in `reqData.timeout` to prevent hanging requests
-4. **Implement responseAnalyzer** for APIs that return 200 OK with error details in the body
-5. **Use concurrent execution** in `stableApiGateway` for independent requests
-6. **Use sequential execution** when requests have dependencies or need to maintain order
-7. **Leverage request groups** to differentiate between critical and optional services
-8. **Use finalErrorAnalyzer** for graceful degradation in non-critical paths
-9. **Enable logging in development** with `logAllErrors` and `logAllSuccessfulAttempts`
-10. **Use Trial Mode** to test your error handling without relying on actual failures
-11. **Group requests by region or service tier** for better monitoring and configuration
+1. **Start simple** - Use basic retries first, add hooks as needed
+2. **Use exponential backoff** for rate-limited APIs
+3. **Validate response content** with `responseAnalyzer` for eventually-consistent systems
+4. **Monitor everything** with `handleErrors` and `handleSuccessfulAttemptData`
+5. **Group related requests** by service tier, region, or priority
+6. **Handle failures gracefully** with `finalErrorAnalyzer` for non-critical features
+7. **Test with trial mode** before deploying to production
+8. **Set appropriate timeouts** to prevent hanging requests
+9. **Use idempotency keys** for payment/financial operations
+10. **Log contextual information** in your hooks for debugging
 
 ## License
 
 MIT © Manish Varma
 
-[![npm version](https://img.shields.io/npm/v/stable-request.svg)](https://www.npmjs.com/package/%40emmvish%2Fstable-request)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
 
-**Made with ❤️ for developers who are sick of integrating apps with unreliable APIs**
+**Made with ❤️ for developers integrating with unreliable APIs**
