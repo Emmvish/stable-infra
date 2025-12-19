@@ -20,6 +20,7 @@ export type {
     ERROR_LOG,
     ReqFnResponse,
     REQUEST_DATA,
+    RequestGroup,
     REQUEST_METHOD_TYPES,
     RETRY_STRATEGY_TYPES,
     SEQUENTIAL_REQUEST_EXECUTION_OPTIONS,

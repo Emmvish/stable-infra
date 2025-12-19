@@ -11,15 +11,15 @@ export function prepareApiRequestData<RequestDataType = any, ResponseDataType = 
                                 SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>
 ): REQUEST_DATA<RequestDataType> {
     const { requestOptions: localOptions } = request;
-    const reqGroup = request.groupId ? commonRequestExecutionOptions.requestGroups?.find(group => group.id === request.groupId) : undefined;
+    const reqGroup = (request.groupId && Array.isArray(commonRequestExecutionOptions.requestGroups) ) ? commonRequestExecutionOptions.requestGroups?.find(group => group.id === request.groupId) : undefined;
 
     const result = {
-        ...(commonRequestExecutionOptions.hasOwnProperty('commonRequestData') ? commonRequestExecutionOptions.commonRequestData : {}),
-        ...(reqGroup && reqGroup?.commonConfig?.hasOwnProperty('commonRequestData') ? reqGroup?.commonConfig?.commonRequestData : {}),
-        ...localOptions.reqData
+        ...(commonRequestExecutionOptions.commonRequestData || {}),
+        ...(reqGroup?.commonConfig?.commonRequestData || {}),
+        ...(localOptions.reqData || {})
     };
 
-    if(!result.hasOwnProperty('hostname')) {
+    if(!result.hostname) {
         console.log('stable-request: Hostname is missing in gateway request data. Setting it to an empty string to avoid errors.');
         result.hostname = '';
     }

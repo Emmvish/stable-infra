@@ -14,14 +14,14 @@ export function prepareApiRequestOptions<RequestDataType = any, ResponseDataType
                                 SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>
 ): Omit<STABLE_REQUEST<RequestDataType, ResponseDataType>, 'reqData'> {
     const { requestOptions: localOptions } = request;
-    const reqGroup = request.groupId ? commonRequestExecutionOptions.requestGroups?.find(group => group.id === request.groupId) : undefined;
-    const result: Record<string, Omit<STABLE_REQUEST<RequestDataType, ResponseDataType>, 'reqData'>> = {};
+    const reqGroup = (request.groupId && Array.isArray(commonRequestExecutionOptions.requestGroups)) ? commonRequestExecutionOptions.requestGroups?.find(group => group.id === request.groupId) : undefined;
+    const result: Record<string, any> = {};
 
     for (const mapping of PrepareApiRequestOptionsMapping) {
         if (localOptions.hasOwnProperty(mapping.localKey)) {
             result[mapping.targetKey] = (localOptions as any)[mapping.localKey];
-        } else if(reqGroup && (reqGroup).hasOwnProperty(mapping.groupCommonKey)) {
-            result[mapping.targetKey] = (reqGroup?.commonConfig as any)[mapping.groupCommonKey];
+        } else if(reqGroup?.commonConfig && (reqGroup.commonConfig as any).hasOwnProperty(mapping.groupCommonKey)) {
+            result[mapping.targetKey] = (reqGroup.commonConfig as any)[mapping.groupCommonKey];
         } else if (commonRequestExecutionOptions.hasOwnProperty(mapping.commonKey)) {
             result[mapping.targetKey] = (commonRequestExecutionOptions as any)[mapping.commonKey];
         }

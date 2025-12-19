@@ -31,7 +31,7 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
     maxSerializableChars?: number
   ) => any | Promise<any>;
   concurrentExecution?: boolean;
-  requestGroups?: RequestGroup[];
+  requestGroups?: RequestGroup<RequestDataType, ResponseDataType>[];
   stopOnFirstError?: boolean;
 }
 
@@ -70,9 +70,9 @@ export interface ERROR_LOG {
   isRetryable: boolean;
 }
 
-export interface RequestGroup {
+export interface RequestGroup<RequestDataType = any, ResponseDataType = any> {
   id: string;
-  commonConfig?: Omit<API_GATEWAY_OPTIONS, "concurrentExecution" | "stopOnFirstError">
+  commonConfig?: Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, "concurrentExecution" | "stopOnFirstError">
 }
 
 export interface ReqFnResponse<ResponseDataType = any> {
