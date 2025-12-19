@@ -113,7 +113,7 @@ export type SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, Response
 
 export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   reqData: REQUEST_DATA<RequestDataType>;
-  responseAnalyzer?: (reqData: AxiosRequestConfig<RequestDataType>, data: ResponseDataType, trialMode?: TRIAL_MODE_OPTIONS) => boolean | Promise<boolean>;
+  responseAnalyzer?: (reqData: AxiosRequestConfig<RequestDataType>, data: ResponseDataType, trialMode?: TRIAL_MODE_OPTIONS, ...params: any[]) => boolean | Promise<boolean>;
   resReq?: boolean;
   attempts?: number;
   performAllAttempts?: boolean;
@@ -123,16 +123,18 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   handleErrors?: (
     reqData: AxiosRequestConfig<RequestDataType>,
     error: ERROR_LOG,
-    maxSerializableChars?: number
+    maxSerializableChars?: number,
+    ...params: any[]
   ) => any | Promise<any>;
   logAllSuccessfulAttempts?: boolean;
   handleSuccessfulAttemptData?: (
     reqData: AxiosRequestConfig<RequestDataType>,
     successfulAttemptData: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>,
-    maxSerializableChars?: number
+    maxSerializableChars?: number,
+    ...params: any[]
   ) => any | Promise<any>;
   maxSerializableChars?: number;
-  finalErrorAnalyzer?: (reqData: AxiosRequestConfig<RequestDataType>, error: any, trialMode?: TRIAL_MODE_OPTIONS) => boolean | Promise<boolean>;
+  finalErrorAnalyzer?: (reqData: AxiosRequestConfig<RequestDataType>, error: any, trialMode?: TRIAL_MODE_OPTIONS, ...params: any[]) => boolean | Promise<boolean>;
   trialMode?: TRIAL_MODE_OPTIONS;
 }
 
