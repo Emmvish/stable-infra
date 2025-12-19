@@ -65,7 +65,8 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
       statusCode: 0
     };
     const maxAttempts = attempts;
-    let lastSuccessfulAttemptData: ResponseDataType = {} as ResponseDataType;
+    let lastSuccessfulAttemptData: ResponseDataType | undefined = undefined;
+    let hadAtLeastOneSuccess = false;
     do {
       attempts--;
       const currentAttempt = maxAttempts - attempts;
@@ -120,26 +121,29 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
           );
         }
       }
-      if (res.ok && !performNextAttempt && logAllSuccessfulAttempts) {
+      if (res.ok && !performNextAttempt) {
+        hadAtLeastOneSuccess = true;
         lastSuccessfulAttemptData = res?.data;
-        const successfulAttemptLog: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType> = {
-          attempt: `${currentAttempt}/${maxAttempts}`,
-          timestamp: res.timestamp,
-          data: res?.data,
-          executionTime: res.executionTime,
-          statusCode: res.statusCode
-        };
-        try {
-          await safelyExecuteUnknownFunction(
-            handleSuccessfulAttemptData,
-            reqData,
-            successfulAttemptLog,
-            maxSerializableChars
-          );
-        } catch (e) {
-          console.log(
-            'stable-request: Unable to report successful attempts due to issues with successful attempt data handler!'
-          );
+        if (logAllSuccessfulAttempts) {
+          const successfulAttemptLog: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType> = {
+            attempt: `${currentAttempt}/${maxAttempts}`,
+            timestamp: res.timestamp,
+            data: res?.data,
+            executionTime: res.executionTime,
+            statusCode: res.statusCode
+          };
+          try {
+            await safelyExecuteUnknownFunction(
+              handleSuccessfulAttemptData,
+              reqData,
+              successfulAttemptLog,
+              maxSerializableChars
+            );
+          } catch (e) {
+            console.log(
+              'stable-request: Unable to report successful attempts due to issues with successful attempt data handler!'
+            );
+          }
         }
       }
       if (performNextAttempt && res.isRetryable) {
@@ -157,7 +161,16 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
       attempts > 0 &&
       ((res.isRetryable && !res.ok) || performAllAttempts)
     );
-    if (res.ok || performAllAttempts) {
+    
+    if (performAllAttempts && hadAtLeastOneSuccess) {
+      if (trialMode.enabled) {
+        console.log(
+          'Final response (performAllAttempts mode):\n',
+          safelyStringify(lastSuccessfulAttemptData as Record<string, any>, maxSerializableChars)
+        );
+      }
+      return resReq ? lastSuccessfulAttemptData! : true;
+    } else if (res.ok) {
       if (trialMode.enabled) {
         const finalResponse = res?.data ?? lastSuccessfulAttemptData;
         console.log(
@@ -165,7 +178,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
           safelyStringify(finalResponse, maxSerializableChars)
         );
       }
-      return resReq ? res?.data ?? lastSuccessfulAttemptData : true;
+      return resReq ? res?.data ?? lastSuccessfulAttemptData! : true;
     } else {
       throw new Error(
         safelyStringify(
