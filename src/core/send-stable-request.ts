@@ -27,22 +27,22 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
 ): Promise<ResponseDataType | boolean> {
   const {
     reqData: givenReqData,
-    responseAnalyzer = (reqData, data, trialMode = { enabled: false }) => true,
+    responseAnalyzer = ({ reqData, data, trialMode = { enabled: false } }) => true,
     resReq = false,
     attempts: givenAttempts = 1,
     performAllAttempts = false,
     wait = 1000,
     retryStrategy = RETRY_STRATEGIES.FIXED,
     logAllErrors = false,
-    handleErrors = (reqData, error, maxSerializableChars = 1000) => 
+    handleErrors = ({ reqData, errorLog, maxSerializableChars = 1000 }) => 
       console.log(
         'Request data:\n',
         safelyStringify(reqData, maxSerializableChars),
         '\nError log:\n',
-        safelyStringify(error, maxSerializableChars)
+        safelyStringify(errorLog, maxSerializableChars)
       ),
     logAllSuccessfulAttempts = false,
-    handleSuccessfulAttemptData = (reqData, successfulAttemptData, maxSerializableChars = 1000) =>
+    handleSuccessfulAttemptData = ({ reqData, successfulAttemptData, maxSerializableChars = 1000 }) =>
       console.log(
         'Request data:\n',
         safelyStringify(reqData, maxSerializableChars),
@@ -50,8 +50,9 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
         safelyStringify(successfulAttemptData, maxSerializableChars)
       ),
     maxSerializableChars = 1000,
-    finalErrorAnalyzer = (reqData, error, trialMode = { enabled: false }) => false,
-    trialMode = { enabled: false }
+    finalErrorAnalyzer = ({ reqData, error, trialMode = { enabled: false } }) => false,
+    trialMode = { enabled: false },
+    hookParams = {}
   } = options;
   let attempts = givenAttempts;
   const reqData: AxiosRequestConfig<RequestDataType> = generateAxiosRequestConfig<RequestDataType>(givenReqData);
@@ -77,9 +78,12 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
         try {
           performNextAttempt = !(await safelyExecuteUnknownFunction(
             responseAnalyzer,
-            reqData,
-            res?.data,
-            trialMode
+            {
+              reqData,
+              data: res?.data,
+              trialMode,
+              params: hookParams.responseAnalyzerParams
+            }
           ));
         } catch (e) {
           console.log(
@@ -111,9 +115,11 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
         try {
           await safelyExecuteUnknownFunction(
             handleErrors,
-            reqData,
-            errorLog,
-            maxSerializableChars
+            {
+              reqData,
+              errorLog,
+              maxSerializableChars
+            }
           );
         } catch (e) {
           console.log(
@@ -135,9 +141,11 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
           try {
             await safelyExecuteUnknownFunction(
               handleSuccessfulAttemptData,
-              reqData,
-              successfulAttemptLog,
-              maxSerializableChars
+              {
+                reqData,
+                successfulAttemptData: successfulAttemptLog,
+                maxSerializableChars
+              }
             );
           } catch (e) {
             console.log(
@@ -196,9 +204,12 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
     }
     const errorAnalysisResult = await safelyExecuteUnknownFunction(
       finalErrorAnalyzer,
-      reqData,
-      e,
-      trialMode
+      {
+        reqData,
+        e,
+        trialMode,
+        params: hookParams.finalErrorAnalyzerParams
+      }
     );
     if(!errorAnalysisResult) {
       throw e;

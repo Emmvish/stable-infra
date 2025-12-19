@@ -4,6 +4,7 @@ export function extractCommonRequestConfigOptions<RequestDataType = any, Respons
     options: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>
 ) {
     const commonOptionKeys: (keyof API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>)[] = [
+        'commonHookParams',
         'commonRequestData',
         'commonResponseAnalyzer',
         'commonHandleErrors',

@@ -10,6 +10,7 @@ import {
 export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any> {
   commonRequestData?: Partial<REQUEST_DATA<RequestDataType>>;
   commonAttempts?: number;
+  commonHookParams?: HookParams;
   commonPerformAllAttempts?: boolean;
   commonWait?: number;
   commonRetryStrategy?: RETRY_STRATEGY_TYPES;
@@ -17,18 +18,14 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
   commonLogAllSuccessfulAttempts?: boolean;
   commonMaxSerializableChars?: number;
   commonTrialMode?: TRIAL_MODE_OPTIONS;
-  commonResponseAnalyzer?: (reqData: AxiosRequestConfig<RequestDataType>, data: ResponseDataType, trialMode?: TRIAL_MODE_OPTIONS) => boolean | Promise<boolean>;
+  commonResponseAnalyzer?: (options: ResponseAnalysisHookOptions<RequestDataType, ResponseDataType>) => boolean | Promise<boolean>;
   commonResReq?: boolean;
-  commonFinalErrorAnalyzer?: (reqData: AxiosRequestConfig<RequestDataType>, error: any, trialMode?: TRIAL_MODE_OPTIONS) => boolean | Promise<boolean>;
+  commonFinalErrorAnalyzer?: (options: FinalErrorAnalysisHookOptions<RequestDataType>) => boolean | Promise<boolean>;
   commonHandleErrors?: (
-    reqData: AxiosRequestConfig<RequestDataType>,
-    error: ERROR_LOG,
-    maxSerializableChars?: number
+    options: HandleErrorHookOptions<RequestDataType>
   ) => any | Promise<any>;
   commonHandleSuccessfulAttemptData?: (
-    reqData: AxiosRequestConfig<RequestDataType>,
-    successfulAttemptData: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>,
-    maxSerializableChars?: number
+    options: HandleSuccessfulAttemptDataHookOptions<RequestDataType, ResponseDataType>
   ) => any | Promise<any>;
   concurrentExecution?: boolean;
   requestGroups?: RequestGroup<RequestDataType, ResponseDataType>[];
@@ -111,9 +108,40 @@ export type RETRY_STRATEGY_TYPES = RETRY_STRATEGIES.FIXED | RETRY_STRATEGIES.LIN
 
 export type SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, ResponseDataType = any> = Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, "concurrentExecution">
 
+interface ObservabilityHooksOptions<RequestDataType = any> {
+  reqData: AxiosRequestConfig<RequestDataType>;
+  maxSerializableChars?: number;
+}
+
+interface AnalysisHookOptions<RequestDataType = any> extends Omit<ObservabilityHooksOptions<RequestDataType>, "maxSerializableChars"> {
+  trialMode?: TRIAL_MODE_OPTIONS,
+  params?: any
+}
+
+export interface ResponseAnalysisHookOptions<RequestDataType = any, ResponseDataType = any> extends AnalysisHookOptions<RequestDataType> {
+  data: ResponseDataType
+}
+
+export interface FinalErrorAnalysisHookOptions<RequestDataType = any> extends AnalysisHookOptions<RequestDataType> {
+  error: any
+}
+
+export interface HandleErrorHookOptions<RequestDataType = any> extends ObservabilityHooksOptions<RequestDataType> {
+  errorLog: ERROR_LOG
+}
+
+export interface HandleSuccessfulAttemptDataHookOptions<RequestDataType = any, ResponseDataType = any> extends ObservabilityHooksOptions<RequestDataType> {
+  successfulAttemptData: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>
+}
+
+export interface HookParams {
+  responseAnalyzerParams?: any;
+  finalErrorAnalyzerParams?: any;
+}
+
 export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   reqData: REQUEST_DATA<RequestDataType>;
-  responseAnalyzer?: (reqData: AxiosRequestConfig<RequestDataType>, data: ResponseDataType, trialMode?: TRIAL_MODE_OPTIONS, ...params: any[]) => boolean | Promise<boolean>;
+  responseAnalyzer?: (options: ResponseAnalysisHookOptions<RequestDataType, ResponseDataType>) => boolean | Promise<boolean>;
   resReq?: boolean;
   attempts?: number;
   performAllAttempts?: boolean;
@@ -121,21 +149,16 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   retryStrategy?: RETRY_STRATEGY_TYPES;
   logAllErrors?: boolean;
   handleErrors?: (
-    reqData: AxiosRequestConfig<RequestDataType>,
-    error: ERROR_LOG,
-    maxSerializableChars?: number,
-    ...params: any[]
+    options: HandleErrorHookOptions<RequestDataType>
   ) => any | Promise<any>;
   logAllSuccessfulAttempts?: boolean;
   handleSuccessfulAttemptData?: (
-    reqData: AxiosRequestConfig<RequestDataType>,
-    successfulAttemptData: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>,
-    maxSerializableChars?: number,
-    ...params: any[]
+    options: HandleSuccessfulAttemptDataHookOptions<RequestDataType, ResponseDataType>
   ) => any | Promise<any>;
   maxSerializableChars?: number;
-  finalErrorAnalyzer?: (reqData: AxiosRequestConfig<RequestDataType>, error: any, trialMode?: TRIAL_MODE_OPTIONS, ...params: any[]) => boolean | Promise<boolean>;
+  finalErrorAnalyzer?: (options: FinalErrorAnalysisHookOptions<RequestDataType>) => boolean | Promise<boolean>;
   trialMode?: TRIAL_MODE_OPTIONS;
+  hookParams?: HookParams;
 }
 
 export interface SUCCESSFUL_ATTEMPT_DATA<ResponseDataType = any> {

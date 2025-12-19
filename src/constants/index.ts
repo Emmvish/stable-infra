@@ -1,6 +1,7 @@
 import { ApiRequestOptionsMapping } from "../types/index.js";
 
 export const PrepareApiRequestOptionsMapping: ApiRequestOptionsMapping[] = [
+    { localKey: 'hookParams', commonKey: 'commonHookParams', groupCommonKey: 'commonHookParams', targetKey: 'hookParams' },
     { localKey: 'resReq', commonKey: 'commonResReq', groupCommonKey: 'commonResReq', targetKey: 'resReq' },
     { localKey: 'attempts', commonKey: 'commonAttempts', groupCommonKey: 'commonAttempts', targetKey: 'attempts' },
     { localKey: 'performAllAttempts', commonKey: 'commonPerformAllAttempts', groupCommonKey: 'commonPerformAllAttempts', targetKey: 'performAllAttempts' },
