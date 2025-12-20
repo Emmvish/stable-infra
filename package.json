@@ -1,6 +1,6 @@
 {
   "name": "@emmvish/stable-request",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "stable-request is a TypeScript-first HTTP reliability toolkit for workflow-driven API integrations, that goes beyond status-code retries by validating response content, handling eventual consistency, coordinating batch workflows with intelligent grouping, and providing deep observability into every request attempt. It is designed for real-world distributed systems where HTTP success does not guarantee business success. It also provides extensive support for managing multiple requests so as to achieve workflow automation.",
   "type": "module",
   "main": "dist/index.js",
@@ -12,7 +12,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test": "jest"
   },
   "keywords": [
     "stable-request",
@@ -42,7 +43,12 @@
   "author": "Manish Varma",
   "license": "MIT",
   "devDependencies": {
+    "@jest/globals": "^30.2.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",
+    "jest": "^30.2.0",
+    "nock": "^14.0.10",
+    "ts-jest": "^29.4.6",
     "ts-node": "^10.9.0",
     "typescript": "^5.0.0"
   },
