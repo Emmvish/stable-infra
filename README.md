@@ -952,6 +952,7 @@ console.log('System Health:', report);
 | `resReq` | `boolean` | `false` | Return response data vs. just boolean |
 | `attempts` | `number` | `1` | Max retry attempts |
 | `wait` | `number` | `1000` | Base delay between retries (ms) |
+| `maxAllowedWait` | `number` | `60000` | Maximum permitted wait duration between retries (ms) |
 | `retryStrategy` | `RETRY_STRATEGY_TYPES` | `'fixed'` | Retry backoff strategy |
 | `performAllAttempts` | `boolean` | `false` | Execute all attempts regardless |
 | `logAllErrors` | `boolean` | `false` | Enable error logging |
@@ -991,6 +992,7 @@ interface REQUEST_DATA<RequestDataType = any> {
 | `commonAttempts` | `number` | `1` | Default attempts for all requests |
 | `commonPerformAllAttempts` | `boolean` | `false` | Default performAllAttempts for all requests |
 | `commonWait` | `number` | `1000` | Default wait time for all requests |
+| `commonMaxAllowedWait` | `number` | `60000` | Default maximum permitted wait time for all requests |
 | `commonRetryStrategy` | `RETRY_STRATEGY_TYPES` | `'fixed'` | Default retry strategy for all requests |
 | `commonLogAllErrors` | `boolean` | `false` | Default error logging for all requests |
 | `commonLogAllSuccessfulAttempts` | `boolean` | `false` | Default success logging for all requests |
