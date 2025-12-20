@@ -29,15 +29,19 @@ npm install @emmvish/stable-request
 ```typescript
 import { stableRequest } from '@emmvish/stable-request';
 
-const data = await stableRequest({
-  reqData: {
-    hostname: 'api.example.com',
-    path: '/users/123'
-  },
-  resReq: true  // Return the response data
-});
+const getStableResponse = async () => {
+  const data = await stableRequest({
+    reqData: {
+      hostname: 'api.example.com',
+      path: '/users/123'
+    },
+    resReq: true  // Return the response data
+  });
+  
+  console.log(data); // { id: 123, name: 'John' }
+}
 
-console.log(data); // { id: 123, name: 'John' }
+getStableResponse();
 ```
 
 ### 2. Add Simple Retries
@@ -45,16 +49,22 @@ console.log(data); // { id: 123, name: 'John' }
 ```typescript
 import { stableRequest, RETRY_STRATEGIES } from '@emmvish/stable-request';
 
-const data = await stableRequest({
-  reqData: {
-    hostname: 'api.example.com',
-    path: '/users/123'
-  },
-  resReq: true,
-  attempts: 3,              // Retry up to 3 times
-  wait: 1000,               // Wait 1 second between retries
-  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL  // 1s, 2s, 4s, 8s...
-});
+const getStableResponse = async () => {
+  const data = await stableRequest({
+    reqData: {
+      hostname: 'api.example.com',
+      path: '/users/123'
+    },
+    resReq: true,
+    attempts: 3,              // Retry up to 3 times
+    wait: 1000,               // Wait 1 second between retries
+    retryStrategy: RETRY_STRATEGIES.EXPONENTIAL  // 1s, 2s, 4s, 8s...
+  });
+
+  console.log(data);
+}
+
+getStableResponse();
 ```
 
 **Retry Strategies:**
