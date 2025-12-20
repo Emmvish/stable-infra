@@ -1,5 +1,5 @@
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
-import { ReqFnResponse ,TRIAL_MODE_OPTIONS } from '../types/index.js';
+import { ReqFnResponse, TRIAL_MODE_OPTIONS } from '../types/index.js';
 import { safelyStringify } from './safely-stringify.js';
 import { isRetryableError } from './is-retryable-error.js';
 

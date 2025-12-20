@@ -13,6 +13,7 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
   commonHookParams?: HookParams;
   commonPerformAllAttempts?: boolean;
   commonWait?: number;
+  commonMaxAllowedWait?: number;
   commonRetryStrategy?: RETRY_STRATEGY_TYPES;
   commonLogAllErrors?: boolean;
   commonLogAllSuccessfulAttempts?: boolean;
@@ -32,7 +33,13 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
   stopOnFirstError?: boolean;
 }
 
-export type API_GATEWAY_REQUEST_OPTIONS_TYPE<RequestDataType, ResponseDataType> = Omit<STABLE_REQUEST<RequestDataType, ResponseDataType>, 'reqData'> & Partial<Pick<STABLE_REQUEST<RequestDataType, ResponseDataType>, 'reqData'>>;
+export type API_GATEWAY_REQUEST_OPTIONS_TYPE<
+  RequestDataType,
+  ResponseDataType
+> =
+  Omit<STABLE_REQUEST<RequestDataType, ResponseDataType>, 'reqData'> & {
+    reqData?: Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>['reqData']>;
+  };
 
 export interface API_GATEWAY_REQUEST<RequestDataType = any, ResponseDataType = any> {
   id: string;
@@ -146,6 +153,7 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   attempts?: number;
   performAllAttempts?: boolean;
   wait?: number;
+  maxAllowedWait?: number;
   retryStrategy?: RETRY_STRATEGY_TYPES;
   logAllErrors?: boolean;
   handleErrors?: (

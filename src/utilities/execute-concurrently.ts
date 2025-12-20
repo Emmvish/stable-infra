@@ -26,12 +26,15 @@ export async function executeConcurrently<RequestDataType = any, ResponseDataTyp
         const req = requests[i];
         if(res.status === 'fulfilled') {
             const value = res.value;
+            const isSuccess = value !== false;
             responses.push({
                 requestId: req.id,
                 ...(req.groupId && { groupId: req.groupId }),
-                success: value ? true : false,
-                ...(value && { data: value as ResponseDataType }),
-                ...(!value && { error: 'Request was unsuccessful, but the error was analyzed successfully!' })
+                success: isSuccess,
+                ...(isSuccess && typeof value !== 'boolean' && { data: value as ResponseDataType }),
+                ...(!isSuccess && {
+                    error: 'Request was unsuccessful, but the error was analyzed successfully!'
+                })
             });
         } else {
             responses.push({

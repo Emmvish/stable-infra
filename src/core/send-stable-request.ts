@@ -32,6 +32,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
     attempts: givenAttempts = 1,
     performAllAttempts = false,
     wait = 1000,
+    maxAllowedWait = 60000,
     retryStrategy = RETRY_STRATEGIES.FIXED,
     logAllErrors = false,
     handleErrors = ({ reqData, errorLog, maxSerializableChars = 1000 }) => 
@@ -163,7 +164,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
           (originalResOk && performNextAttempt) ||
           performAllAttempts)
       ) {
-        await delay(getNewDelayTime(retryStrategy, wait, currentAttempt));
+        await delay(getNewDelayTime(retryStrategy, wait, currentAttempt), maxAllowedWait);
       }
     } while (
       attempts > 0 &&
@@ -206,7 +207,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
       finalErrorAnalyzer,
       {
         reqData,
-        e,
+        error: e,
         trialMode,
         params: hookParams.finalErrorAnalyzerParams
       }

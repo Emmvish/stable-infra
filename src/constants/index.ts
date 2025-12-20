@@ -1,7 +1,27 @@
-import { ApiRequestOptionsMapping } from "../types/index.js";
+import { API_GATEWAY_OPTIONS, ApiRequestOptionsMapping } from "../types/index.js";
+
+export const extractCommonOptionsKeys: (keyof API_GATEWAY_OPTIONS)[] = [
+    'commonHookParams',
+    'commonMaxAllowedWait',
+    'commonRequestData',
+    'commonResponseAnalyzer',
+    'commonHandleErrors',
+    'commonHandleSuccessfulAttemptData',
+    'commonFinalErrorAnalyzer',
+    'commonResReq',
+    'commonAttempts',
+    'commonPerformAllAttempts',
+    'commonWait',
+    'commonRetryStrategy',
+    'commonLogAllErrors',
+    'commonLogAllSuccessfulAttempts',
+    'commonMaxSerializableChars',
+    'commonTrialMode'
+];
 
 export const PrepareApiRequestOptionsMapping: ApiRequestOptionsMapping[] = [
     { localKey: 'hookParams', commonKey: 'commonHookParams', groupCommonKey: 'commonHookParams', targetKey: 'hookParams' },
+    { localKey: 'maxAllowedWait', commonKey: 'commonMaxAllowedWait', groupCommonKey: 'commonMaxAllowedWait', targetKey: 'maxAllowedWait' },
     { localKey: 'resReq', commonKey: 'commonResReq', groupCommonKey: 'commonResReq', targetKey: 'resReq' },
     { localKey: 'attempts', commonKey: 'commonAttempts', groupCommonKey: 'commonAttempts', targetKey: 'attempts' },
     { localKey: 'performAllAttempts', commonKey: 'commonPerformAllAttempts', groupCommonKey: 'commonPerformAllAttempts', targetKey: 'performAllAttempts' },
