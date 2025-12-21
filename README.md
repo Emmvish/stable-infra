@@ -29,11 +29,23 @@ npm install @emmvish/stable-request
 ```typescript
 import { stableRequest } from '@emmvish/stable-request';
 
+interface RequestBodyParams {
+  page: number,
+  offset: number
+}
+
+interface ResponseParams {
+  id: number,
+  name: string
+}
+
 const getStableResponse = async () => {
-  const data = await stableRequest({
+  const data = await stableRequest<RequestBodyParams, ResponseParams>({
     reqData: {
       hostname: 'api.example.com',
-      path: '/users/123'
+      path: '/users/123',
+      headers: { Authorization: `Bearer ${token}` }
+      body: { page: 10, offset: 5 }
     },
     resReq: true  // Return the response data
   });
