@@ -24,7 +24,7 @@ export async function executeSequentially<RequestDataType = any, ResponseDataTyp
                 ...(req.groupId && { groupId: req.groupId }),
                 success: res ? true : false,
                 ...(res && { data: res as ResponseDataType }),
-                ...(!res && { error: 'Request was unsuccessful, but analyzed successfully!' })
+                ...(!res && { error: 'Request was unsuccessful, but the error was analyzed successfully!' })
             })
         } catch(e: any) {
             responses.push({
