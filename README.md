@@ -58,6 +58,7 @@ const getStableResponse = async () => {
     resReq: true,
     attempts: 3,              // Retry up to 3 times
     wait: 1000,               // Wait 1 second between retries
+    maxAllowedWait: 8000,   // Maximum permissible wait time between retries
     retryStrategy: RETRY_STRATEGIES.EXPONENTIAL  // 1s, 2s, 4s, 8s...
   });
 
