@@ -120,11 +120,13 @@ interface ObservabilityHooksOptions<RequestDataType = any> {
   reqData: AxiosRequestConfig<RequestDataType>;
   params?: any;
   maxSerializableChars?: number;
+  preExecutionResult?: any;
 }
 
 interface AnalysisHookOptions<RequestDataType = any> extends Omit<ObservabilityHooksOptions<RequestDataType>, "maxSerializableChars"> {
-  trialMode?: TRIAL_MODE_OPTIONS,
-  params?: any
+  trialMode?: TRIAL_MODE_OPTIONS;
+  params?: any;
+  preExecutionResult?: any;
 }
 
 export interface ResponseAnalysisHookOptions<RequestDataType = any, ResponseDataType = any> extends AnalysisHookOptions<RequestDataType> {

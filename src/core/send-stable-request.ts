@@ -35,9 +35,9 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
       preExecutionOutputBuffer: {}
     }
   } = options;
-  let result: Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>> | unknown;
+  let preExecutionResult: Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>> | unknown;
   try {
-    result = await safelyExecuteUnknownFunction(
+    preExecutionResult = await safelyExecuteUnknownFunction(
       preExecution?.preExecutionHook as Function,
       {
         inputParams: preExecution?.preExecutionHookParams,
@@ -47,7 +47,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
     if(preExecution?.applyPreExecutionConfigOverride) {
       const finalOptions = {
         ...options,
-        ...result as Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>>
+        ...preExecutionResult as Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>>
       }
       Object.assign(options, finalOptions);
     }
@@ -116,7 +116,8 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
               reqData,
               data: res?.data,
               trialMode,
-              params: hookParams?.responseAnalyzerParams
+              params: hookParams?.responseAnalyzerParams,
+              preExecutionResult
             }
           ));
         } catch (e) {
@@ -153,7 +154,8 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
               reqData,
               errorLog,
               maxSerializableChars,
-              params: hookParams?.handleErrorsParams
+              params: hookParams?.handleErrorsParams,
+              preExecutionResult
             }
           );
         } catch (e) {
@@ -180,7 +182,8 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
                 reqData,
                 successfulAttemptData: successfulAttemptLog,
                 maxSerializableChars,
-                params: hookParams?.handleSuccessfulAttemptDataParams
+                params: hookParams?.handleSuccessfulAttemptDataParams,
+                preExecutionResult
               }
             );
           } catch (e) {
@@ -244,7 +247,8 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
         reqData,
         error: e,
         trialMode,
-        params: hookParams?.finalErrorAnalyzerParams
+        params: hookParams?.finalErrorAnalyzerParams,
+        preExecutionResult
       }
     );
     if(!errorAnalysisResult) {
