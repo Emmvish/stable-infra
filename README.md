@@ -380,6 +380,69 @@ const data = await stableRequest({
 });
 ```
 
+### 8. Pre-Execution Hook (Dynamic Configuration)
+
+Use `preExecution` to modify request configuration dynamically before execution:
+
+```typescript
+const outputBuffer: Record<string, any> = {};
+
+const data = await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    path: '/protected-resource'
+  },
+  resReq: true,
+  attempts: 3,
+  
+  preExecution: {
+    // Hook executed before any request attempts
+    preExecutionHook: async ({ inputParams, outputBuffer }) => {
+      const token = await authService.getToken(inputParams.userId);
+      outputBuffer.token = token;
+      outputBuffer.fetchedAt = new Date().toISOString();
+      // Return configuration overrides
+      return {
+        reqData: {
+          hostname: 'api.example.com',
+          path: '/protected-resource',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        },
+        attempts: 5
+      };
+    },
+    preExecutionHookParams: {
+      userId: 'user-123',
+      environment: 'production'
+    },
+    preExecutionOutputBuffer: outputBuffer,
+    applyPreExecutionConfigOverride: true,
+    continueOnPreExecutionHookFailure: false
+  }
+});
+
+console.log('Token used:', outputBuffer.token);
+console.log('Fetched at:', outputBuffer.fetchedAt);
+```
+
+**Pre-Execution Options:**
+
+```typescript
+interface PreExecutionOptions {
+  preExecutionHook: (options: {
+    inputParams: any;        // Custom parameters you provide
+    outputBuffer: Object;    // Object to store hook results
+  }) => any | Promise<any>;  // Returns config overrides
+  
+  preExecutionHookParams?: any;              // Custom input parameters
+  preExecutionOutputBuffer: Object;           // Required: buffer for hook output
+  applyPreExecutionConfigOverride?: boolean;  // Apply returned overrides (default: false)
+  continueOnPreExecutionHookFailure?: boolean; // Continue if hook fails (default: false)
+}
+```
+
 ## Intermediate Concepts
 
 ### Making POST/PUT/PATCH Requests
@@ -1530,6 +1593,35 @@ interface STABLE_WORKFLOW_RESULT {
 ```
 
 ### Hooks Reference
+
+#### preExecutionHook
+
+**Purpose:** Dynamically configure request before execution
+
+```typescript
+preExecution: {
+  preExecutionHook: async ({ inputParams, outputBuffer }) => {
+    // Fetch dynamic data
+    const token = await getAuthToken();
+    
+    // Store in output buffer
+    outputBuffer.token = token;
+    outputBuffer.timestamp = Date.now();
+    
+    // Return config overrides
+    return {
+      reqData: {
+        headers: { 'Authorization': `Bearer ${token}` }
+      },
+      attempts: 5
+    };
+  },
+  preExecutionHookParams: { userId: 'user-123' },
+  preExecutionOutputBuffer: {},
+  applyPreExecutionConfigOverride: true,
+  continueOnPreExecutionHookFailure: false
+}
+```
 
 #### responseAnalyzer
 
