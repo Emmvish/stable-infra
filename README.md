@@ -1539,10 +1539,10 @@ handlePhaseError: async ({ workflowId, phaseResult, error, maxSerializableChars,
 }
 ```
 
-## Configuration Hierarchy:**
+## Configuration Hierarchy
 
 1. **Workflow-level** (lowest priority): Applied to all phases
-2. **Phase-level** (`commonConfig`): Overrides workflow-level
+2. **Phase-level**: Overrides workflow-level
 3. **Request Group**: Overrides phase-level
 4. **Individual Request** (highest priority): Overrides everything
 
