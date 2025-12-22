@@ -1412,6 +1412,51 @@ interface REQUEST_DATA<RequestDataType = any> {
 | `commonRequestData` | `Partial<REQUEST_DATA>` | `{ hostname: '' }` | Common set of request options for each request |
 | `commonHookParams` | `HookParams` | `{ }` | Common options for each request hook |
 
+### `stableWorkflow(phases, options)`
+
+Execute a multi-phase workflow with full control over execution order and error handling.
+
+**Phases Array:**
+```typescript
+interface STABLE_WORKFLOW_PHASE {
+  id?: string;                     // Phase identifier (auto-generated if omitted)
+  concurrentExecution?: boolean;   // true = parallel, false = sequential (default: true)
+  stopOnFirstError?: boolean;      // Stop phase on first request failure (default: false)
+  commonConfig?: Omit<API_GATEWAY_OPTIONS, 'concurrentExecution' | 'stopOnFirstError' | 'requestGroups'>;
+  requests: API_GATEWAY_REQUEST[]; // Array of requests for this phase
+}
+```
+
+**Workflow Options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `workflowId` | `string` | `workflow-{timestamp}` | Workflow identifier |
+| `stopOnFirstPhaseError` | `boolean` | `false` | Stop workflow if any phase fails |
+| `logPhaseResults` | `boolean` | `false` | Log phase execution to console |
+| `handlePhaseCompletion` | `function` | `undefined` | Hook called after each successful phase |
+| `handlePhaseError` | `function` | `undefined` | Hook called when a phase fails |
+| `maxSerializableChars` | `number` | `1000` | Max chars for serialization in hooks |
+| `workflowHookParams` | `WorkflowHookParams` | {} | Custom set of params passed to hooks |
+| All `stableApiGateway` options | - | - | Applied as workflow-level defaults |
+
+**STABLE_WORKFLOW_RESULT response:**
+```typescript
+interface STABLE_WORKFLOW_RESULT {
+  workflowId: string;
+  success: boolean;             // All phases successful?
+  executionTime: number;        // Total workflow duration (ms)
+  timestamp: string;            // ISO timestamp
+  totalPhases: number;
+  completedPhases: number;
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  phases: PHASE_RESULT[];      // Detailed results per phase
+  error?: string;              // Workflow-level error
+}
+```
+
 ### Hooks Reference
 
 #### responseAnalyzer
@@ -1467,6 +1512,40 @@ finalErrorAnalyzer: async ({ reqData, error, trialMode, params }) => {
 }
 ```
 
+#### handlePhaseCompletion
+
+**Purpose:** Execute phase-bridging code upon successful completion of a phase
+
+```typescript
+handlePhaseCompletion: async ({ workflowId, phaseResult, maxSerializableChars, params }) => {
+  await logger.log(phaseResult.phaseId, phaseResult.success);
+  // phaseResult includes:
+  // - phaseId, phaseIndex
+  // - success, executionTime, timestamp
+  // - totalRequests, successfulRequests, failedRequests
+  // - responses array
+}
+```
+
+#### handlePhaseError
+
+**Purpose:** Execute error handling code if a phase runs into an error
+
+```typescript
+handlePhaseError: async ({ workflowId, phaseResult, error, maxSerializableChars, params }) => {
+  await logger.error(error);
+  // Similar to handlePhaseCompletion, plus:
+  // - error: the error object
+}
+```
+
+## Configuration Hierarchy:**
+
+1. **Workflow-level** (lowest priority): Applied to all phases
+2. **Phase-level** (`commonConfig`): Overrides workflow-level
+3. **Request Group**: Overrides phase-level
+4. **Individual Request** (highest priority): Overrides everything
+
 ## TypeScript Support
 
 Fully typed with generics:
@@ -1500,76 +1579,6 @@ const user = await stableRequest<CreateUserRequest, UserResponse>({
 // user is typed as UserResponse
 console.log(user.id);  // TypeScript knows this exists
 ```
-
-### `stableWorkflow(phases, options)`
-
-Execute a multi-phase workflow with full control over execution order and error handling.
-
-**Phases Array:**
-```typescript
-interface STABLE_WORKFLOW_PHASE {
-  id?: string;                     // Phase identifier (auto-generated if omitted)
-  concurrentExecution?: boolean;   // true = parallel, false = sequential (default: true)
-  stopOnFirstError?: boolean;      // Stop phase on first request failure (default: false)
-  commonConfig?: Omit<API_GATEWAY_OPTIONS, 'concurrentExecution' | 'stopOnFirstError' | 'requestGroups'>;
-  requests: API_GATEWAY_REQUEST[]; // Array of requests for this phase
-}
-```
-
-**Workflow Options:**
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `workflowId` | `string` | `workflow-{timestamp}` | Workflow identifier |
-| `stopOnFirstPhaseError` | `boolean` | `false` | Stop workflow if any phase fails |
-| `logPhaseResults` | `boolean` | `false` | Log phase execution to console |
-| `handlePhaseCompletion` | `function` | `undefined` | Hook called after each successful phase |
-| `handlePhaseError` | `function` | `undefined` | Hook called when a phase fails |
-| `maxSerializableChars` | `number` | `1000` | Max chars for serialization in hooks |
-| All `stableApiGateway` options | - | - | Applied as workflow-level defaults |
-
-**handlePhaseCompletion Hook:**
-```typescript
-handlePhaseCompletion: async ({ workflowId, phaseResult, maxSerializableChars }) => {
-  // phaseResult includes:
-  // - phaseId, phaseIndex
-  // - success, executionTime, timestamp
-  // - totalRequests, successfulRequests, failedRequests
-  // - responses array
-}
-```
-
-**handlePhaseError Hook:**
-```typescript
-handlePhaseError: async ({ workflowId, phaseResult, error, maxSerializableChars }) => {
-  // Similar to handlePhaseCompletion, plus:
-  // - error: the error object
-}
-```
-
-**STABLE_WORKFLOW_RESULT response:**
-```typescript
-interface STABLE_WORKFLOW_RESULT {
-  workflowId: string;
-  success: boolean;             // All phases successful?
-  executionTime: number;        // Total workflow duration (ms)
-  timestamp: string;            // ISO timestamp
-  totalPhases: number;
-  completedPhases: number;
-  totalRequests: number;
-  successfulRequests: number;
-  failedRequests: number;
-  phases: PHASE_RESULT[];      // Detailed results per phase
-  error?: string;              // Workflow-level error
-}
-```
-
-**Configuration Hierarchy:**
-
-1. **Workflow-level** (lowest priority): Applied to all phases
-2. **Phase-level** (`commonConfig`): Overrides workflow-level
-3. **Request Group**: Overrides phase-level
-4. **Individual Request** (highest priority): Overrides everything
 
 ## Best Practices
 
