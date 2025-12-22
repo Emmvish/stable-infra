@@ -4,7 +4,10 @@ import {
     STABLE_WORKFLOW_PHASE,
     STABLE_WORKFLOW_RESULT
 } from '../types/index.js';
-import { safelyExecuteUnknownFunction } from '../utilities/index.js';
+import { 
+    safelyExecuteUnknownFunction, 
+    safelyStringify 
+} from '../utilities/index.js';
 
 export async function stableWorkflow<RequestDataType = any, ResponseDataType = any>(
     phases: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>[],
@@ -13,8 +16,22 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
     const {
         stopOnFirstPhaseError = false,
         logPhaseResults = false,
-        handlePhaseCompletion,
-        handlePhaseError,
+        handlePhaseCompletion = ({ workflowId, phaseResult, maxSerializableChars = 1000 }) =>
+            console.info(
+                'stable-request:\n',
+                'Workflow ID:\n',
+                workflowId,
+                '\nPhase result:\n',
+                safelyStringify(phaseResult, maxSerializableChars)
+            ),
+        handlePhaseError = ({ workflowId, error, phaseResult, maxSerializableChars = 1000 }) =>
+            console.error(
+                'stable-request:\n',
+                'Workflow ID:\n',
+                workflowId,
+                '\nError:\n',
+                safelyStringify({ error, phaseResult }, maxSerializableChars)
+            ),
         maxSerializableChars = 1000,
         requestGroups = [],
         workflowHookParams = {},
@@ -136,23 +153,21 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                     );
                 }
 
-                if (handlePhaseError) {
-                    try {
-                        await safelyExecuteUnknownFunction(
-                            handlePhaseError, {
-                                workflowId,
-                                phaseResult,
-                                error: phaseError,
-                                maxSerializableChars,
-                                params: workflowHookParams?.handlePhaseErrorParams
-                            }
-                        );
-                    } catch (hookError) {
-                        console.error(
-                            `stable-request: [Workflow: ${workflowId}] Error in handlePhaseError hook:`,
-                            hookError
-                        );
-                    }
+                try {
+                    await safelyExecuteUnknownFunction(
+                        handlePhaseError, {
+                            workflowId,
+                            phaseResult,
+                            error: phaseError,
+                            maxSerializableChars,
+                            params: workflowHookParams?.handlePhaseErrorParams
+                        }
+                    );
+                } catch (hookError) {
+                    console.error(
+                        `stable-request: [Workflow: ${workflowId}] Error in handlePhaseError hook:`,
+                        hookError
+                    );
                 }
 
                 if (stopOnFirstPhaseError) {

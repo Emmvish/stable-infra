@@ -117,6 +117,7 @@ export type SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, Response
 
 interface ObservabilityHooksOptions<RequestDataType = any> {
   reqData: AxiosRequestConfig<RequestDataType>;
+  params?: any;
   maxSerializableChars?: number;
 }
 
@@ -143,6 +144,8 @@ export interface HandleSuccessfulAttemptDataHookOptions<RequestDataType = any, R
 
 export interface HookParams {
   responseAnalyzerParams?: any;
+  handleSuccessfulAttemptDataParams?: any;
+  handleErrorsParams?: any;
   finalErrorAnalyzerParams?: any;
 }
 

@@ -37,6 +37,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
     logAllErrors = false,
     handleErrors = ({ reqData, errorLog, maxSerializableChars = 1000 }) => 
       console.error(
+        'stable-request:\n',
         'Request data:\n',
         safelyStringify(reqData, maxSerializableChars),
         '\nError log:\n',
@@ -45,6 +46,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
     logAllSuccessfulAttempts = false,
     handleSuccessfulAttemptData = ({ reqData, successfulAttemptData, maxSerializableChars = 1000 }) =>
       console.info(
+        'stable-request:\n',
         'Request data:\n',
         safelyStringify(reqData, maxSerializableChars),
         '\nSuccessful attempt:\n',
@@ -119,7 +121,8 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
             {
               reqData,
               errorLog,
-              maxSerializableChars
+              maxSerializableChars,
+              params: hookParams?.handleErrorsParams
             }
           );
         } catch (e) {
@@ -145,7 +148,8 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
               {
                 reqData,
                 successfulAttemptData: successfulAttemptLog,
-                maxSerializableChars
+                maxSerializableChars,
+                params: hookParams?.handleSuccessfulAttemptDataParams
               }
             );
           } catch (e) {
