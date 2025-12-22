@@ -1475,7 +1475,7 @@ responseAnalyzer: async ({ reqData, data, trialMode, params }) => {
 **Purpose:** Monitor and log failed attempts
 
 ```typescript
-handleErrors: async ({ reqData, errorLog, maxSerializableChars }) => {
+handleErrors: async ({ reqData, errorLog, maxSerializableChars, params }) => {
   await logger.error({
     url: reqData.url,
     attempt: errorLog.attempt,
@@ -1489,7 +1489,7 @@ handleErrors: async ({ reqData, errorLog, maxSerializableChars }) => {
 **Purpose:** Monitor and log successful attempts
 
 ```typescript
-handleSuccessfulAttemptData: async ({ reqData, successfulAttemptData, maxSerializableChars }) => {
+handleSuccessfulAttemptData: async ({ reqData, successfulAttemptData, maxSerializableChars, params }) => {
   await analytics.track({
     url: reqData.url,
     duration: successfulAttemptData.executionTime
