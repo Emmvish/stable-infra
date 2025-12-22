@@ -67,13 +67,13 @@ Most HTTP clients answer only one question:
 
 🧩 **Multi-phase workflows (`stableWorkflow`)**
 
-🔀 Mix concurrent and sequential execution
+🔀 **Mix concurrent and sequential execution**
 
-🛑 Stop early or degrade gracefully
+🛑 **Stop early or degrade gracefully**
 
-📈 Phase-level metrics and hooks
+📈 **Phase-level metrics and hooks**
 
-🧭 Deterministic, observable execution paths
+🧭 **Deterministic, observable execution paths**
 
 ---
 
