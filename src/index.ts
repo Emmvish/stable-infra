@@ -25,6 +25,8 @@ export type {
     HandlePhaseErrorHookOptions,
     HandleSuccessfulAttemptDataHookOptions,
     HookParams,
+    PreExecutionHookOptions,
+    RequestPreExecutionOptions,
     ReqFnResponse,
     REQUEST_DATA,
     RequestGroup,

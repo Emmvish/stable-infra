@@ -7,6 +7,7 @@ import {
 
 import { 
     ERROR_LOG,
+    PreExecutionHookOptions,
     ReqFnResponse, 
     STABLE_REQUEST,
     SUCCESSFUL_ATTEMPT_DATA,
@@ -25,6 +26,36 @@ import {
 export async function sendStableRequest<RequestDataType = any, ResponseDataType = any>(
   options: STABLE_REQUEST<RequestDataType, ResponseDataType>
 ): Promise<ResponseDataType | boolean> {
+  const { 
+    preExecution = {
+      preExecutionHook: ({ inputParams, outputBuffer }: PreExecutionHookOptions) => {},
+      preExecutionHookParams: {},
+      applyPreExecutionConfigOverride: false,
+      continueOnPreExecutionHookFailure: false,
+      preExecutionOutputBuffer: {}
+    }
+  } = options;
+  let result: Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>> | unknown;
+  try {
+    result = await safelyExecuteUnknownFunction(
+      preExecution?.preExecutionHook as Function,
+      {
+        inputParams: preExecution?.preExecutionHookParams,
+        outputBuffer: preExecution?.preExecutionOutputBuffer
+      }
+    );
+    if(preExecution?.applyPreExecutionConfigOverride) {
+      const finalOptions = {
+        ...options,
+        ...result as Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>>
+      }
+      Object.assign(options, finalOptions);
+    }
+  } catch(e) {
+    if (!preExecution?.continueOnPreExecutionHookFailure) {
+      throw e;
+    }
+  }
   const {
     reqData: givenReqData,
     responseAnalyzer = ({ reqData, data, trialMode = { enabled: false } }) => true,
@@ -55,7 +86,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
     maxSerializableChars = 1000,
     finalErrorAnalyzer = ({ reqData, error, trialMode = { enabled: false } }) => false,
     trialMode = { enabled: false },
-    hookParams = {}
+    hookParams = {},
   } = options;
   let attempts = givenAttempts;
   const reqData: AxiosRequestConfig<RequestDataType> = generateAxiosRequestConfig<RequestDataType>(givenReqData);

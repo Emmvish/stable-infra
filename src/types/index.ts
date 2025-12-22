@@ -28,6 +28,7 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
   commonHandleSuccessfulAttemptData?: (
     options: HandleSuccessfulAttemptDataHookOptions<RequestDataType, ResponseDataType>
   ) => any | Promise<any>;
+  commonPreExecution?: RequestPreExecutionOptions;
   concurrentExecution?: boolean;
   requestGroups?: RequestGroup<RequestDataType, ResponseDataType>[];
   stopOnFirstError?: boolean;
@@ -149,6 +150,19 @@ export interface HookParams {
   finalErrorAnalyzerParams?: any;
 }
 
+export interface PreExecutionHookOptions {
+  inputParams: any;
+  outputBuffer: Object;
+}
+
+export interface RequestPreExecutionOptions {
+  preExecutionHook: ({ inputParams, outputBuffer }: PreExecutionHookOptions) => any | Promise<any>;
+  preExecutionHookParams?: any;
+  preExecutionOutputBuffer: Object;
+  applyPreExecutionConfigOverride?: boolean;
+  continueOnPreExecutionHookFailure?: boolean;
+}
+
 export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   reqData: REQUEST_DATA<RequestDataType>;
   responseAnalyzer?: (options: ResponseAnalysisHookOptions<RequestDataType, ResponseDataType>) => boolean | Promise<boolean>;
@@ -170,6 +184,7 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   finalErrorAnalyzer?: (options: FinalErrorAnalysisHookOptions<RequestDataType>) => boolean | Promise<boolean>;
   trialMode?: TRIAL_MODE_OPTIONS;
   hookParams?: HookParams;
+  preExecution?: RequestPreExecutionOptions;
 }
 
 export interface SUCCESSFUL_ATTEMPT_DATA<ResponseDataType = any> {

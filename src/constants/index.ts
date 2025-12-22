@@ -1,6 +1,7 @@
 import { API_GATEWAY_OPTIONS, ApiRequestOptionsMapping } from "../types/index.js";
 
 export const extractCommonOptionsKeys: (keyof API_GATEWAY_OPTIONS)[] = [
+    'commonPreExecution',
     'commonHookParams',
     'commonMaxAllowedWait',
     'commonRequestData',
@@ -19,7 +20,8 @@ export const extractCommonOptionsKeys: (keyof API_GATEWAY_OPTIONS)[] = [
     'commonTrialMode'
 ];
 
-export const PrepareApiRequestOptionsMapping: ApiRequestOptionsMapping[] = [
+export const PrepareApiRequestOptionsMapping: ApiRequestOptionsMapping[] = [    
+    { localKey: 'preExecution', commonKey: 'commonPreExecution', groupCommonKey: 'commonPreExecution', targetKey: 'preExecution' },
     { localKey: 'hookParams', commonKey: 'commonHookParams', groupCommonKey: 'commonHookParams', targetKey: 'hookParams' },
     { localKey: 'maxAllowedWait', commonKey: 'commonMaxAllowedWait', groupCommonKey: 'commonMaxAllowedWait', targetKey: 'maxAllowedWait' },
     { localKey: 'resReq', commonKey: 'commonResReq', groupCommonKey: 'commonResReq', targetKey: 'resReq' },
