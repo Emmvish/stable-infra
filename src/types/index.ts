@@ -152,13 +152,13 @@ export interface HookParams {
 
 export interface PreExecutionHookOptions {
   inputParams: any;
-  outputBuffer: Object;
+  outputBuffer: Record<string, any>;
 }
 
 export interface RequestPreExecutionOptions {
   preExecutionHook: ({ inputParams, outputBuffer }: PreExecutionHookOptions) => any | Promise<any>;
   preExecutionHookParams?: any;
-  preExecutionOutputBuffer: Object;
+  preExecutionOutputBuffer: Record<string, any>;
   applyPreExecutionConfigOverride?: boolean;
   continueOnPreExecutionHookFailure?: boolean;
 }
