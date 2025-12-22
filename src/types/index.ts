@@ -239,12 +239,6 @@ export interface STABLE_WORKFLOW_RESULT<ResponseDataType = any> {
   error?: string;
 }
 
-interface WorkflowHookOptions<ResponseDataType = any> {
-  workflowId: string;
-  phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>;
-  maxSerializableChars?: number;
-}
-
 export interface WorkflowHookParams {
   handlePhaseCompletionParams?: any;
   handlePhaseErrorParams?: any;
