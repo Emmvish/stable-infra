@@ -43,8 +43,6 @@ describe('stableRequest - preExecution option (sendStableRequest)', () => {
   });
 
   it('applies returned overrides when applyPreExecutionConfigOverride=true (e.g., override attempts)', async () => {
-    // Without override, attempts=1 would fail and throw.
-    // With override, attempts becomes 3 → 2 failures + 1 success.
     mockedAxios.request
       .mockRejectedValueOnce({ response: { status: 500, data: 'e1' }, code: undefined })
       .mockRejectedValueOnce({ response: { status: 500, data: 'e2' }, code: undefined })
@@ -89,7 +87,7 @@ describe('stableRequest - preExecution option (sendStableRequest)', () => {
         wait: 1,
         retryStrategy: RETRY_STRATEGIES.FIXED,
         preExecution: {
-          preExecutionHook: () => ({ attempts: 3 }), // ignored
+          preExecutionHook: () => ({ attempts: 3 }),
           preExecutionHookParams: {},
           preExecutionOutputBuffer: {},
           applyPreExecutionConfigOverride: false,
@@ -208,7 +206,6 @@ describe('stableRequest - preExecution option (sendStableRequest)', () => {
       wait: 1,
       preExecution: {
         preExecutionHook: () => ({
-          // force “content-aware retries” even if caller didn’t pass a responseAnalyzer
           responseAnalyzer: async ({ data }: any) => data?.state === 'ready'
         }),
         preExecutionHookParams: {},
@@ -229,7 +226,6 @@ describe('stableRequest - preExecution option (sendStableRequest)', () => {
       async <T = any, R = AxiosResponse<T>, D = any>(
         config: AxiosRequestConfig<D>
       ): Promise<R> => {
-        // preExecution runs before axios.request is called
         expect(buffer).toEqual(
           expect.objectContaining({
             token: 'tok_123',
