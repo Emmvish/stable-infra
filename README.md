@@ -65,7 +65,7 @@ Most HTTP clients answer only one question:
 
 ### Full workflow orchestration
 
-🧩 **Multi-phase workflows (`stableWorkflow`)**
+🧩 Multi-phase workflows (`stableWorkflow`)
 🔀 Mix concurrent and sequential execution
 🛑 Stop early or degrade gracefully
 📈 Phase-level metrics and hooks
