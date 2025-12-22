@@ -1501,6 +1501,7 @@ console.log(`Records processed: ${etlWorkflow.successfulRequests}/${etlWorkflow.
 | `maxSerializableChars` | `number` | `1000` | Max chars for logs |
 | `trialMode` | `TRIAL_MODE_OPTIONS` | `{ enabled: false }` | Failure simulation |
 | `hookParams` | `HookParams` | `{}` | Custom parameters for hooks |
+| `preExecution` | `RequestPreExecutionOptions` | `{}` | Executes before actually sending request, can modify request config |
 | `responseAnalyzer` | `function` | `() => true` | Validate response content |
 | `handleErrors` | `function` | `console.log` | Error handler |
 | `handleSuccessfulAttemptData` | `function` | `console.log` | Success handler |
