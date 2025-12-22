@@ -1502,6 +1502,7 @@ console.log(`Records processed: ${etlWorkflow.successfulRequests}/${etlWorkflow.
 | `trialMode` | `TRIAL_MODE_OPTIONS` | `{ enabled: false }` | Failure simulation |
 | `hookParams` | `HookParams` | `{}` | Custom parameters for hooks |
 | `preExecution` | `RequestPreExecutionOptions` | `{}` | Executes before actually sending request, can modify request config |
+| `commonBuffer` | `Record<string, any>` | `{}` | For communication between various request hooks |
 | `responseAnalyzer` | `function` | `() => true` | Validate response content |
 | `handleErrors` | `function` | `console.log` | Error handler |
 | `handleSuccessfulAttemptData` | `function` | `console.log` | Success handler |
@@ -1547,6 +1548,7 @@ interface REQUEST_DATA<RequestDataType = any> {
 | `commonHandleSuccessfulAttemptData` | `function` | console.log | Default success handler for all requests |
 | `commonRequestData` | `Partial<REQUEST_DATA>` | `{ hostname: '' }` | Common set of request options for each request |
 | `commonHookParams` | `HookParams` | `{ }` | Common options for each request hook |
+| `sharedBuffer` | `Record<string, any>` | `{}` | For communication between various requests |
 
 ### `stableWorkflow(phases, options)`
 
@@ -1601,13 +1603,13 @@ interface STABLE_WORKFLOW_RESULT {
 
 ```typescript
 preExecution: {
-  preExecutionHook: async ({ inputParams, outputBuffer }) => {
+  preExecutionHook: async ({ inputParams, commonBuffer }) => {
     // Fetch dynamic data
     const token = await getAuthToken();
     
-    // Store in output buffer
-    outputBuffer.token = token;
-    outputBuffer.timestamp = Date.now();
+    // Store in common buffer
+    commonBuffer.token = token;
+    commonBuffer.timestamp = Date.now();
     
     // Return config overrides
     return {
@@ -1618,7 +1620,6 @@ preExecution: {
     };
   },
   preExecutionHookParams: { userId: 'user-123' },
-  preExecutionOutputBuffer: {},
   applyPreExecutionConfigOverride: true,
   continueOnPreExecutionHookFailure: false
 }
@@ -1629,7 +1630,7 @@ preExecution: {
 **Purpose:** Validate response content, retry even on HTTP 200
 
 ```typescript
-responseAnalyzer: async ({ reqData, data, trialMode, params }) => {
+responseAnalyzer: async ({ reqData, data, trialMode, params, commonBuffer }) => {
   // Return true if valid, false to retry
   return data.status === 'ready';
 }
@@ -1640,7 +1641,7 @@ responseAnalyzer: async ({ reqData, data, trialMode, params }) => {
 **Purpose:** Monitor and log failed attempts
 
 ```typescript
-handleErrors: async ({ reqData, errorLog, maxSerializableChars, params }) => {
+handleErrors: async ({ reqData, errorLog, maxSerializableChars, params, commonBuffer }) => {
   await logger.error({
     url: reqData.url,
     attempt: errorLog.attempt,
@@ -1654,7 +1655,7 @@ handleErrors: async ({ reqData, errorLog, maxSerializableChars, params }) => {
 **Purpose:** Monitor and log successful attempts
 
 ```typescript
-handleSuccessfulAttemptData: async ({ reqData, successfulAttemptData, maxSerializableChars, params }) => {
+handleSuccessfulAttemptData: async ({ reqData, successfulAttemptData, maxSerializableChars, params, commonBuffer }) => {
   await analytics.track({
     url: reqData.url,
     duration: successfulAttemptData.executionTime
@@ -1667,7 +1668,7 @@ handleSuccessfulAttemptData: async ({ reqData, successfulAttemptData, maxSeriali
 **Purpose:** Handle final error after all retries exhausted
 
 ```typescript
-finalErrorAnalyzer: async ({ reqData, error, trialMode, params }) => {
+finalErrorAnalyzer: async ({ reqData, error, trialMode, params, commonBuffer }) => {
   // Return true to suppress error (return false)
   // Return false to throw error
   if (error.message.includes('404')) {
