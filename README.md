@@ -1,21 +1,89 @@
-## stable-request
+# stable-request
 
-`stable-request` is a TypeScript-first HTTP reliability toolkit for workflow-driven API integrations, that goes beyond status-code retries by validating response content, handling eventual consistency, coordinating batch workflows with intelligent grouping, and providing deep observability into every request attempt. 
+**stable-request** is a TypeScript-first **HTTP workflow execution engine** for real-world distributed systems — where HTTP `200 OK` does **not** guarantee business success.
 
-It is designed for real-world distributed systems where HTTP success (200) does not guarantee business success.
+It enables **content-aware retries**, **hierarchical configuration**, **batch orchestration**, and **multi-phase workflows** with deep observability — all built on top of standard HTTP calls.
 
-## Why stable-request?
+> If you’ve ever retried an API call that “succeeded” but returned the *wrong* data — this library is for you.
 
-Most HTTP client libraries only retry on network failures or specific HTTP status codes. **stable-request** goes further by providing:
+---
 
-- ✅ **Content-aware Retries** - Validate response content and retry even on successful HTTP responses
-- 🔄 **Multi-Phase Workflows** - Orchestrate complex workflows with sequential phases and mixed phase execution modes (concurrent & sequential)
-- 🚀 **Batch Processing** - Execute multiple requests with hierarchical configuration (global → group → request)
-- 🎯 **Request Groups** - Organize related requests with shared settings and logical boundaries
-- 🧪 **Trial Mode** - Simulate failures to test your retry logic without depending on real network instability
-- 📊 **Granular Observability** - Monitor every attempt with detailed hooks
-- ⚡ **Multiple Retry Strategies** - Fixed, linear, or exponential backoff
-- 🔧 **Flexible Error Handling** - Custom error analysis and graceful degradation
+## Why stable-request exists
+
+Modern systems fail in subtle and dangerous ways:
+
+- APIs return `200` but the resource isn’t ready
+- Databases are eventually consistent
+- Downstream services partially fail
+- Some requests are critical, others are optional
+- Blind retries amplify failures
+- Workflows fail midway and leave systems inconsistent
+
+Most HTTP clients answer only one question:
+
+> “Did the request fail at the network or HTTP layer?”
+
+**stable-request answers a different one:**
+
+> “Is the system state actually correct yet?”
+
+---
+
+## What stable-request gives you
+
+### Core capabilities
+
+- ✅ **Content-aware retries**  
+  Retry based on response validation, not just status codes
+
+- 🔄 **Deterministic execution semantics**  
+  Fixed, linear, or exponential retry strategies with hard limits
+
+- 🧠 **Graceful failure handling**  
+  Suppress non-critical failures without crashing workflows
+
+- 🧪 **Trial mode / chaos testing**  
+  Simulate failures without depending on real outages
+
+- 📊 **First-class observability hooks**  
+  Inspect every failed and successful attempt
+
+---
+
+### Scaling beyond single requests
+
+- 🚀 **Batch execution (`stableApiGateway`)**  
+  Run many requests concurrently or sequentially with shared configuration
+
+- 🎯 **Request groups**  
+  Apply different reliability rules to critical, standard, and optional services
+
+- 🧱 **Hierarchical configuration**  
+  Workflow → Phase → Group → Request (predictable overrides)
+
+---
+
+### Full workflow orchestration
+
+- 🧩 **Multi-phase workflows (`stableWorkflow`)**
+- 🔀 Mix concurrent and sequential execution
+- 🛑 Stop early or degrade gracefully
+- 📈 Phase-level metrics and hooks
+- 🧭 Deterministic, observable execution paths
+
+---
+
+## Choose your entry point
+
+| Need | Use |
+|-----|-----|
+| Reliable single API call | `stableRequest` |
+| Batch or fan-out requests | `stableApiGateway` |
+| Multi-step orchestration | `stableWorkflow` |
+
+Start small and scale **without changing mental models**.
+
+---
 
 ## Installation
 
