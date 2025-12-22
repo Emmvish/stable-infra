@@ -39,6 +39,7 @@ export type {
     STABLE_WORKFLOW_RESULT,
     SUCCESSFUL_ATTEMPT_DATA,
     VALID_REQUEST_PROTOCOL_TYPES,
+    WorkflowHookParams,
     TRIAL_MODE_OPTIONS
 } from './types/index.js';
 
