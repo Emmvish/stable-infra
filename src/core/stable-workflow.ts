@@ -15,7 +15,9 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
         logPhaseResults = false,
         handlePhaseCompletion,
         handlePhaseError,
+        maxSerializableChars = 1000,
         requestGroups = [],
+        workflowHookParams = {},
         ...commonGatewayOptions
     } = options;
 
@@ -41,7 +43,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 ...(phase.commonConfig || {}),
                 concurrentExecution: phase.concurrentExecution ?? true,
                 stopOnFirstError: phase.stopOnFirstError ?? false,
-                requestGroups
+                requestGroups,
             };
 
             try {
@@ -80,13 +82,14 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                     );
                 }
 
-                // Call phase completion hook
                 if (handlePhaseCompletion) {
                     try {
                         await safelyExecuteUnknownFunction(
                             handlePhaseCompletion, {
                                 workflowId,
                                 phaseResult,
+                                maxSerializableChars,
+                                params: workflowHookParams?.handlePhaseCompletionParams
                             }
                         );
                     } catch (hookError) {
@@ -140,6 +143,8 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                                 workflowId,
                                 phaseResult,
                                 error: phaseError,
+                                maxSerializableChars,
+                                params: workflowHookParams?.handlePhaseErrorParams
                             }
                         );
                     } catch (hookError) {

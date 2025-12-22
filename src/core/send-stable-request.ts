@@ -83,7 +83,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
               reqData,
               data: res?.data,
               trialMode,
-              params: hookParams.responseAnalyzerParams
+              params: hookParams?.responseAnalyzerParams
             }
           ));
         } catch (e) {
@@ -209,7 +209,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
         reqData,
         error: e,
         trialMode,
-        params: hookParams.finalErrorAnalyzerParams
+        params: hookParams?.finalErrorAnalyzerParams
       }
     );
     if(!errorAnalysisResult) {

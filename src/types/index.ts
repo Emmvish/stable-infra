@@ -208,6 +208,8 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   handlePhaseError?: (
     options: HandlePhaseErrorHookOptions<ResponseDataType>
   ) => any | Promise<any>;
+  maxSerializableChars?: number;
+  workflowHookParams?: WorkflowHookParams;
 }
 
 export interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any> {
@@ -237,15 +239,24 @@ export interface STABLE_WORKFLOW_RESULT<ResponseDataType = any> {
   error?: string;
 }
 
-export interface HandlePhaseCompletionHookOptions<ResponseDataType = any> {
+interface WorkflowHookOptions<ResponseDataType = any> {
   workflowId: string;
   phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>;
   maxSerializableChars?: number;
 }
 
-export interface HandlePhaseErrorHookOptions<ResponseDataType = any> {
+export interface WorkflowHookParams {
+  handlePhaseCompletionParams?: any;
+  handlePhaseErrorParams?: any;
+}
+
+export interface HandlePhaseCompletionHookOptions<ResponseDataType = any> {
   workflowId: string;
   phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>;
-  error: any;
   maxSerializableChars?: number;
+  params?: any;
+}
+
+export interface HandlePhaseErrorHookOptions<ResponseDataType = any> extends HandlePhaseCompletionHookOptions<ResponseDataType> {
+  error: any;
 }
