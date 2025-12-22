@@ -9,6 +9,7 @@ It is designed for real-world distributed systems where HTTP success (200) does 
 Most HTTP client libraries only retry on network failures or specific HTTP status codes. **stable-request** goes further by providing:
 
 - ✅ **Content-aware Retries** - Validate response content and retry even on successful HTTP responses
+- 🔄 **Multi-Phase Workflows** - Orchestrate complex workflows with sequential phases and mixed phase execution modes (concurrent & sequential)
 - 🚀 **Batch Processing** - Execute multiple requests with hierarchical configuration (global → group → request)
 - 🎯 **Request Groups** - Organize related requests with shared settings and logical boundaries
 - 🧪 **Trial Mode** - Simulate failures to test your retry logic without depending on real network instability
@@ -717,6 +718,275 @@ const results = await stableApiGateway(
 );
 ```
 
+## Multi-Phase Workflows
+
+For complex operations that require multiple stages of execution, use `stableWorkflow` to orchestrate phase-based workflows with full control over execution order and error handling.
+
+### Basic Workflow
+
+```typescript
+import { stableWorkflow } from '@emmvish/stable-request';
+
+const workflow = await stableWorkflow(
+  [
+    {
+      id: 'validation',
+      concurrentExecution: true,
+      requests: [
+        {
+          id: 'check-inventory',
+          requestOptions: {
+            reqData: { path: '/inventory/check' },
+            resReq: true
+          }
+        },
+        {
+          id: 'validate-payment',
+          requestOptions: {
+            reqData: { path: '/payment/validate' },
+            resReq: true
+          }
+        }
+      ]
+    },
+    {
+      id: 'processing',
+      concurrentExecution: false,
+      stopOnFirstError: true,
+      requests: [
+        {
+          id: 'charge-payment',
+          requestOptions: {
+            reqData: { path: '/payment/charge', method: REQUEST_METHODS.POST },
+            resReq: true
+          }
+        },
+        {
+          id: 'reserve-inventory',
+          requestOptions: {
+            reqData: { path: '/inventory/reserve', method: REQUEST_METHODS.POST },
+            resReq: true
+          }
+        }
+      ]
+    }
+  ],
+  {
+    workflowId: 'order-processing-123',
+    stopOnFirstPhaseError: true,
+    logPhaseResults: true,
+    commonRequestData: {
+      hostname: 'api.example.com',
+      headers: { 'X-Transaction-Id': 'txn-123' }
+    },
+    commonAttempts: 3,
+    commonWait: 1000
+  }
+);
+
+console.log('Workflow completed:', workflow.success);
+console.log(`${workflow.successfulRequests}/${workflow.totalRequests} requests succeeded`);
+console.log(`Completed in ${workflow.executionTime}ms`);
+```
+
+**Workflow Result:**
+```typescript
+interface STABLE_WORKFLOW_RESULT {
+  workflowId: string;           // Workflow identifier
+  success: boolean;             // Did all phases succeed?
+  executionTime: number;        // Total workflow duration (ms)
+  timestamp: string;            // ISO timestamp
+  totalPhases: number;          // Number of phases defined
+  completedPhases: number;      // Number of phases executed
+  totalRequests: number;        // Total requests across all phases
+  successfulRequests: number;   // Successful requests
+  failedRequests: number;       // Failed requests
+  phases: PHASE_RESULT[];       // Detailed results per phase
+  error?: string;               // Workflow-level error (if any)
+}
+```
+
+### Phase Configuration
+
+Each phase can have its own execution mode and error handling:
+
+```typescript
+{
+  id: 'phase-name',                    // Optional: phase identifier
+  concurrentExecution?: boolean,       // true = parallel, false = sequential
+  stopOnFirstError?: boolean,          // Stop phase on first request failure
+  commonConfig?: { /* phase-level common config */ },
+  requests: [/* array of requests */]
+}
+```
+
+**Configuration Priority:**
+Individual Request > Phase Common Config > Workflow Common Config
+
+### Workflow with Request Groups
+
+Combine workflows with request groups for fine-grained control:
+
+```typescript
+const workflow = await stableWorkflow(
+  [
+    {
+      id: 'critical-validation',
+      concurrentExecution: true,
+      requests: [
+        {
+          id: 'auth-check',
+          groupId: 'critical',
+          requestOptions: {
+            reqData: { path: '/auth/verify' },
+            resReq: true
+          }
+        },
+        {
+          id: 'rate-limit-check',
+          groupId: 'critical',
+          requestOptions: {
+            reqData: { path: '/ratelimit/check' },
+            resReq: true
+          }
+        }
+      ]
+    },
+    {
+      id: 'data-processing',
+      concurrentExecution: false,
+      commonConfig: {
+        // Phase-specific overrides
+        commonAttempts: 5,
+        commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+      },
+      requests: [
+        {
+          id: 'process-data',
+          groupId: 'standard',
+          requestOptions: {
+            reqData: { path: '/data/process', method: REQUEST_METHODS.POST },
+            resReq: true
+          }
+        },
+        {
+          id: 'store-result',
+          groupId: 'standard',
+          requestOptions: {
+            reqData: { path: '/data/store', method: REQUEST_METHODS.POST },
+            resReq: true
+          }
+        }
+      ]
+    },
+    {
+      id: 'notifications',
+      concurrentExecution: true,
+      requests: [
+        {
+          id: 'email-notification',
+          groupId: 'optional',
+          requestOptions: {
+            reqData: { path: '/notify/email' },
+            resReq: true
+          }
+        },
+        {
+          id: 'webhook-notification',
+          groupId: 'optional',
+          requestOptions: {
+            reqData: { path: '/notify/webhook' },
+            resReq: true
+          }
+        }
+      ]
+    }
+  ],
+  {
+    workflowId: 'data-pipeline-workflow',
+    stopOnFirstPhaseError: true,
+    logPhaseResults: true,
+    
+    commonRequestData: {
+      hostname: 'api.example.com'
+    },
+    commonAttempts: 3,
+    commonWait: 1000,
+    
+    // Request groups with different reliability requirements
+    requestGroups: [
+      {
+        id: 'critical',
+        commonConfig: {
+          commonAttempts: 10,
+          commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+          commonWait: 2000,
+          commonHandleErrors: async ({ errorLog }) => {
+            await alerting.critical('Critical service failure', errorLog);
+          }
+        }
+      },
+      {
+        id: 'standard',
+        commonConfig: {
+          commonAttempts: 5,
+          commonRetryStrategy: RETRY_STRATEGIES.LINEAR,
+          commonWait: 1000
+        }
+      },
+      {
+        id: 'optional',
+        commonConfig: {
+          commonAttempts: 2,
+          commonFinalErrorAnalyzer: async () => true  // Suppress errors
+        }
+      }
+    ]
+  }
+);
+```
+
+### Phase Observability Hooks
+
+Monitor workflow execution with phase-level hooks:
+
+```typescript
+const workflow = await stableWorkflow(
+  [
+    // ...phases...
+  ],
+  {
+    workflowId: 'monitored-workflow',
+    
+    // Called after each phase completes successfully
+    handlePhaseCompletion: async ({ workflowId, phaseResult }) => {
+      console.log(`Phase ${phaseResult.phaseId} completed`);
+      
+      await analytics.track('workflow_phase_complete', {
+        workflowId,
+        phaseId: phaseResult.phaseId,
+        duration: phaseResult.executionTime,
+        successRate: phaseResult.successfulRequests / phaseResult.totalRequests
+      });
+    },
+    
+    // Called when a phase fails
+    handlePhaseError: async ({ workflowId, phaseResult, error }) => {
+      console.error(`Phase ${phaseResult.phaseId} failed`);
+      
+      await alerting.notify('workflow_phase_failed', {
+        workflowId,
+        phaseId: phaseResult.phaseId,
+        error: error.message,
+        failedRequests: phaseResult.failedRequests
+      });
+    },
+    
+    logPhaseResults: true  // Enable console logging
+  }
+);
+```
+
 ## Real-World Examples
 
 ### 1. Polling for Job Completion
@@ -965,6 +1235,119 @@ const report = {
 console.log('System Health:', report);
 ```
 
+### 6. Data Pipeline (ETL Workflow)
+
+```typescript
+const etlWorkflow = await stableWorkflow(
+  [
+    {
+      id: 'extract',
+      concurrentExecution: true,
+      commonConfig: {
+        commonAttempts: 5,
+        commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+      },
+      requests: [
+        { id: 'extract-users', requestOptions: { reqData: { path: '/extract/users' }, resReq: true } },
+        { id: 'extract-orders', requestOptions: { reqData: { path: '/extract/orders' }, resReq: true } },
+        { id: 'extract-products', requestOptions: { reqData: { path: '/extract/products' }, resReq: true } }
+      ]
+    },
+    {
+      id: 'transform',
+      concurrentExecution: false,
+      stopOnFirstError: true,
+      requests: [
+        {
+          id: 'clean-data',
+          requestOptions: {
+            reqData: { path: '/transform/clean', method: REQUEST_METHODS.POST },
+            resReq: true
+          }
+        },
+        {
+          id: 'enrich-data',
+          requestOptions: {
+            reqData: { path: '/transform/enrich', method: REQUEST_METHODS.POST },
+            resReq: true
+          }
+        },
+        {
+          id: 'validate-data',
+          requestOptions: {
+            reqData: { path: '/transform/validate', method: REQUEST_METHODS.POST },
+            resReq: true,
+            responseAnalyzer: async ({ data }) => {
+              return data?.validationErrors?.length === 0;
+            }
+          }
+        }
+      ]
+    },
+    {
+      id: 'load',
+      concurrentExecution: true,
+      requests: [
+        {
+          id: 'load-warehouse',
+          requestOptions: {
+            reqData: { path: '/load/warehouse', method: REQUEST_METHODS.POST },
+            resReq: true
+          }
+        },
+        {
+          id: 'update-indexes',
+          requestOptions: {
+            reqData: { path: '/load/indexes', method: REQUEST_METHODS.POST },
+            resReq: true
+          }
+        },
+        {
+          id: 'refresh-cache',
+          requestOptions: {
+            reqData: { path: '/cache/refresh', method: REQUEST_METHODS.POST },
+            resReq: true
+          }
+        }
+      ]
+    }
+  ],
+  {
+    workflowId: `etl-${new Date().toISOString()}`,
+    stopOnFirstPhaseError: true,
+    logPhaseResults: true,
+    
+    commonRequestData: {
+      hostname: 'pipeline.example.com'
+    },
+    commonAttempts: 3,
+    commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+    
+    handlePhaseCompletion: async ({ phaseResult }) => {
+      const recordsProcessed = phaseResult.responses
+        .filter(r => r.success)
+        .reduce((sum, r) => sum + (r.data?.recordCount || 0), 0);
+      
+      await metrics.gauge('etl.phase.records', recordsProcessed, {
+        phase: phaseResult.phaseId
+      });
+    },
+    
+    handlePhaseError: async ({ phaseResult, error }) => {
+      await pagerDuty.alert('ETL Pipeline Phase Failed', {
+        phase: phaseResult.phaseId,
+        error: error.message,
+        failedRequests: phaseResult.failedRequests
+      });
+    }
+  }
+);
+
+console.log(`ETL Pipeline: ${etlWorkflow.success ? 'SUCCESS' : 'FAILED'}`);
+console.log(`Total time: ${etlWorkflow.executionTime}ms`);
+console.log(`Records processed: ${etlWorkflow.successfulRequests}/${etlWorkflow.totalRequests}`);
+```
+
 ## Complete API Reference
 
 ### `stableRequest(options)`
@@ -1118,6 +1501,76 @@ const user = await stableRequest<CreateUserRequest, UserResponse>({
 console.log(user.id);  // TypeScript knows this exists
 ```
 
+### `stableWorkflow(phases, options)`
+
+Execute a multi-phase workflow with full control over execution order and error handling.
+
+**Phases Array:**
+```typescript
+interface STABLE_WORKFLOW_PHASE {
+  id?: string;                     // Phase identifier (auto-generated if omitted)
+  concurrentExecution?: boolean;   // true = parallel, false = sequential (default: true)
+  stopOnFirstError?: boolean;      // Stop phase on first request failure (default: false)
+  commonConfig?: Omit<API_GATEWAY_OPTIONS, 'concurrentExecution' | 'stopOnFirstError' | 'requestGroups'>;
+  requests: API_GATEWAY_REQUEST[]; // Array of requests for this phase
+}
+```
+
+**Workflow Options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `workflowId` | `string` | `workflow-{timestamp}` | Workflow identifier |
+| `stopOnFirstPhaseError` | `boolean` | `false` | Stop workflow if any phase fails |
+| `logPhaseResults` | `boolean` | `false` | Log phase execution to console |
+| `handlePhaseCompletion` | `function` | `undefined` | Hook called after each successful phase |
+| `handlePhaseError` | `function` | `undefined` | Hook called when a phase fails |
+| `maxSerializableChars` | `number` | `1000` | Max chars for serialization in hooks |
+| All `stableApiGateway` options | - | - | Applied as workflow-level defaults |
+
+**handlePhaseCompletion Hook:**
+```typescript
+handlePhaseCompletion: async ({ workflowId, phaseResult, maxSerializableChars }) => {
+  // phaseResult includes:
+  // - phaseId, phaseIndex
+  // - success, executionTime, timestamp
+  // - totalRequests, successfulRequests, failedRequests
+  // - responses array
+}
+```
+
+**handlePhaseError Hook:**
+```typescript
+handlePhaseError: async ({ workflowId, phaseResult, error, maxSerializableChars }) => {
+  // Similar to handlePhaseCompletion, plus:
+  // - error: the error object
+}
+```
+
+**STABLE_WORKFLOW_RESULT response:**
+```typescript
+interface STABLE_WORKFLOW_RESULT {
+  workflowId: string;
+  success: boolean;             // All phases successful?
+  executionTime: number;        // Total workflow duration (ms)
+  timestamp: string;            // ISO timestamp
+  totalPhases: number;
+  completedPhases: number;
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  phases: PHASE_RESULT[];      // Detailed results per phase
+  error?: string;              // Workflow-level error
+}
+```
+
+**Configuration Hierarchy:**
+
+1. **Workflow-level** (lowest priority): Applied to all phases
+2. **Phase-level** (`commonConfig`): Overrides workflow-level
+3. **Request Group**: Overrides phase-level
+4. **Individual Request** (highest priority): Overrides everything
+
 ## Best Practices
 
 1. **Start simple** - Use basic retries first, add hooks as needed
@@ -1130,6 +1583,11 @@ console.log(user.id);  // TypeScript knows this exists
 8. **Set appropriate timeouts** to prevent hanging requests
 9. **Use idempotency keys** for payment/financial operations
 10. **Log contextual information** in your hooks for debugging
+11. **Design workflows with clear phases** - Each phase should represent a logical stage
+12. **Use phase hooks** (`handlePhaseCompletion`, `handlePhaseError`) for workflow observability
+13. **Set `stopOnFirstPhaseError: true`** for critical workflows that shouldn't continue after failure
+14. **Use mixed execution modes** - Concurrent for independent operations, sequential for dependencies
+15. **Leverage request groups in workflows** for different reliability tiers within phases
 
 ## License
 
