@@ -14,9 +14,10 @@ export async function executeSequentially<RequestDataType = any, ResponseDataTyp
     const responses: API_GATEWAY_RESPONSE<ResponseDataType>[] = [];
     for (const req of requests) {
         try {
-            const finalRequestOptions = { 
+            const finalRequestOptions = {
                 reqData: prepareApiRequestData<RequestDataType, ResponseDataType>(req, requestExecutionOptions),
-                ...prepareApiRequestOptions<RequestDataType, ResponseDataType>(req, requestExecutionOptions) 
+                ...prepareApiRequestOptions<RequestDataType, ResponseDataType>(req, requestExecutionOptions),
+                commonBuffer: requestExecutionOptions.sharedBuffer ?? req.requestOptions.commonBuffer
             };
             const res = await stableRequest<RequestDataType, ResponseDataType>(finalRequestOptions);
             responses.push({

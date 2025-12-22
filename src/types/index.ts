@@ -32,6 +32,7 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
   concurrentExecution?: boolean;
   requestGroups?: RequestGroup<RequestDataType, ResponseDataType>[];
   stopOnFirstError?: boolean;
+  sharedBuffer?: Record<string, any>;
 }
 
 export type API_GATEWAY_REQUEST_OPTIONS_TYPE<
@@ -63,7 +64,7 @@ export type ApiRequestOptionsMapping = {
   targetKey: string;
 };
 
-export type CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, ResponseDataType = any> = Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, "concurrentExecution" | "stopOnFirstError">
+export type CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, ResponseDataType = any> = Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, "concurrentExecution" | "stopOnFirstError" | "createSharedBuffer">;
 
 export interface ERROR_LOG {
   timestamp: string;
@@ -121,12 +122,14 @@ interface ObservabilityHooksOptions<RequestDataType = any> {
   params?: any;
   maxSerializableChars?: number;
   preExecutionResult?: any;
+  commonBuffer?: Record<string, any>;
 }
 
 interface AnalysisHookOptions<RequestDataType = any> extends Omit<ObservabilityHooksOptions<RequestDataType>, "maxSerializableChars"> {
   trialMode?: TRIAL_MODE_OPTIONS;
   params?: any;
   preExecutionResult?: any;
+  commonBuffer?: Record<string, any>;
 }
 
 export interface ResponseAnalysisHookOptions<RequestDataType = any, ResponseDataType = any> extends AnalysisHookOptions<RequestDataType> {
@@ -153,14 +156,13 @@ export interface HookParams {
 }
 
 export interface PreExecutionHookOptions {
-  inputParams: any;
-  outputBuffer: Record<string, any>;
+  inputParams?: any;
+  commonBuffer?: Record<string, any>;
 }
 
 export interface RequestPreExecutionOptions {
-  preExecutionHook: ({ inputParams, outputBuffer }: PreExecutionHookOptions) => any | Promise<any>;
+  preExecutionHook: ({ inputParams, commonBuffer }: PreExecutionHookOptions) => any | Promise<any>;
   preExecutionHookParams?: any;
-  preExecutionOutputBuffer: Record<string, any>;
   applyPreExecutionConfigOverride?: boolean;
   continueOnPreExecutionHookFailure?: boolean;
 }
@@ -187,6 +189,7 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   trialMode?: TRIAL_MODE_OPTIONS;
   hookParams?: HookParams;
   preExecution?: RequestPreExecutionOptions;
+  commonBuffer?: Record<string, any>;
 }
 
 export interface SUCCESSFUL_ATTEMPT_DATA<ResponseDataType = any> {

@@ -28,12 +28,12 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
 ): Promise<ResponseDataType | boolean> {
   const { 
     preExecution = {
-      preExecutionHook: ({ inputParams, outputBuffer }: PreExecutionHookOptions) => {},
+      preExecutionHook: ({ inputParams, commonBuffer }: PreExecutionHookOptions) => {},
       preExecutionHookParams: {},
       applyPreExecutionConfigOverride: false,
       continueOnPreExecutionHookFailure: false,
-      preExecutionOutputBuffer: {}
-    }
+    },
+    commonBuffer = {}
   } = options;
   let preExecutionResult: Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>> | unknown;
   try {
@@ -41,7 +41,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
       preExecution?.preExecutionHook as Function,
       {
         inputParams: preExecution?.preExecutionHookParams,
-        outputBuffer: preExecution?.preExecutionOutputBuffer
+        commonBuffer
       }
     );
     if(preExecution?.applyPreExecutionConfigOverride) {
@@ -117,7 +117,8 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
               data: res?.data,
               trialMode,
               params: hookParams?.responseAnalyzerParams,
-              preExecutionResult
+              preExecutionResult,
+              commonBuffer
             }
           ));
         } catch (e) {
@@ -155,7 +156,8 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
               errorLog,
               maxSerializableChars,
               params: hookParams?.handleErrorsParams,
-              preExecutionResult
+              preExecutionResult,
+              commonBuffer
             }
           );
         } catch (e) {
@@ -183,7 +185,8 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
                 successfulAttemptData: successfulAttemptLog,
                 maxSerializableChars,
                 params: hookParams?.handleSuccessfulAttemptDataParams,
-                preExecutionResult
+                preExecutionResult,
+                commonBuffer
               }
             );
           } catch (e) {
@@ -248,7 +251,8 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
         error: e,
         trialMode,
         params: hookParams?.finalErrorAnalyzerParams,
-        preExecutionResult
+        preExecutionResult,
+        commonBuffer
       }
     );
     if(!errorAnalysisResult) {

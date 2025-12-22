@@ -31,10 +31,10 @@ describe('stableRequest - preExecution option (sendStableRequest)', () => {
       preExecution: {
         preExecutionHook,
         preExecutionHookParams: { tenantId: 't-123', feature: 'x' },
-        preExecutionOutputBuffer: {},
         applyPreExecutionConfigOverride: false,
         continueOnPreExecutionHookFailure: false
-      }
+      },
+      commonBuffer: {}
     });
 
     expect(preExecutionHook).toHaveBeenCalledTimes(1);
@@ -63,10 +63,10 @@ describe('stableRequest - preExecution option (sendStableRequest)', () => {
       preExecution: {
         preExecutionHook: () => ({ attempts: 3 }),
         preExecutionHookParams: {},
-        preExecutionOutputBuffer: {},
         applyPreExecutionConfigOverride: true,
         continueOnPreExecutionHookFailure: false
-      }
+      },
+      commonBuffer: {}
     });
 
     expect(mockedAxios.request).toHaveBeenCalledTimes(3);
@@ -89,10 +89,10 @@ describe('stableRequest - preExecution option (sendStableRequest)', () => {
         preExecution: {
           preExecutionHook: () => ({ attempts: 3 }),
           preExecutionHookParams: {},
-          preExecutionOutputBuffer: {},
           applyPreExecutionConfigOverride: false,
           continueOnPreExecutionHookFailure: false
-        }
+        },
+        commonBuffer: {}
       })
     ).rejects.toThrow();
 
@@ -116,10 +116,10 @@ describe('stableRequest - preExecution option (sendStableRequest)', () => {
           reqData: { hostname: 'api.example.com', path: '/overridden' }
         }),
         preExecutionHookParams: {},
-        preExecutionOutputBuffer: {},
         applyPreExecutionConfigOverride: true,
         continueOnPreExecutionHookFailure: false
-      }
+      },
+      commonBuffer: {}
     });
 
     expect(mockedAxios.request).toHaveBeenCalledWith(
@@ -143,10 +143,10 @@ describe('stableRequest - preExecution option (sendStableRequest)', () => {
         preExecution: {
           preExecutionHook,
           preExecutionHookParams: {},
-          preExecutionOutputBuffer: {},
           applyPreExecutionConfigOverride: true,
           continueOnPreExecutionHookFailure: false
-        }
+        },
+        commonBuffer: {}
       })
     ).rejects.toThrow('pre-exec failed');
 
@@ -172,10 +172,10 @@ describe('stableRequest - preExecution option (sendStableRequest)', () => {
       preExecution: {
         preExecutionHook,
         preExecutionHookParams: {},
-        preExecutionOutputBuffer: {},
         applyPreExecutionConfigOverride: true,
         continueOnPreExecutionHookFailure: true
-      }
+      },
+      commonBuffer: {}
     });
 
     expect(mockedAxios.request).toHaveBeenCalledTimes(1);
@@ -209,17 +209,17 @@ describe('stableRequest - preExecution option (sendStableRequest)', () => {
           responseAnalyzer: async ({ data }: any) => data?.state === 'ready'
         }),
         preExecutionHookParams: {},
-        preExecutionOutputBuffer: {},
         applyPreExecutionConfigOverride: true,
         continueOnPreExecutionHookFailure: false
-      }
+      },
+      commonBuffer: {}
     });
 
     expect(mockedAxios.request).toHaveBeenCalledTimes(2);
     expect(result).toEqual({ state: 'ready' });
   });
 
-  it('records output in preExecutionOutputBuffer (sync hook) and it is visible during request execution', async () => {
+  it('records output in common buffer and it is visible during request execution', async () => {
     const buffer: Record<string, any> = {};
 
     mockedAxios.request.mockImplementationOnce(
@@ -249,23 +249,23 @@ describe('stableRequest - preExecution option (sendStableRequest)', () => {
       reqData: { hostname: 'api.example.com', path: '/needs-token' },
       resReq: true,
       preExecution: {
-        preExecutionHook: ({ outputBuffer }: any) => {
-          outputBuffer.token = 'tok_123';
-          outputBuffer.preparedAt = new Date().toISOString();
+        preExecutionHook: ({ commonBuffer }: any) => {
+          commonBuffer.token = 'tok_123';
+          commonBuffer.preparedAt = new Date().toISOString();
           return {};
         },
         preExecutionHookParams: { userId: 'u1' },
-        preExecutionOutputBuffer: buffer,
         applyPreExecutionConfigOverride: false,
         continueOnPreExecutionHookFailure: false
-      }
+      },
+      commonBuffer: buffer
     });
 
     expect(result).toEqual({ ok: true, url: '/needs-token' });
     expect(buffer.token).toBe('tok_123');
   });
 
-  it('records output in preExecutionOutputBuffer (async hook) and can also override config', async () => {
+  it('records output in common buffer and can also override config', async () => {
     const buffer: Record<string, any> = {};
 
     mockedAxios.request.mockResolvedValueOnce({
@@ -280,19 +280,19 @@ describe('stableRequest - preExecution option (sendStableRequest)', () => {
       reqData: { hostname: 'api.example.com', path: '/original-path' },
       resReq: true,
       preExecution: {
-        preExecutionHook: async ({ outputBuffer }: any) => {
-          outputBuffer.traceId = 'trace-abc';
-          outputBuffer.didOverride = true;
+        preExecutionHook: async ({ commonBuffer }: any) => {
+          commonBuffer.traceId = 'trace-abc';
+          commonBuffer.didOverride = true;
 
           return {
             reqData: { hostname: 'api.example.com', path: '/overridden-path' }
           };
         },
         preExecutionHookParams: {},
-        preExecutionOutputBuffer: buffer,
         applyPreExecutionConfigOverride: true,
         continueOnPreExecutionHookFailure: false
-      }
+      },
+      commonBuffer: buffer
     });
 
     expect(mockedAxios.request).toHaveBeenCalledWith(
