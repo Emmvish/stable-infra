@@ -135,7 +135,7 @@ describe('stableApiGateway - sharedBuffer option', () => {
         }
       ],
       {
-        concurrentExecution: false,
+        concurrentExecution: true,
         commonRequestData: { hostname: 'api.example.com' },
         sharedBuffer
       }

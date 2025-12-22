@@ -16,7 +16,8 @@ export async function executeConcurrently<RequestDataType = any, ResponseDataTyp
     for (const req of requests) {
         const finalRequestOptions = { 
             reqData: prepareApiRequestData<RequestDataType, ResponseDataType>(req, requestExecutionOptions),
-            ...prepareApiRequestOptions<RequestDataType, ResponseDataType>(req, requestExecutionOptions) 
+            ...prepareApiRequestOptions<RequestDataType, ResponseDataType>(req, requestExecutionOptions),
+                commonBuffer: requestExecutionOptions.sharedBuffer ?? req.requestOptions.commonBuffer 
         };
         stableRequests.push(stableRequest<RequestDataType, ResponseDataType>(finalRequestOptions));
     }

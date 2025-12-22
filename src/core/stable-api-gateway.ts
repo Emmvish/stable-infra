@@ -33,7 +33,7 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
     }
 
     if (concurrentExecution) {
-        return executeConcurrently<RequestDataType, ResponseDataType>(requests,  { ...requestExecutionOptions, stopOnFirstError: undefined, createSharedBuffer: undefined } as CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>);
+        return executeConcurrently<RequestDataType, ResponseDataType>(requests,  { ...requestExecutionOptions, stopOnFirstError: undefined } as CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>);
     } else {
         return executeSequentially<RequestDataType, ResponseDataType>(requests, requestExecutionOptions as SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>);
     }
