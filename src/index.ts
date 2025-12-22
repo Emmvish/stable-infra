@@ -1,6 +1,7 @@
 export { 
     stableRequest,
-    stableApiGateway 
+    stableApiGateway,
+    stableWorkflow 
 } from './core/index.js';
 
 export {
@@ -20,6 +21,8 @@ export type {
     ERROR_LOG,
     FinalErrorAnalysisHookOptions,
     HandleErrorHookOptions,
+    HandlePhaseCompletionHookOptions,
+    HandlePhaseErrorHookOptions,
     HandleSuccessfulAttemptDataHookOptions,
     HookParams,
     ReqFnResponse,
@@ -30,6 +33,10 @@ export type {
     RETRY_STRATEGY_TYPES,
     SEQUENTIAL_REQUEST_EXECUTION_OPTIONS,
     STABLE_REQUEST,
+    STABLE_WORKFLOW_PHASE,
+    STABLE_WORKFLOW_OPTIONS,
+    STABLE_WORKFLOW_PHASE_RESULT,
+    STABLE_WORKFLOW_RESULT,
     SUCCESSFUL_ATTEMPT_DATA,
     VALID_REQUEST_PROTOCOL_TYPES,
     TRIAL_MODE_OPTIONS

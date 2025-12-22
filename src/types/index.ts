@@ -186,3 +186,66 @@ export interface TRIAL_MODE_OPTIONS {
 export type VALID_REQUEST_PROTOCOL_TYPES =
   | VALID_REQUEST_PROTOCOLS.HTTP
   | VALID_REQUEST_PROTOCOLS.HTTPS;
+
+export interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType = any> {
+  id?: string;
+  requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[];
+  concurrentExecution?: boolean;
+  stopOnFirstError?: boolean;
+  commonConfig?: Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, 
+    'concurrentExecution' | 'stopOnFirstError' | 'requestGroups'>;
+}
+
+export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType = any> 
+  extends Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, 
+    'concurrentExecution' | 'stopOnFirstError'> {
+  workflowId?: string;
+  stopOnFirstPhaseError?: boolean;
+  logPhaseResults?: boolean;
+  handlePhaseCompletion?: (
+    options: HandlePhaseCompletionHookOptions<ResponseDataType>
+  ) => any | Promise<any>;
+  handlePhaseError?: (
+    options: HandlePhaseErrorHookOptions<ResponseDataType>
+  ) => any | Promise<any>;
+}
+
+export interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any> {
+  phaseId: string;
+  phaseIndex: number;
+  success: boolean;
+  executionTime: number;
+  timestamp: string;
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  responses: API_GATEWAY_RESPONSE<ResponseDataType>[];
+  error?: string;
+}
+
+export interface STABLE_WORKFLOW_RESULT<ResponseDataType = any> {
+  workflowId: string;
+  success: boolean;
+  executionTime: number;
+  timestamp: string;
+  totalPhases: number;
+  completedPhases: number;
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  phases: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
+  error?: string;
+}
+
+export interface HandlePhaseCompletionHookOptions<ResponseDataType = any> {
+  workflowId: string;
+  phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>;
+  maxSerializableChars?: number;
+}
+
+export interface HandlePhaseErrorHookOptions<ResponseDataType = any> {
+  workflowId: string;
+  phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>;
+  error: any;
+  maxSerializableChars?: number;
+}

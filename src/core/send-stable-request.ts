@@ -36,7 +36,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
     retryStrategy = RETRY_STRATEGIES.FIXED,
     logAllErrors = false,
     handleErrors = ({ reqData, errorLog, maxSerializableChars = 1000 }) => 
-      console.log(
+      console.error(
         'Request data:\n',
         safelyStringify(reqData, maxSerializableChars),
         '\nError log:\n',
@@ -44,7 +44,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
       ),
     logAllSuccessfulAttempts = false,
     handleSuccessfulAttemptData = ({ reqData, successfulAttemptData, maxSerializableChars = 1000 }) =>
-      console.log(
+      console.info(
         'Request data:\n',
         safelyStringify(reqData, maxSerializableChars),
         '\nSuccessful attempt:\n',
@@ -87,7 +87,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
             }
           ));
         } catch (e) {
-          console.log(
+          console.error(
             `stable-request: Unable to analyze the response returned on attempt #${currentAttempt}. Response: ${safelyStringify(
               res?.data,
               maxSerializableChars
@@ -123,7 +123,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
             }
           );
         } catch (e) {
-          console.log(
+          console.error(
             'stable-request: Unable to report errors due to issues with error handler!'
           );
         }
@@ -149,7 +149,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
               }
             );
           } catch (e) {
-            console.log(
+            console.error(
               'stable-request: Unable to report successful attempts due to issues with successful attempt data handler!'
             );
           }
@@ -173,8 +173,8 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
     
     if (performAllAttempts && hadAtLeastOneSuccess) {
       if (trialMode.enabled) {
-        console.log(
-          'Final response (performAllAttempts mode):\n',
+        console.info(
+          'stable-request: Final response (performAllAttempts mode):\n',
           safelyStringify(lastSuccessfulAttemptData as Record<string, any>, maxSerializableChars)
         );
       }
@@ -182,8 +182,8 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
     } else if (res.ok) {
       if (trialMode.enabled) {
         const finalResponse = res?.data ?? lastSuccessfulAttemptData;
-        console.log(
-          'Final response:\n',
+        console.info(
+          'stable-request: Final response:\n',
           safelyStringify(finalResponse, maxSerializableChars)
         );
       }
@@ -201,7 +201,7 @@ export async function sendStableRequest<RequestDataType = any, ResponseDataType 
     }
   } catch (e: any) {
     if (trialMode.enabled) {
-      console.log('Final error:\n', e.message);
+      console.error('stable-request: Final error:\n', e.message);
     }
     const errorAnalysisResult = await safelyExecuteUnknownFunction(
       finalErrorAnalyzer,

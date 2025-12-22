@@ -17,8 +17,8 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
       const trialCondition =
         Math.random() <= (trialMode?.reqFailureProbability ?? 0);
       if (trialCondition) {
-        console.log(
-          'Request failed in trial mode.\nRequest data:\n',
+        console.error(
+          'stable-request: Request failed in trial mode.\nRequest data:\n',
           safelyStringify(reqData, maxSerializableChars)
         );
         throw new Error('Request failed in trial mode.');

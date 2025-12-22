@@ -20,7 +20,7 @@ export function prepareApiRequestData<RequestDataType = any, ResponseDataType = 
     };
 
     if(!result.hostname) {
-        console.log('stable-request: Hostname is missing in gateway request data. Setting it to an empty string to avoid errors.');
+        console.info('stable-request: Hostname is missing in gateway request data. Setting it to an empty string to avoid errors.');
         result.hostname = '';
     }
     return result as REQUEST_DATA<RequestDataType>;
