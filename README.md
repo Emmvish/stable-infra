@@ -200,7 +200,7 @@ interface ResponseParams {
 const getStableResponse = async () => {
   const data = await stableRequest<PatchRequestBodyParams, ResponseParams>({
     reqData: {
-      method: REQUEST_METHODS.PATCH
+      method: REQUEST_METHODS.PATCH,
       hostname: 'api.example.com',
       path: '/users',
       headers: { Authorization: `Bearer ${token}` },
