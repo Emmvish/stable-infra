@@ -4,7 +4,71 @@
 
 It enables **content-aware retries**, **hierarchical configuration**, **batch orchestration**, and **multi-phase workflows** with deep observability — all built on top of standard HTTP calls.
 
-> If you’ve ever retried an API call that “succeeded” but returned the *wrong* data — this library is for you.
+All in all, it provides you with the **entire ecosystem** to build **API-integrations based workflows**.
+
+---
+
+## 📚 Table of Contents
+<!-- TOC START -->
+- [Why stable-request exists](#why-stable-request-exists)
+- [What stable-request gives you](#what-stable-request-gives-you)
+  - [Core capabilities](#core-capabilities)
+  - [Scaling beyond single requests](#scaling-beyond-single-requests)
+  - [Full workflow orchestration](#full-workflow-orchestration)
+- [How stable-request is different](#how-stable-request-is-different)
+- [Choose your entry point](#choose-your-entry-point)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+  - [Basic Request (No Retries)](#1-basic-request-no-retries)
+  - [Add Simple Retries](#2-add-simple-retries)
+  - [Validate Response Content](#3-validate-response-content-content-aware-retries)
+  - [Monitor Errors](#4-monitor-errors-observability)
+  - [Monitor Successful Attempts](#5-monitor-successful-attempts)
+  - [Handle Final Errors Gracefully](#6-handle-final-errors-gracefully)
+  - [Pass Custom Parameters to Hooks](#7-pass-custom-parameters-to-hooks)
+  - [Pre-Execution Hook](#8-pre-execution-hook-dynamic-configuration)
+- [Intermediate Concepts](#intermediate-concepts)
+  - [Making POST/PUT/PATCH Requests](#making-postputpatch-requests)
+  - [Query Parameters](#query-parameters)
+  - [Custom Timeout and Port](#custom-timeout-and-port)
+  - [Request Cancellation](#request-cancellation)
+  - [Trial Mode](#trial-mode-testing-your-retry-logic)
+- [Batch Processing - Multiple Requests](#batch-processing---multiple-requests)
+  - [Basic Batch Request](#basic-batch-request)
+  - [Sequential Execution (With Dependencies)](#sequential-execution-with-dependencies)
+  - [Shared Configuration (Common Options)](#shared-configuration-common-options)
+- [Advanced: Request Grouping](#advanced-request-grouping)
+  - [Service Tiers](#example-service-tiers)
+  - [Multi-Region Configuration](#example-multi-region-configuration)
+  - [Shared Buffer Across Requests](#example-shared-buffer-is-common-across-the-entire-batch-of-requests)
+- [Multi-Phase Workflows](#multi-phase-workflows)
+  - [Basic Workflow](#basic-workflow)
+  - [Phase Configuration](#phase-configuration)
+  - [Workflow with Request Groups](#workflow-with-request-groups)
+  - [Phase Observability Hooks](#phase-observability-hooks)
+- [Real-World Examples](#real-world-examples)
+  - [Polling for Job Completion](#1-polling-for-job-completion)
+  - [Database Replication Lag](#2-database-replication-lag)
+  - [Idempotent Payment Processing](#3-idempotent-payment-processing)
+  - [Batch User Creation](#4-batch-user-creation-with-error-handling)
+  - [Health Check Monitoring System](#5-health-check-monitoring-system)
+  - [Data Pipeline (ETL Workflow)](#6-data-pipeline-etl-workflow)
+- [Complete API Reference](#complete-api-reference)
+  - [`stableRequest`](#stablerequestoptions)
+  - [`stableApiGateway`](#stableapigatewayrequests-options)
+  - [`stableWorkflow`](#stableworkflowphases-options)
+- [Hooks Reference](#hooks-reference)
+  - [`preExecutionHook`](#preexecutionhook)
+  - [`responseAnalyzer`](#responseanalyzer)
+  - [`handleErrors`](#handleerrors)
+  - [`handleSuccessfulAttemptData`](#handlesuccessfulattemptdata)
+  - [`finalErrorAnalyzer`](#finalerroranalyzer)
+  - [`handlePhaseCompletion`](#handlephasecompletion)
+  - [`handlePhaseError`](#handlephaseerror)
+- [Configuration Hierarchy](#configuration-hierarchy)
+- [TypeScript Support](#typescript-support)
+- [License](#license)
+<!-- TOC END -->
 
 ---
 
@@ -66,14 +130,31 @@ Most HTTP clients answer only one question:
 ### Full workflow orchestration
 
 🧩 **Multi-phase workflows with shared state (`stableWorkflow`)**
+  Model real-world business flows as deterministic, observable execution graphs.
 
 🔀 **Mix concurrent and sequential execution**
+  Parallelize where safe, serialize where correctness matters.
 
 🛑 **Stop early or degrade gracefully**
+Stop execution early or continue based on business criticality.
 
 📈 **Phase-level metrics and hooks**
+Track execution time, success rates, and failure boundaries per phase.
 
 🧭 **Deterministic, observable execution paths**
+Every decision is explicit, traceable, and reproducible.
+
+---
+
+## How stable-request is different
+
+| Traditional HTTP Clients | stable-request |
+|--------------------------|---------------|
+| Status-code based retries | Content-aware retries |
+| Per-request thinking | System-level thinking |
+| Fire-and-forget | Deterministic workflows |
+| Best-effort retries | Business-aware execution |
+| Little observability | Deep, structured hooks |
 
 ---
 
