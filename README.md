@@ -1925,10 +1925,10 @@ handlePhaseError: async ({ workflowId, phaseResult, error, maxSerializableChars,
 
 Configuration precedence across orchestration:
 
-Workflow-level (lowest priority)
-Phase-level (commonConfig)
-Request group (requestGroups[].commonConfig)
-Individual request options (highest priority)
+- Workflow-level (lowest priority)
+- Phase-level (commonConfig)
+- Request group (requestGroups[].commonConfig)
+- Individual request options (highest priority)
 
 Buffers are state (not config):
 
