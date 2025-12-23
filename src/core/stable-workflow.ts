@@ -60,7 +60,6 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 ...(phase.commonConfig || {}),
                 concurrentExecution: phase.concurrentExecution ?? true,
                 stopOnFirstError: phase.stopOnFirstError ?? false,
-                sharedBuffer: options.workflowBuffer,
                 requestGroups,
             };
 
@@ -108,7 +107,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                                 phaseResult,
                                 maxSerializableChars,
                                 params: workflowHookParams?.handlePhaseCompletionParams,
-                                workflowBuffer: options.workflowBuffer
+                                sharedBuffer: options.sharedBuffer
                             }
                         );
                     } catch (hookError) {
@@ -163,7 +162,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                             error: phaseError,
                             maxSerializableChars,
                             params: workflowHookParams?.handlePhaseErrorParams,
-                            workflowBuffer: options.workflowBuffer
+                            sharedBuffer: options.sharedBuffer
                         }
                     );
                 } catch (hookError) {

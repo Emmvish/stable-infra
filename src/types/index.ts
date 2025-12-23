@@ -215,9 +215,8 @@ export interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType =
   requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[];
   concurrentExecution?: boolean;
   stopOnFirstError?: boolean;
-  sharedBuffer?: Record<string, any>;
   commonConfig?: Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, 
-    'concurrentExecution' | 'stopOnFirstError' | 'requestGroups' | 'sharedBuffer'>;
+    'concurrentExecution' | 'stopOnFirstError' | 'requestGroups'>;
 }
 
 export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType = any> 
@@ -234,7 +233,6 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   ) => any | Promise<any>;
   maxSerializableChars?: number;
   workflowHookParams?: WorkflowHookParams;
-  workflowBuffer?: Record<string, any>;
 }
 
 export interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any> {
@@ -274,8 +272,7 @@ export interface HandlePhaseCompletionHookOptions<ResponseDataType = any> {
   phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>;
   maxSerializableChars?: number;
   params?: any;
-  workflowBuffer?: Record<string, any>;
-}
+  sharedBuffer?: Record<string, any>;}
 
 export interface HandlePhaseErrorHookOptions<ResponseDataType = any> extends HandlePhaseCompletionHookOptions<ResponseDataType> {
   error: any;

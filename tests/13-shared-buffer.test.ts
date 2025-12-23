@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import axios, { AxiosRequestConfig } from 'axios';
+import axios from 'axios';
 import { stableApiGateway, stableRequest, stableWorkflow } from '../src/core/index.js';
-import type { API_GATEWAY_REQUEST, STABLE_WORKFLOW_PHASE } from '../src/types/index.js';
+import type { API_GATEWAY_REQUEST, HandlePhaseCompletionHookOptions, STABLE_WORKFLOW_PHASE } from '../src/types/index.js';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-describe('Buffer options: commonBuffer (stableRequest), sharedBuffer (stableApiGateway), workflowBuffer (stableWorkflow)', () => {
+describe('Buffer options: commonBuffer (stableRequest) and sharedBuffer (stableApiGateway, stableWorkflow)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -192,7 +192,7 @@ describe('Buffer options: commonBuffer (stableRequest), sharedBuffer (stableApiG
     expect(buffer2.onlyIn1).toBeUndefined();
   });
 
-  it('stableWorkflow: workflowBuffer is passed as sharedBuffer into each phase gateway, and is shared across phases', async () => {
+  it("stableWorkflow: Workflow's sharedBuffer is passed as phase's sharedBuffer into each phase gateway, and is shared across phases", async () => {
     mockedAxios.request
       .mockResolvedValueOnce({
         status: 200,
@@ -267,7 +267,7 @@ describe('Buffer options: commonBuffer (stableRequest), sharedBuffer (stableApiG
     const result = await stableWorkflow(phases, {
       workflowId: 'wf-buffer-demo',
       commonRequestData: { hostname: 'api.example.com' },
-      workflowBuffer
+      sharedBuffer: workflowBuffer
     });
 
     expect(result.success).toBe(true);
@@ -281,7 +281,7 @@ describe('Buffer options: commonBuffer (stableRequest), sharedBuffer (stableApiG
     );
   });
 
-  it('stableWorkflow: workflowBuffer is accessible in workflow hooks (handlePhaseCompletion) and mutations are visible to later phases', async () => {
+  it("stableWorkflow: Workflow's sharedBuffer is accessible in workflow hooks (handlePhaseCompletion) and mutations are visible to later phases", async () => {
     mockedAxios.request
       .mockResolvedValueOnce({
         status: 200,
@@ -300,11 +300,11 @@ describe('Buffer options: commonBuffer (stableRequest), sharedBuffer (stableApiG
 
     const workflowBuffer: Record<string, any> = {};
 
-    const handlePhaseCompletion = jest.fn(async ({ phaseResult, workflowBuffer: wb }: any) => {
+    const handlePhaseCompletion = jest.fn(async ({ phaseResult, sharedBuffer: wb }: HandlePhaseCompletionHookOptions) => {
       expect(wb).toBe(workflowBuffer);
-      wb.completedPhases = (wb.completedPhases || 0) + 1;
+      wb!.completedPhases = (wb!.completedPhases || 0) + 1;
       if (phaseResult.phaseId === 'p1') {
-        wb.tokenFromHook = 'hook-token';
+        wb!.tokenFromHook = 'hook-token';
       }
     });
 
@@ -350,7 +350,7 @@ describe('Buffer options: commonBuffer (stableRequest), sharedBuffer (stableApiG
     const result = await stableWorkflow(phases, {
       workflowId: 'wf-buffer-hooks-demo',
       commonRequestData: { hostname: 'api.example.com' },
-      workflowBuffer,
+      sharedBuffer: workflowBuffer,
       handlePhaseCompletion
     });
 
