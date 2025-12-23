@@ -6,7 +6,7 @@ import { RETRY_STRATEGIES } from '../src/enums/index.js';
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-describe('stableRequest - preExecution option (sendStableRequest)', () => {
+describe('stableRequest - preExecution option (stableRequest)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });

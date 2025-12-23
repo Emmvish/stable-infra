@@ -60,6 +60,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 ...(phase.commonConfig || {}),
                 concurrentExecution: phase.concurrentExecution ?? true,
                 stopOnFirstError: phase.stopOnFirstError ?? false,
+                sharedBuffer: options.workflowBuffer,
                 requestGroups,
             };
 

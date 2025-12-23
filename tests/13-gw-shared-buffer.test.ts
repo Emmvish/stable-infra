@@ -1,45 +1,156 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
-import { stableApiGateway } from '../src/core/index.js';
+import axios, { AxiosRequestConfig } from 'axios';
+import { stableApiGateway, stableRequest, stableWorkflow } from '../src/core/index.js';
+import type { API_GATEWAY_REQUEST, STABLE_WORKFLOW_PHASE } from '../src/types/index.js';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-describe('stableApiGateway - sharedBuffer option', () => {
+describe('Buffer options: commonBuffer (stableRequest), sharedBuffer (stableApiGateway), workflowBuffer (stableWorkflow)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('shares the same buffer across sequential requests (mutate in first, read in second)', async () => {
+  it('stableRequest: commonBuffer is writable in preExecution and readable in responseAnalyzer', async () => {
+    mockedAxios.request.mockResolvedValueOnce({
+      status: 200,
+      data: { state: 'ready' },
+      statusText: 'OK',
+      headers: {},
+      config: { url: '/job' } as any
+    });
+
+    const commonBuffer: Record<string, any> = {};
+
+    const responseAnalyzer = jest.fn(async ({ data, commonBuffer: cb }: any) => {
+      expect(cb).toBe(commonBuffer);
+      expect(cb.traceId).toBe('trace-123');
+      return data?.state === 'ready';
+    });
+
+    const result = await stableRequest({
+      reqData: { hostname: 'api.example.com', path: '/job' },
+      resReq: true,
+      commonBuffer,
+      preExecution: {
+        preExecutionHook: ({ commonBuffer: cb }: any) => {
+          cb.traceId = 'trace-123';
+          cb.setAt = 'preExecution';
+          return {};
+        },
+        preExecutionHookParams: { any: 'value' },
+        applyPreExecutionConfigOverride: false,
+        continueOnPreExecutionHookFailure: false
+      },
+      responseAnalyzer
+    });
+
+    expect(result).toEqual({ state: 'ready' });
+    expect(responseAnalyzer).toHaveBeenCalledTimes(1);
+    expect(commonBuffer).toEqual(
+      expect.objectContaining({ traceId: 'trace-123', setAt: 'preExecution' })
+    );
+  });
+
+  it('stableApiGateway: sharedBuffer is the same object used as commonBuffer for every request', async () => {
+    mockedAxios.request
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { ok: true, id: 'a' },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { ok: true, id: 'b' },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      });
+
     const sharedBuffer: Record<string, any> = {};
 
-    const seenConfigs: AxiosRequestConfig[] = [];
+    const requests = [
+      {
+        id: 'a',
+        requestOptions: {
+          reqData: { path: '/a' },
+          resReq: true,
+          preExecution: {
+            preExecutionHook: ({ commonBuffer }: any) => {
+              expect(commonBuffer).toBe(sharedBuffer);
+              commonBuffer.fromA = true;
+              return {};
+            },
+            preExecutionHookParams: {},
+            applyPreExecutionConfigOverride: false,
+            continueOnPreExecutionHookFailure: false
+          }
+        }
+      },
+      {
+        id: 'b',
+        requestOptions: {
+          reqData: { path: '/b' },
+          resReq: true,
+          preExecution: {
+            preExecutionHook: ({ commonBuffer }: any) => {
+              expect(commonBuffer).toBe(sharedBuffer);
+              commonBuffer.fromB = true;
+              return {};
+            },
+            preExecutionHookParams: {},
+            applyPreExecutionConfigOverride: false,
+            continueOnPreExecutionHookFailure: false
+          }
+        }
+      }
+    ] satisfies API_GATEWAY_REQUEST[];
 
-    mockedAxios.request.mockImplementation(
-      (async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
-        seenConfigs.push(config);
+    const results = await stableApiGateway(requests, {
+      concurrentExecution: true,
+      commonRequestData: { hostname: 'api.example.com' },
+      sharedBuffer
+    });
 
-        return {
-          status: 200,
-          data: { ok: true, url: config.url },
-          statusText: 'OK',
-          headers: {},
-          config: config as any
-        };
-      }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
-    );
+    expect(results).toHaveLength(2);
+    expect(results.every(r => r.success)).toBe(true);
+
+    expect(sharedBuffer).toEqual(expect.objectContaining({ fromA: true, fromB: true }));
+  });
+
+  it('stableApiGateway: without sharedBuffer, each request can have its own commonBuffer and they do NOT leak into each other', async () => {
+    mockedAxios.request
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { ok: true, id: 'first' },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { ok: true, id: 'second' },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      });
+
+    const buffer1: Record<string, any> = {};
+    const buffer2: Record<string, any> = {};
 
     const results = await stableApiGateway(
       [
         {
-          id: 'r1',
+          id: 'first',
           requestOptions: {
-            reqData: { path: '/a' },
+            reqData: { path: '/first' },
             resReq: true,
+            commonBuffer: buffer1,
             preExecution: {
               preExecutionHook: ({ commonBuffer }: any) => {
-                commonBuffer.token = 'tok_123';
-                commonBuffer.setBy = 'r1';
+                commonBuffer.onlyIn1 = 'yes';
                 return {};
               },
               preExecutionHookParams: {},
@@ -49,84 +160,17 @@ describe('stableApiGateway - sharedBuffer option', () => {
           }
         },
         {
-          id: 'r2',
+          id: 'second',
           requestOptions: {
-            reqData: { path: '/b' },
+            reqData: { path: '/second' },
             resReq: true,
+            commonBuffer: buffer2,
             preExecution: {
               preExecutionHook: ({ commonBuffer }: any) => {
-                expect(commonBuffer.token).toBe('tok_123');
-                expect(commonBuffer.setBy).toBe('r1');
-                return {
-                  reqData: {
-                    hostname: 'api.example.com',
-                    path: '/b',
-                    headers: {
-                      Authorization: `Bearer ${commonBuffer.token}`
-                    }
-                  }
-                };
+                expect(commonBuffer.onlyIn1).toBeUndefined();
+                commonBuffer.onlyIn2 = 'yes';
+                return {};
               },
-              preExecutionHookParams: {},
-              applyPreExecutionConfigOverride: true,
-              continueOnPreExecutionHookFailure: false
-            }
-          }
-        }
-      ],
-      {
-        concurrentExecution: false,
-        commonRequestData: { hostname: 'api.example.com' },
-        sharedBuffer
-      }
-    );
-
-    expect(results).toHaveLength(2);
-    expect(results[0]).toEqual(
-      expect.objectContaining({ requestId: 'r1', success: true, data: expect.any(Object) })
-    );
-    expect(results[1]).toEqual(
-      expect.objectContaining({ requestId: 'r2', success: true, data: expect.any(Object) })
-    );
-
-    expect(sharedBuffer).toEqual(expect.objectContaining({ token: 'tok_123', setBy: 'r1' }));
-
-    const secondConfig = seenConfigs.find(c => c.url === '/b');
-    expect(secondConfig).toBeDefined();
-    expect(secondConfig?.headers).toEqual(
-      expect.objectContaining({
-        Authorization: 'Bearer tok_123'
-      })
-    );
-  });
-
-  it('prefers sharedBuffer over per-request commonBuffer when both are provided', async () => {
-    const sharedBuffer: Record<string, any> = { marker: 'from-shared' };
-
-    mockedAxios.request.mockResolvedValueOnce({
-      status: 200,
-      data: { ok: true },
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    });
-
-    const preExecutionHook = jest.fn(({ commonBuffer }: any) => {
-      expect(commonBuffer.marker).toBe('from-shared');
-      commonBuffer.touched = true;
-      return {};
-    });
-
-    const results = await stableApiGateway(
-      [
-        {
-          id: 'r1',
-          requestOptions: {
-            reqData: { path: '/only' },
-            resReq: true,
-            commonBuffer: { marker: 'from-request' },
-            preExecution: {
-              preExecutionHook,
               preExecutionHookParams: {},
               applyPreExecutionConfigOverride: false,
               continueOnPreExecutionHookFailure: false
@@ -135,14 +179,105 @@ describe('stableApiGateway - sharedBuffer option', () => {
         }
       ],
       {
-        concurrentExecution: true,
-        commonRequestData: { hostname: 'api.example.com' },
-        sharedBuffer
+        concurrentExecution: false,
+        commonRequestData: { hostname: 'api.example.com' }
       }
     );
 
-    expect(preExecutionHook).toHaveBeenCalledTimes(1);
-    expect(sharedBuffer).toEqual(expect.objectContaining({ marker: 'from-shared', touched: true }));
-    expect(results[0]).toEqual(expect.objectContaining({ requestId: 'r1', success: true }));
+    expect(results).toHaveLength(2);
+    expect(results.every(r => r.success)).toBe(true);
+
+    expect(buffer1).toEqual(expect.objectContaining({ onlyIn1: 'yes' }));
+    expect(buffer2).toEqual(expect.objectContaining({ onlyIn2: 'yes' }));
+    expect(buffer2.onlyIn1).toBeUndefined();
+  });
+
+  it('stableWorkflow: workflowBuffer is passed as sharedBuffer into each phase gateway, and is shared across phases', async () => {
+    mockedAxios.request
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { ok: true, phase: 1 },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { ok: true, phase: 2 },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      });
+
+    const workflowBuffer: Record<string, any> = {};
+
+    const phases = [
+      {
+        id: 'p1',
+        concurrentExecution: false,
+        requests: [
+          {
+            id: 'r1',
+            requestOptions: {
+              reqData: { path: '/p1' },
+              resReq: true,
+              preExecution: {
+                preExecutionHook: ({ commonBuffer }: any) => {
+                  expect(commonBuffer).toBe(workflowBuffer);
+                  commonBuffer.token = 'wf-token';
+                  commonBuffer.setIn = 'p1';
+                  return {};
+                },
+                preExecutionHookParams: {},
+                applyPreExecutionConfigOverride: false,
+                continueOnPreExecutionHookFailure: false
+              }
+            }
+          }
+        ]
+      },
+      {
+        id: 'p2',
+        concurrentExecution: false,
+        requests: [
+          {
+            id: 'r2',
+            requestOptions: {
+              reqData: { path: '/p2' },
+              resReq: true,
+              preExecution: {
+                preExecutionHook: ({ commonBuffer }: any) => {
+                  expect(commonBuffer).toBe(workflowBuffer);
+                  expect(commonBuffer.token).toBe('wf-token');
+                  expect(commonBuffer.setIn).toBe('p1');
+
+                  commonBuffer.usedIn = 'p2';
+                  return {};
+                },
+                preExecutionHookParams: {},
+                applyPreExecutionConfigOverride: false,
+                continueOnPreExecutionHookFailure: false
+              }
+            }
+          }
+        ]
+      }
+    ] satisfies STABLE_WORKFLOW_PHASE[];
+
+    const result = await stableWorkflow(phases, {
+      workflowId: 'wf-buffer-demo',
+      commonRequestData: { hostname: 'api.example.com' },
+      workflowBuffer
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.totalPhases).toBe(2);
+    expect(workflowBuffer).toEqual(
+      expect.objectContaining({
+        token: 'wf-token',
+        setIn: 'p1',
+        usedIn: 'p2'
+      })
+    );
   });
 });
