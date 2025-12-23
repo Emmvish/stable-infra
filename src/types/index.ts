@@ -274,6 +274,7 @@ export interface HandlePhaseCompletionHookOptions<ResponseDataType = any> {
   phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>;
   maxSerializableChars?: number;
   params?: any;
+  workflowBuffer?: Record<string, any>;
 }
 
 export interface HandlePhaseErrorHookOptions<ResponseDataType = any> extends HandlePhaseCompletionHookOptions<ResponseDataType> {

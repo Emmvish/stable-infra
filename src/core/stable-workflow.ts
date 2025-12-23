@@ -107,7 +107,8 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                                 workflowId,
                                 phaseResult,
                                 maxSerializableChars,
-                                params: workflowHookParams?.handlePhaseCompletionParams
+                                params: workflowHookParams?.handlePhaseCompletionParams,
+                                workflowBuffer: options.workflowBuffer
                             }
                         );
                     } catch (hookError) {
@@ -161,7 +162,8 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                             phaseResult,
                             error: phaseError,
                             maxSerializableChars,
-                            params: workflowHookParams?.handlePhaseErrorParams
+                            params: workflowHookParams?.handlePhaseErrorParams,
+                            workflowBuffer: options.workflowBuffer
                         }
                     );
                 } catch (hookError) {

@@ -280,4 +280,84 @@ describe('Buffer options: commonBuffer (stableRequest), sharedBuffer (stableApiG
       })
     );
   });
+
+  it('stableWorkflow: workflowBuffer is accessible in workflow hooks (handlePhaseCompletion) and mutations are visible to later phases', async () => {
+    mockedAxios.request
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { ok: true, phase: 1 },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { ok: true, phase: 2 },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      });
+
+    const workflowBuffer: Record<string, any> = {};
+
+    const handlePhaseCompletion = jest.fn(async ({ phaseResult, workflowBuffer: wb }: any) => {
+      expect(wb).toBe(workflowBuffer);
+      wb.completedPhases = (wb.completedPhases || 0) + 1;
+      if (phaseResult.phaseId === 'p1') {
+        wb.tokenFromHook = 'hook-token';
+      }
+    });
+
+    const phases = [
+      {
+        id: 'p1',
+        concurrentExecution: false,
+        requests: [
+          {
+            id: 'r1',
+            requestOptions: {
+              reqData: { path: '/p1' },
+              resReq: true
+            }
+          }
+        ]
+      },
+      {
+        id: 'p2',
+        concurrentExecution: false,
+        requests: [
+          {
+            id: 'r2',
+            requestOptions: {
+              reqData: { path: '/p2' },
+              resReq: true,
+              preExecution: {
+                preExecutionHook: ({ commonBuffer }: any) => {
+                  expect(commonBuffer).toBe(workflowBuffer);
+                  expect(commonBuffer.tokenFromHook).toBe('hook-token');
+                  return {};
+                },
+                preExecutionHookParams: {},
+                applyPreExecutionConfigOverride: false,
+                continueOnPreExecutionHookFailure: false
+              }
+            }
+          }
+        ]
+      }
+    ] satisfies STABLE_WORKFLOW_PHASE[];
+
+    const result = await stableWorkflow(phases, {
+      workflowId: 'wf-buffer-hooks-demo',
+      commonRequestData: { hostname: 'api.example.com' },
+      workflowBuffer,
+      handlePhaseCompletion
+    });
+
+    expect(result.success).toBe(true);
+    expect(handlePhaseCompletion).toHaveBeenCalledTimes(2);
+    expect(workflowBuffer).toEqual(
+      expect.objectContaining({ tokenFromHook: 'hook-token', completedPhases: 2 })
+    );
+  });
 });
