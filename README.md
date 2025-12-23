@@ -198,13 +198,16 @@ interface ResponseParams {
 }
 
 const getStableResponse = async () => {
+
+  const token = 'my-auth-token';
+
   const data = await stableRequest<PatchRequestBodyParams, ResponseParams>({
     reqData: {
       method: REQUEST_METHODS.PATCH,
       hostname: 'api.example.com',
       path: '/users',
       headers: { Authorization: `Bearer ${token}` },
-      body: { id: 123, updates: { name: 'MV', age: 27 } }
+      body: { id: 123, updates: { age: 27 } }
     },
     resReq: true  // Return the response data
   });
