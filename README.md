@@ -1,8 +1,23 @@
 # stable-request
 
-**stable-request** is a TypeScript-first **HTTP workflow execution engine** for real-world distributed systems — where HTTP `200 OK` does **not** guarantee business success.
+**stable-request** is a TypeScript-first **HTTP workflow execution engine** for real-world distributed systems — where HTTP `200 OK` does **not** guarantee business success, and HTTP failures still deserve **structured, actionable responses**.
 
-It enables **content-aware retries**, **hierarchical configuration**, **batch orchestration**, and **multi-phase workflows** with deep observability — all built on top of standard HTTP calls.
+It ensures that **every request attempt**, whether it succeeds or fails, can be:
+
+- Observed
+- Analyzed
+- Retried intelligently
+- Suppressed when non-critical
+- Escalated when business-critical
+
+All without crashing your application or hiding context behind opaque errors.
+
+**stable-request treats failures as data.**
+
+> If you’ve ever logged `error.message` and thought  
+> **“This tells me absolutely nothing”** — this library is for you.
+
+In addition, it enables **content-aware retries**, **hierarchical configuration**, **batch orchestration**, and **multi-phase workflows** with deep observability — all built on top of standard HTTP calls.
 
 All in all, it provides you with the **entire ecosystem** to build **API-integrations based workflows**.
 
