@@ -19,7 +19,7 @@ All without crashing your application or hiding context behind opaque errors.
 
 In addition, it enables **content-aware retries**, **hierarchical configuration**, **batch orchestration**, and **multi-phase workflows** with deep observability — all built on top of standard HTTP calls.
 
-All in all, it provides you with the **entire ecosystem** to build **API-integrations based workflows**.
+All in all, it provides you with the **entire ecosystem** to build **API-integrations based workflows** with **complete flexibility**.
 
 ---
 
