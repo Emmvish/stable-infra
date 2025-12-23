@@ -28,7 +28,7 @@ All in all, it provides you with the **entire ecosystem** to build **API-integra
   - [Pass Custom Parameters to Hooks](#7-pass-custom-parameters-to-hooks)
   - [Pre-Execution Hook](#8-pre-execution-hook-dynamic-configuration)
 - [Intermediate Concepts](#intermediate-concepts)
-  - [Making POST/PUT/PATCH Requests](#making-postputpatch-requests)
+  - [Making POST/PUT/PATCH/DELETE Requests](#making-postputpatchdelete-requests)
   - [Query Parameters](#query-parameters)
   - [Custom Timeout and Port](#custom-timeout-and-port)
   - [Request Cancellation](#request-cancellation)
@@ -527,7 +527,7 @@ interface PreExecutionOptions {
 
 ## Intermediate Concepts
 
-### Making POST/PUT/PATCH Requests
+### Making POST/PUT/PATCH/DELETE Requests
 
 ```typescript
 import { stableRequest, REQUEST_METHODS } from '@emmvish/stable-request';
