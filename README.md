@@ -181,30 +181,35 @@ npm install @emmvish/stable-request
 ### 1. Basic Request (No Retries)
 
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest, REQUEST_METHODS } from '@emmvish/stable-request';
 
-interface RequestBodyParams {
-  page: number,
-  offset: number
+interface PatchRequestBodyParams {
+  id: number;
+  updates: {
+    name?: string;
+    age?: number;
+  }
 }
 
 interface ResponseParams {
-  id: number,
-  name: string
+  id: number;
+  name: string;
+  age: number;
 }
 
 const getStableResponse = async () => {
-  const data = await stableRequest<RequestBodyParams, ResponseParams>({
+  const data = await stableRequest<PatchRequestBodyParams, ResponseParams>({
     reqData: {
+      method: REQUEST_METHODS.PATCH
       hostname: 'api.example.com',
-      path: '/users/123',
+      path: '/users',
       headers: { Authorization: `Bearer ${token}` },
-      query: { page: 10, offset: 5 }
+      body: { id: 123, updates: { name: 'MV', age: 27 } }
     },
     resReq: true  // Return the response data
   });
   
-  console.log(data); // { id: 123, name: 'John' }
+  console.log(data); // { id: 123, name: 'MV', age: 27 }
 }
 
 getStableResponse();
