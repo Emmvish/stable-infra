@@ -198,8 +198,8 @@ const getStableResponse = async () => {
     reqData: {
       hostname: 'api.example.com',
       path: '/users/123',
-      headers: { Authorization: `Bearer ${token}` }
-      body: { page: 10, offset: 5 }
+      headers: { Authorization: `Bearer ${token}` },
+      query: { page: 10, offset: 5 }
     },
     resReq: true  // Return the response data
   });
