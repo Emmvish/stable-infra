@@ -1250,7 +1250,7 @@ const workflow = await stableWorkflow(
     workflowId: 'monitored-workflow',
     
     // Called after each phase completes successfully
-    handlePhaseCompletion: async ({ workflowId, phaseResult, workflowBuffer }) => {
+    handlePhaseCompletion: async ({ workflowId, phaseResult, sharedBuffer }) => {
       console.log(`Phase ${phaseResult.phaseId} completed`);
       
       await analytics.track('workflow_phase_complete', {
@@ -1262,7 +1262,7 @@ const workflow = await stableWorkflow(
     },
     
     // Called when a phase fails
-    handlePhaseError: async ({ workflowId, phaseResult, error, workflowBuffer }) => {
+    handlePhaseError: async ({ workflowId, phaseResult, error, sharedBuffer }) => {
       console.error(`Phase ${phaseResult.phaseId} failed`);
       
       await alerting.notify('workflow_phase_failed', {
@@ -1336,7 +1336,7 @@ const phases = [
 const result = await stableWorkflow(phases, {
   workflowId: 'wf-buffer-demo',
   commonRequestData: { hostname: 'api.example.com' },
-  workflowBuffer
+  sharedBuffer: workflowBuffer
 });
 
 console.log(workflowBuffer); // { token: 'wf-token' setIn: 'p1', usedIn: 'p2' }
@@ -1798,7 +1798,7 @@ interface STABLE_WORKFLOW_PHASE {
 | `handlePhaseError` | `function` | `undefined` | Hook called when a phase fails |
 | `maxSerializableChars` | `number` | `1000` | Max chars for serialization in hooks |
 | `workflowHookParams` | `WorkflowHookParams` | {} | Custom set of params passed to hooks |
-| `workflowBuffer` | `Record<string, any>` | `undefined` | Buffer shared by all phases and all requests within them |
+| `sharedBuffer` | `Record<string, any>` | `undefined` | Buffer shared by all phases and all requests within them |
 | All `stableApiGateway` options | - | - | Applied as workflow-level defaults |
 
 **STABLE_WORKFLOW_RESULT response:**
@@ -1906,7 +1906,7 @@ finalErrorAnalyzer: async ({ reqData, error, trialMode, params, commonBuffer }) 
 **Purpose:** Execute phase-bridging code upon successful completion of a phase
 
 ```typescript
-handlePhaseCompletion: async ({ workflowId, phaseResult, maxSerializableChars, params, workflowBuffer }) => {
+handlePhaseCompletion: async ({ workflowId, phaseResult, maxSerializableChars, params, sharedBuffer }) => {
   await logger.log(phaseResult.phaseId, phaseResult.success);
 }
 ```
@@ -1916,7 +1916,7 @@ handlePhaseCompletion: async ({ workflowId, phaseResult, maxSerializableChars, p
 **Purpose:** Execute error handling code if a phase runs into an error
 
 ```typescript
-handlePhaseError: async ({ workflowId, phaseResult, error, maxSerializableChars, params, workflowBuffer }) => {
+handlePhaseError: async ({ workflowId, phaseResult, error, maxSerializableChars, params, sharedBuffer }) => {
   await logger.error(error);
 }
 ```
@@ -1925,7 +1925,7 @@ handlePhaseError: async ({ workflowId, phaseResult, error, maxSerializableChars,
 
 Configuration precedence across orchestration:
 
-- Workflow-level (lowest priority)
+- Workflow-level (options.sharedBuffer)
 - Phase-level (commonConfig)
 - Request group (requestGroups[].commonConfig)
 - Individual request options (highest priority)
@@ -1933,8 +1933,8 @@ Configuration precedence across orchestration:
 Buffers are state (not config):
 
 - Request scope: commonBuffer
-- Gateway scope: sharedBuffer
-- Workflow scope: workflowBuffer
+- Gateway scope: Gateway's / Phase's sharedBuffer
+- Workflow scope: Workflow's sharedBuffer
 
 ## TypeScript Support
 
