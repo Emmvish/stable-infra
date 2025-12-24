@@ -121,10 +121,16 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
               commonBuffer
             }
           ));
-        } catch (e) {
+        } catch (e: any) {
           console.error(
             `stable-request: Unable to analyze the response returned on attempt #${currentAttempt}. Response: ${safelyStringify(
               res?.data,
+              maxSerializableChars
+            )}`
+          );
+          console.error(
+            `stable-request: Error message provided by your responseAnalyzer: ${safelyStringify(
+              e.message,
               maxSerializableChars
             )}`
           );
@@ -160,9 +166,12 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
               commonBuffer
             }
           );
-        } catch (e) {
+        } catch (e: any) {
           console.error(
-            'stable-request: Unable to report errors due to issues with error handler!'
+            `stable-request: Unable to report errors due to issues with error handler! Error message provided by your handleErrors: ${safelyStringify(
+              e.message,
+              maxSerializableChars
+            )}`
           );
         }
       }
@@ -189,9 +198,12 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
                 commonBuffer
               }
             );
-          } catch (e) {
+          } catch (e: any) {
             console.error(
-              'stable-request: Unable to report successful attempts due to issues with successful attempt data handler!'
+              `stable-request: Unable to report successful attempts due to issues with successful attempt data handler! Error message provided by your handleSuccessfulAttemptData: ${safelyStringify(
+                e.message,
+                maxSerializableChars
+              )}`
             );
           }
         }
@@ -244,17 +256,27 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     if (trialMode.enabled) {
       console.error('stable-request: Final error:\n', e.message);
     }
-    const errorAnalysisResult = await safelyExecuteUnknownFunction(
-      finalErrorAnalyzer,
-      {
-        reqData,
-        error: e,
-        trialMode,
-        params: hookParams?.finalErrorAnalyzerParams,
-        preExecutionResult,
-        commonBuffer
-      }
-    );
+    let errorAnalysisResult = false;
+    try {
+      errorAnalysisResult = await safelyExecuteUnknownFunction(
+        finalErrorAnalyzer,
+        {
+          reqData,
+          error: e,
+          trialMode,
+          params: hookParams?.finalErrorAnalyzerParams,
+          preExecutionResult,
+          commonBuffer
+        }
+      );
+    } catch(errorAnalysisError: any) {
+      console.error(
+        `stable-request: Unable to analyze the final error returned. Error message provided by your finalErrorAnalyzer: ${safelyStringify(
+          errorAnalysisError.message,
+          maxSerializableChars
+        )}`
+      );
+    }
     if(!errorAnalysisResult) {
       throw e;
     } else {
