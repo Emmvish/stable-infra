@@ -389,4 +389,431 @@ describe('Multi-Phase Workflows', () => {
 
     expect(mockedAxios.request).toHaveBeenCalledTimes(2);
   });
+
+  it('should execute all phases concurrently when concurrentPhaseExecution is true', async () => {
+    const executionOrder: string[] = [];
+    const phaseStartTimes: Record<string, number> = {};
+
+    mockedAxios.request.mockImplementation(
+      (async (config: AxiosRequestConfig) => {
+        const path = config.url || '';
+        const phaseId = path.includes('p1') ? 'p1' : path.includes('p2') ? 'p2' : 'p3';
+        
+        if (!phaseStartTimes[phaseId]) {
+          phaseStartTimes[phaseId] = Date.now();
+        }
+        
+        executionOrder.push(path);
+        
+        // Simulate different execution times for different phases
+        if (path.includes('p1')) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        } else if (path.includes('p2')) {
+          await new Promise(resolve => setTimeout(resolve, 30));
+        } else if (path.includes('p3')) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+
+        return {
+          status: 200,
+          data: { phase: phaseId, path },
+          statusText: 'OK',
+          headers: {},
+          config: config as any
+        };
+      }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
+    );
+
+    const phases = [
+      {
+        id: 'phase-1',
+        requests: [
+          { id: 'r1', requestOptions: { reqData: { path: '/p1/r1' }, resReq: true } }
+        ]
+      },
+      {
+        id: 'phase-2',
+        requests: [
+          { id: 'r2', requestOptions: { reqData: { path: '/p2/r1' }, resReq: true } }
+        ]
+      },
+      {
+        id: 'phase-3',
+        requests: [
+          { id: 'r3', requestOptions: { reqData: { path: '/p3/r1' }, resReq: true } }
+        ]
+      }
+    ] satisfies STABLE_WORKFLOW_PHASE[];
+
+    const startTime = Date.now();
+    const result = await stableWorkflow(phases, {
+      workflowId: 'wf-concurrent-phases',
+      commonRequestData: { hostname: 'api.example.com' },
+      commonAttempts: 1,
+      commonWait: 1,
+      concurrentPhaseExecution: true
+    });
+    const totalTime = Date.now() - startTime;
+
+    expect(result.success).toBe(true);
+    expect(result.completedPhases).toBe(3);
+    expect(mockedAxios.request).toHaveBeenCalledTimes(3);
+
+    // All phases should start within a short time window (indicating concurrent execution)
+    const startTimeValues = Object.values(phaseStartTimes);
+    const maxTimeDiff = Math.max(...startTimeValues) - Math.min(...startTimeValues);
+    expect(maxTimeDiff).toBeLessThan(30); // Should start nearly simultaneously
+
+    // Total time should be closer to the longest phase (50ms) rather than sum (90ms)
+    expect(totalTime).toBeLessThan(120); // Much less than sequential would take
+  });
+
+  it('should handle phase failures gracefully in concurrent execution', async () => {
+    mockedAxios.request.mockImplementation(
+      (async (config: AxiosRequestConfig) => {
+        const path = config.url || '';
+        
+        if (path.includes('p2')) {
+          throw {
+            response: { status: 500, data: 'Phase 2 error' },
+            message: 'Phase 2 failed'
+          };
+        }
+
+        return {
+          status: 200,
+          data: { success: true, path },
+          statusText: 'OK',
+          headers: {},
+          config: config as any
+        };
+      }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
+    );
+
+    const phases = [
+      {
+        id: 'phase-1-success',
+        requests: [
+          { id: 'r1', requestOptions: { reqData: { path: '/p1/r1' }, resReq: true, attempts: 1 } }
+        ]
+      },
+      {
+        id: 'phase-2-fail',
+        requests: [
+          { id: 'r2', requestOptions: { reqData: { path: '/p2/r1' }, resReq: true, attempts: 1 } }
+        ]
+      },
+      {
+        id: 'phase-3-success',
+        requests: [
+          { id: 'r3', requestOptions: { reqData: { path: '/p3/r1' }, resReq: true, attempts: 1 } }
+        ]
+      }
+    ] satisfies STABLE_WORKFLOW_PHASE[];
+
+    const result = await stableWorkflow(phases, {
+      workflowId: 'wf-concurrent-with-failure',
+      commonRequestData: { hostname: 'api.example.com' },
+      commonAttempts: 1,
+      commonWait: 1,
+      concurrentPhaseExecution: true
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.completedPhases).toBe(3); // All phases should complete
+    expect(result.successfulRequests).toBe(2);
+    expect(result.failedRequests).toBe(1);
+    
+    // Verify all three phases were executed
+    expect(mockedAxios.request).toHaveBeenCalledTimes(3);
+    
+    // Check individual phase results
+    expect(result.phases[0].success).toBe(true);
+    expect(result.phases[1].success).toBe(false);
+    expect(result.phases[2].success).toBe(true);
+  });
+
+  it('should execute phases with different concurrentExecution settings within concurrent workflow', async () => {
+    const executionLog: string[] = [];
+
+    mockedAxios.request.mockImplementation(
+      (async (config: AxiosRequestConfig) => {
+        const path = config.url || '';
+        executionLog.push(`start-${path}`);
+        
+        await new Promise(resolve => setTimeout(resolve, 10));
+        
+        executionLog.push(`end-${path}`);
+
+        return {
+          status: 200,
+          data: { path },
+          statusText: 'OK',
+          headers: {},
+          config: config as any
+        };
+      }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
+    );
+
+    const phases = [
+      {
+        id: 'phase-1-concurrent-requests',
+        concurrentExecution: true,
+        requests: [
+          { id: 'r1a', requestOptions: { reqData: { path: '/p1/r1' }, resReq: true } },
+          { id: 'r1b', requestOptions: { reqData: { path: '/p1/r2' }, resReq: true } }
+        ]
+      },
+      {
+        id: 'phase-2-sequential-requests',
+        concurrentExecution: false,
+        requests: [
+          { id: 'r2a', requestOptions: { reqData: { path: '/p2/r1' }, resReq: true } },
+          { id: 'r2b', requestOptions: { reqData: { path: '/p2/r2' }, resReq: true } }
+        ]
+      }
+    ] satisfies STABLE_WORKFLOW_PHASE[];
+
+    const result = await stableWorkflow(phases, {
+      workflowId: 'wf-mixed-execution-modes',
+      commonRequestData: { hostname: 'api.example.com' },
+      commonAttempts: 1,
+      commonWait: 1,
+      concurrentPhaseExecution: true
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.completedPhases).toBe(2);
+    expect(mockedAxios.request).toHaveBeenCalledTimes(4);
+
+    // Phase 1 requests should start concurrently (both start before either ends)
+    const p1r1Start = executionLog.indexOf('start-/p1/r1');
+    const p1r2Start = executionLog.indexOf('start-/p1/r2');
+    const p1r1End = executionLog.indexOf('end-/p1/r1');
+    
+    expect(p1r2Start).toBeLessThan(p1r1End); // r2 starts before r1 ends
+
+    // Phase 2 requests should be sequential (one completes before next starts)
+    const p2r1End = executionLog.indexOf('end-/p2/r1');
+    const p2r2Start = executionLog.indexOf('start-/p2/r2');
+    
+    expect(p2r2Start).toBeGreaterThan(p2r1End); // r2 starts after r1 ends
+  });
+
+  it('should call handlePhaseCompletion for all phases in concurrent execution', async () => {
+    const handlePhaseCompletion = jest.fn();
+    const completedPhases: string[] = [];
+
+    handlePhaseCompletion.mockImplementation(async ({ phaseResult }: any) => {
+      completedPhases.push(phaseResult.phaseId);
+    });
+
+    mockedAxios.request.mockImplementation(
+      (async (config: AxiosRequestConfig) => {
+        // Simulate variable execution times
+        const path = config.url || '';
+        const delay = path.includes('p1') ? 50 : path.includes('p2') ? 30 : 10;
+        await new Promise(resolve => setTimeout(resolve, delay));
+
+        return {
+          status: 200,
+          data: { path },
+          statusText: 'OK',
+          headers: {},
+          config: config as any
+        };
+      }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
+    );
+
+    const phases = [
+      {
+        id: 'phase-1-slow',
+        requests: [{ id: 'r1', requestOptions: { reqData: { path: '/p1/r1' }, resReq: true } }]
+      },
+      {
+        id: 'phase-2-medium',
+        requests: [{ id: 'r2', requestOptions: { reqData: { path: '/p2/r1' }, resReq: true } }]
+      },
+      {
+        id: 'phase-3-fast',
+        requests: [{ id: 'r3', requestOptions: { reqData: { path: '/p3/r1' }, resReq: true } }]
+      }
+    ] satisfies STABLE_WORKFLOW_PHASE[];
+
+    const result = await stableWorkflow(phases, {
+      workflowId: 'wf-concurrent-hooks',
+      commonRequestData: { hostname: 'api.example.com' },
+      commonAttempts: 1,
+      commonWait: 1,
+      concurrentPhaseExecution: true,
+      handlePhaseCompletion
+    });
+
+    expect(result.success).toBe(true);
+    expect(handlePhaseCompletion).toHaveBeenCalledTimes(3);
+    
+    // All phases should have completion hooks called
+    expect(completedPhases).toHaveLength(3);
+    expect(completedPhases).toContain('phase-1-slow');
+    expect(completedPhases).toContain('phase-2-medium');
+    expect(completedPhases).toContain('phase-3-fast');
+
+    // Fastest phase should complete first (phase-3-fast)
+    expect(completedPhases[0]).toBe('phase-3-fast');
+  });
+
+  it('should respect stopOnFirstPhaseError=false in concurrent execution and complete all phases', async () => {
+    mockedAxios.request.mockImplementation(
+      (async (config: AxiosRequestConfig) => {
+        const path = config.url || '';
+        
+        if (path.includes('p2')) {
+          await new Promise(resolve => setTimeout(resolve, 20));
+          throw {
+            response: { status: 500, data: 'Phase 2 error' },
+            message: 'Phase 2 failed'
+          };
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return {
+          status: 200,
+          data: { success: true, path },
+          statusText: 'OK',
+          headers: {},
+          config: config as any
+        };
+      }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
+    );
+
+    const phases = [
+      {
+        id: 'phase-1',
+        requests: [{ id: 'r1', requestOptions: { reqData: { path: '/p1' }, resReq: true, attempts: 1 } }]
+      },
+      {
+        id: 'phase-2-fail',
+        requests: [{ id: 'r2', requestOptions: { reqData: { path: '/p2' }, resReq: true, attempts: 1 } }]
+      },
+      {
+        id: 'phase-3',
+        requests: [{ id: 'r3', requestOptions: { reqData: { path: '/p3' }, resReq: true, attempts: 1 } }]
+      }
+    ] satisfies STABLE_WORKFLOW_PHASE[];
+
+    const result = await stableWorkflow(phases, {
+      workflowId: 'wf-concurrent-continue-on-error',
+      commonRequestData: { hostname: 'api.example.com' },
+      concurrentPhaseExecution: true,
+      stopOnFirstPhaseError: false // Should not stop even though a phase fails
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.completedPhases).toBe(3); // All 3 phases should complete
+    expect(result.successfulRequests).toBe(2);
+    expect(result.failedRequests).toBe(1);
+    expect(mockedAxios.request).toHaveBeenCalledTimes(3);
+  });
+
+  it('should handle sharedBuffer correctly in concurrent phase execution', async () => {
+    const sharedBuffer: Record<string, any> = { counter: 0 };
+
+    mockedAxios.request.mockImplementation(
+      (async (config: AxiosRequestConfig) => {
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return {
+          status: 200,
+          data: { path: config.url },
+          statusText: 'OK',
+          headers: {},
+          config: config as any
+        };
+      }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
+    );
+
+    const phases = [
+      {
+        id: 'phase-1',
+        requests: [
+          {
+            id: 'r1',
+            requestOptions: {
+              reqData: { path: '/p1' },
+              resReq: true,
+              preExecution: {
+                preExecutionHook: ({ commonBuffer }: any) => {
+                  commonBuffer.phase1 = true;
+                  commonBuffer.counter += 1;
+                  return {};
+                },
+                preExecutionHookParams: {},
+                applyPreExecutionConfigOverride: false,
+                continueOnPreExecutionHookFailure: false
+              }
+            }
+          }
+        ]
+      },
+      {
+        id: 'phase-2',
+        requests: [
+          {
+            id: 'r2',
+            requestOptions: {
+              reqData: { path: '/p2' },
+              resReq: true,
+              preExecution: {
+                preExecutionHook: ({ commonBuffer }: any) => {
+                  commonBuffer.phase2 = true;
+                  commonBuffer.counter += 1;
+                  return {};
+                },
+                preExecutionHookParams: {},
+                applyPreExecutionConfigOverride: false,
+                continueOnPreExecutionHookFailure: false
+              }
+            }
+          }
+        ]
+      },
+      {
+        id: 'phase-3',
+        requests: [
+          {
+            id: 'r3',
+            requestOptions: {
+              reqData: { path: '/p3' },
+              resReq: true,
+              preExecution: {
+                preExecutionHook: ({ commonBuffer }: any) => {
+                  commonBuffer.phase3 = true;
+                  commonBuffer.counter += 1;
+                  return {};
+                },
+                preExecutionHookParams: {},
+                applyPreExecutionConfigOverride: false,
+                continueOnPreExecutionHookFailure: false
+              }
+            }
+          }
+        ]
+      }
+    ] satisfies STABLE_WORKFLOW_PHASE[];
+
+    const result = await stableWorkflow(phases, {
+      workflowId: 'wf-concurrent-shared-buffer',
+      commonRequestData: { hostname: 'api.example.com' },
+      concurrentPhaseExecution: true,
+      sharedBuffer
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.completedPhases).toBe(3);
+    
+    // All phases should have written to shared buffer
+    expect(sharedBuffer.phase1).toBe(true);
+    expect(sharedBuffer.phase2).toBe(true);
+    expect(sharedBuffer.phase3).toBe(true);
+    expect(sharedBuffer.counter).toBe(3);
+  });
 });

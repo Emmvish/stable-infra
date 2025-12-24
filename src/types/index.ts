@@ -225,6 +225,7 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   workflowId?: string;
   stopOnFirstPhaseError?: boolean;
   logPhaseResults?: boolean;
+  concurrentPhaseExecution?: boolean;
   handlePhaseCompletion?: (
     options: HandlePhaseCompletionHookOptions<ResponseDataType>
   ) => any | Promise<any>;
