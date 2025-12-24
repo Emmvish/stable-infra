@@ -61,7 +61,9 @@ All in all, it provides you with the **entire ecosystem** to build **API-integra
   - [Phase Configuration](#phase-configuration)
   - [Workflow with Request Groups](#workflow-with-request-groups)
   - [Phase Observability Hooks](#phase-observability-hooks)
+  - [Workflow Buffer](#workflow-buffer)
   - [Concurrent Execution of Phases](#concurrent-execution-of-phases)
+  - [Mixed Execution of Phases](#mixed-execution-of-phases)
 - [Real-World Examples](#real-world-examples)
   - [Polling for Job Completion](#1-polling-for-job-completion)
   - [Database Replication Lag](#2-database-replication-lag)
@@ -1292,7 +1294,7 @@ const workflow = await stableWorkflow(
 );
 ```
 
-### Phase Observability Hooks
+### Workflow Buffer
 
 Workflow Buffer is shared by all phases and by extension, all requests contained in every phase of the workflow :
 
@@ -1386,6 +1388,36 @@ const result = await stableWorkflow(phases, {
   commonWait: 1,
   concurrentPhaseExecution: true
 });
+```
+### Mixed Execution of Phases
+
+```typescript
+const workflow = await stableWorkflow(
+  [
+    {
+      id: 'phase-1-sequential',
+      requests: [/* ... */]
+    },
+    {
+      id: 'phase-2-concurrent-start',
+      markConcurrentPhase: true,  // Will run concurrently with phase-3
+      requests: [/* ... */]
+    },
+    {
+      id: 'phase-3-concurrent',
+      markConcurrentPhase: true,  // Will run concurrently with phase-2
+      requests: [/* ... */]
+    },
+    {
+      id: 'phase-4-sequential',
+      requests: [/* ... */]  // Runs after phases 2 & 3 complete
+    }
+  ],
+  {
+    workflowId: 'mixed-execution-workflow',
+    allowExecutionMixing: true  // Enable mixed execution mode
+  }
+);
 ```
 
 ## Real-World Examples
@@ -1826,9 +1858,9 @@ interface STABLE_WORKFLOW_PHASE {
   id?: string;                     // Phase identifier (auto-generated if omitted)
   concurrentExecution?: boolean;   // true = parallel, false = sequential (default: true)
   stopOnFirstError?: boolean;      // Stop phase on first request failure (default: false)
-  commonConfig?: Omit<API_GATEWAY_OPTIONS, 'concurrentExecution' | 'stopOnFirstError' | 'requestGroups'>;
+  commonConfig?: Omit<API_GATEWAY_OPTIONS; 'concurrentExecution' | 'stopOnFirstError' | 'requestGroups'>;
   requests: API_GATEWAY_REQUEST[]; // Array of requests for this phase
-  sharedBuffer: Record<string, any> // Shared buffer for API Gateway requests
+  markConcurrentPhase?: boolean; // Allows this phase to be executed concurrently with immediately next phase marked as concurrent
 }
 ```
 
@@ -1839,12 +1871,13 @@ interface STABLE_WORKFLOW_PHASE {
 | `workflowId` | `string` | `workflow-{timestamp}` | Workflow identifier |
 | `stopOnFirstPhaseError` | `boolean` | `false` | Stop workflow if any phase fails |
 | `logPhaseResults` | `boolean` | `false` | Log phase execution to console |
-| `concurrentPhaseExecution` | `boolean` | `false` | Execute all phases in parallel |
+| `concurrentPhaseExecution` | `boolean` | `false` | Execute all phases in parallel. Overrides `enableMixedExecution` |
 | `handlePhaseCompletion` | `function` | `undefined` | Hook called after each successful phase |
 | `handlePhaseError` | `function` | `undefined` | Hook called when a phase fails |
 | `maxSerializableChars` | `number` | `1000` | Max chars for serialization in hooks |
 | `workflowHookParams` | `WorkflowHookParams` | {} | Custom set of params passed to hooks |
 | `sharedBuffer` | `Record<string, any>` | `undefined` | Buffer shared by all phases and all requests within them |
+| `enableMixedExecution` | `boolean` | `false` | Enables mixing of sequential and parallel sub-workflows |
 | All `stableApiGateway` options | - | - | Applied as workflow-level defaults |
 
 **STABLE_WORKFLOW_RESULT response:**
