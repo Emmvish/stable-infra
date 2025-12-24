@@ -113,18 +113,23 @@ Most HTTP clients answer only one question:
 ### Core capabilities
 
 ✅ **Content-aware retries**  
+  
   Retry based on response validation, not just status codes
 
 🔄 **Deterministic execution semantics**  
+  
   Fixed, linear, or exponential retry strategies with hard limits
 
 🧠 **Graceful failure handling**  
+  
   Suppress non-critical failures without crashing workflows
 
 🧪 **Trial mode / chaos testing**  
+  
   Simulate failures without depending on real outages
 
 📊 **First-class observability hooks**  
+  
   Inspect every failed and successful attempt
 
 ---
@@ -132,12 +137,15 @@ Most HTTP clients answer only one question:
 ### Scaling beyond single requests
 
 🚀 **Batch execution with shared state (`stableApiGateway`)**  
+  
   Run many requests concurrently or sequentially with shared configuration and shared state
 
 🎯 **Request groups**  
+  
   Apply different reliability rules to critical, standard, and optional services
 
 🧱 **Hierarchical configuration**  
+  
   Workflow → Phase → Group → Request (predictable overrides)
 
 ---
@@ -145,18 +153,23 @@ Most HTTP clients answer only one question:
 ### Full workflow orchestration
 
 🧩 **Multi-phase workflows with shared state (`stableWorkflow`)**
+  
   Model real-world business flows as deterministic, observable execution graphs.
 
 🔀 **Mix concurrent and sequential execution**
+  
   Parallelize where safe, serialize where correctness matters.
 
 🛑 **Stop early or degrade gracefully**
+  
   Stop execution early or continue based on business criticality.
 
 📈 **Phase-level metrics and hooks**
+  
   Track execution time, success rates, and failure boundaries per phase.
 
 🧭 **Deterministic, observable execution paths**
+  
   Every decision is explicit, traceable, and reproducible.
 
 ---
