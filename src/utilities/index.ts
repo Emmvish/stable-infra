@@ -1,5 +1,6 @@
 export { delay } from './delay.js';
 export { executeConcurrently } from './execute-concurrently.js';
+export { executePhase } from './execute-phase.js';
 export { executeSequentially } from './execute-sequentially.js';
 export { extractCommonRequestConfigOptions } from './extract-common-request-config-options.js';
 export { generateAxiosRequestConfig } from './generate-axios-request-config.js';

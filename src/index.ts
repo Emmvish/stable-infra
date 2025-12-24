@@ -48,6 +48,7 @@ export type {
 export {
     delay,
     executeConcurrently,
+    executePhase,
     executeSequentially,
     extractCommonRequestConfigOptions,
     generateAxiosRequestConfig,
