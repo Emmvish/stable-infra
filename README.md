@@ -1794,6 +1794,7 @@ interface STABLE_WORKFLOW_PHASE {
 | `workflowId` | `string` | `workflow-{timestamp}` | Workflow identifier |
 | `stopOnFirstPhaseError` | `boolean` | `false` | Stop workflow if any phase fails |
 | `logPhaseResults` | `boolean` | `false` | Log phase execution to console |
+| `concurrentPhaseExecution` | `boolean` | `false` | Execute all phases in parallel |
 | `handlePhaseCompletion` | `function` | `undefined` | Hook called after each successful phase |
 | `handlePhaseError` | `function` | `undefined` | Hook called when a phase fails |
 | `maxSerializableChars` | `number` | `1000` | Max chars for serialization in hooks |
