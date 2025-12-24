@@ -145,18 +145,23 @@ Most HTTP clients answer only one question:
 ### Full workflow orchestration
 
 🧩 **Multi-phase workflows with shared state (`stableWorkflow`)**
+
   Model real-world business flows as deterministic, observable execution graphs.
 
 🔀 **Mix concurrent and sequential execution**
+
   Parallelize where safe, serialize where correctness matters.
 
 🛑 **Stop early or degrade gracefully**
+
 Stop execution early or continue based on business criticality.
 
 📈 **Phase-level metrics and hooks**
+
 Track execution time, success rates, and failure boundaries per phase.
 
 🧭 **Deterministic, observable execution paths**
+
 Every decision is explicit, traceable, and reproducible.
 
 ---
@@ -1341,7 +1346,38 @@ const result = await stableWorkflow(phases, {
 
 console.log(workflowBuffer); // { token: 'wf-token' setIn: 'p1', usedIn: 'p2' }
 ```
+### Concurrent Execution of Phases
 
+```typescript
+const phases = [
+  {
+    id: 'phase-1',
+    requests: [
+      { id: 'r1', requestOptions: { reqData: { path: '/p1/r1' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'phase-2',
+    requests: [
+      { id: 'r2', requestOptions: { reqData: { path: '/p2/r1' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'phase-3',
+    requests: [
+      { id: 'r3', requestOptions: { reqData: { path: '/p3/r1' }, resReq: true } }
+    ]
+  }
+] satisfies STABLE_WORKFLOW_PHASE[];
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'wf-concurrent-phases',
+  commonRequestData: { hostname: 'api.example.com' },
+  commonAttempts: 1,
+  commonWait: 1,
+  concurrentPhaseExecution: true
+});
+```
 
 ## Real-World Examples
 
