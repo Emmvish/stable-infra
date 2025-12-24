@@ -61,6 +61,7 @@ All in all, it provides you with the **entire ecosystem** to build **API-integra
   - [Phase Configuration](#phase-configuration)
   - [Workflow with Request Groups](#workflow-with-request-groups)
   - [Phase Observability Hooks](#phase-observability-hooks)
+  - [Concurrent Execution of Phases](#concurrent-execution-of-phases)
 - [Real-World Examples](#real-world-examples)
   - [Polling for Job Completion](#1-polling-for-job-completion)
   - [Database Replication Lag](#2-database-replication-lag)
