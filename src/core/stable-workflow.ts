@@ -36,6 +36,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
         requestGroups = [],
         workflowHookParams = {},
         concurrentPhaseExecution = false,
+        enableMixedExecution = false,
         ...commonGatewayOptions
     } = options;
 
@@ -47,7 +48,168 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
     let failedRequests = 0;
 
     try {
-        if (concurrentPhaseExecution) {
+        const processPhaseResult = (phaseResult: STABLE_WORKFLOW_RESULT<ResponseDataType>['phases'][number]) => {
+            phaseResults.push(phaseResult);
+            totalRequests += phaseResult.totalRequests;
+            successfulRequests += phaseResult.successfulRequests;
+            failedRequests += phaseResult.failedRequests;
+        };
+
+        const handlePhaseExecutionError = async (phaseId: string, phaseIndex: number, error: any, phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>) => {
+            const phaseResult = {
+                phaseId,
+                phaseIndex,
+                success: false,
+                executionTime: 0,
+                timestamp: new Date().toISOString(),
+                totalRequests: phase.requests.length,
+                successfulRequests: 0,
+                failedRequests: phase.requests.length,
+                responses: [],
+                error: error?.message || 'Phase execution failed'
+            };
+
+            processPhaseResult(phaseResult);
+
+            if (logPhaseResults) {
+                console.error(
+                    `stable-request: [Workflow: ${workflowId}] Phase ${phaseId} failed:`,
+                    error
+                );
+            }
+
+            try {
+                await safelyExecuteUnknownFunction(
+                    handlePhaseError, {
+                        workflowId,
+                        phaseResult,
+                        error,
+                        maxSerializableChars,
+                        params: workflowHookParams?.handlePhaseErrorParams,
+                        sharedBuffer: options.sharedBuffer
+                    }
+                );
+            } catch (hookError) {
+                console.error(
+                    `stable-request: [Workflow: ${workflowId}] Error in handlePhaseError hook:`,
+                    hookError
+                );
+            }
+        };
+
+        if (enableMixedExecution && !concurrentPhaseExecution) {
+            let i = 0;
+            while (i < phases.length) {
+                const currentPhase = phases[i];
+                const currentPhaseId = currentPhase.id || `phase-${i + 1}`;
+
+                if (currentPhase.markConcurrentPhase) {
+                    const concurrentGroup: { phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>; index: number }[] = [
+                        { phase: currentPhase, index: i }
+                    ];
+                    
+                    let j = i + 1;
+                    while (j < phases.length && phases[j].markConcurrentPhase) {
+                        concurrentGroup.push({ phase: phases[j], index: j });
+                        j++;
+                    }
+
+                    if (logPhaseResults) {
+                        const phaseIds = concurrentGroup.map(({ phase, index }) => 
+                            phase.id || `phase-${index + 1}`
+                        ).join(', ');
+                        console.info(
+                            `\nstable-request: [Workflow: ${workflowId}] Executing concurrent group: [${phaseIds}]`
+                        );
+                    }
+
+                    const groupPromises = concurrentGroup.map(({ phase, index }) =>
+                        executePhase(
+                            phase,
+                            index,
+                            workflowId,
+                            commonGatewayOptions,
+                            requestGroups,
+                            logPhaseResults,
+                            handlePhaseCompletion,
+                            maxSerializableChars,
+                            workflowHookParams,
+                            options.sharedBuffer
+                        )
+                    );
+
+                    const settledGroup = await Promise.allSettled(groupPromises);
+
+                    for (let k = 0; k < settledGroup.length; k++) {
+                        const result = settledGroup[k];
+                        const { phase, index } = concurrentGroup[k];
+                        const phaseId = phase.id || `phase-${index + 1}`;
+
+                        if (result.status === 'fulfilled') {
+                            processPhaseResult(result.value);
+                        } else {
+                            await handlePhaseExecutionError(phaseId, index, result.reason, phase);
+                        }
+                    }
+
+                    if (stopOnFirstPhaseError && failedRequests > 0) {
+                        if (logPhaseResults) {
+                            console.error(
+                                `stable-request: [Workflow: ${workflowId}] Stopping workflow due to phase failure in concurrent group`
+                            );
+                        }
+                        break;
+                    }
+
+                    i = j;
+                } else {
+                    if (logPhaseResults) {
+                        console.info(
+                            `\nstable-request: [Workflow: ${workflowId}] Starting Phase ${i + 1}/${phases.length}: ${currentPhaseId}`
+                        );
+                    }
+
+                    try {
+                        const phaseResult = await executePhase(
+                            currentPhase,
+                            i,
+                            workflowId,
+                            commonGatewayOptions,
+                            requestGroups,
+                            logPhaseResults,
+                            handlePhaseCompletion,
+                            maxSerializableChars,
+                            workflowHookParams,
+                            options.sharedBuffer
+                        );
+
+                        processPhaseResult(phaseResult);
+
+                        if (phaseResult.failedRequests > 0 && stopOnFirstPhaseError) {
+                            if (logPhaseResults) {
+                                console.error(
+                                    `stable-request: [Workflow: ${workflowId}] Stopping workflow due to phase failure`
+                                );
+                            }
+                            break;
+                        }
+                    } catch (phaseError: any) {
+                        await handlePhaseExecutionError(currentPhaseId, i, phaseError, currentPhase);
+
+                        if (stopOnFirstPhaseError) {
+                            if (logPhaseResults) {
+                                console.error(
+                                    `stable-request: [Workflow: ${workflowId}] Stopping workflow due to phase error`
+                                );
+                            }
+                            break;
+                        }
+                    }
+
+                    i++;
+                }
+            }
+        } else if (concurrentPhaseExecution) {
             const phasePromises = phases.map((phase, i) => 
                 executePhase(
                     phase,
@@ -65,54 +227,19 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
 
             const settledPhases = await Promise.allSettled(phasePromises);
 
-            settledPhases.forEach((result, i) => {
+            for (let i = 0; i < settledPhases.length; i++) {
+                const result = settledPhases[i];
                 if (result.status === 'fulfilled') {
-                    const phaseResult = result.value;
-                    phaseResults.push(phaseResult);
-                    totalRequests += phaseResult.totalRequests;
-                    successfulRequests += phaseResult.successfulRequests;
-                    failedRequests += phaseResult.failedRequests;
+                    processPhaseResult(result.value);
                 } else {
-                    const phaseId = phases[i].id || `phase-${i + 1}`;
-                    const phaseResult = {
-                        phaseId,
-                        phaseIndex: i,
-                        success: false,
-                        executionTime: 0,
-                        timestamp: new Date().toISOString(),
-                        totalRequests: phases[i].requests.length,
-                        successfulRequests: 0,
-                        failedRequests: phases[i].requests.length,
-                        responses: [],
-                        error: result.reason?.message || 'Phase execution failed'
-                    };
-                    phaseResults.push(phaseResult);
-                    totalRequests += phases[i].requests.length;
-                    failedRequests += phases[i].requests.length;
-
-                    if (logPhaseResults) {
-                        console.error(
-                            `stable-request: [Workflow: ${workflowId}] Phase ${phaseId} failed:`,
-                            result.reason
-                        );
-                    }
-                    
-                    try {
-                        safelyExecuteUnknownFunction(
-                            handlePhaseError, {
-                                workflowId,
-                                phaseResult,
-                                error: result.reason,
-                                maxSerializableChars,
-                                params: workflowHookParams?.handlePhaseErrorParams,
-                                sharedBuffer: options.sharedBuffer
-                            }
-                        );
-                    } catch (error) {
-                        console.error(`stable-request: [Workflow: ${workflowId}]Error in handlePhaseError hook:`, error);
-                    }
+                    await handlePhaseExecutionError(
+                        phases[i].id || `phase-${i + 1}`,
+                        i,
+                        result.reason,
+                        phases[i]
+                    );
                 }
-            });
+            }
         } else {
             for (let i = 0; i < phases.length; i++) {
                 const phase = phases[i];
@@ -136,10 +263,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                         options.sharedBuffer
                     );
 
-                    phaseResults.push(phaseResult);
-                    totalRequests += phaseResult.totalRequests;
-                    successfulRequests += phaseResult.successfulRequests;
-                    failedRequests += phaseResult.failedRequests;
+                    processPhaseResult(phaseResult);
 
                     if (phaseResult.failedRequests > 0 && stopOnFirstPhaseError) {
                         if (logPhaseResults) {
@@ -151,47 +275,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                     }
 
                 } catch (phaseError: any) {
-                    const phaseResult = {
-                        phaseId,
-                        phaseIndex: i,
-                        success: false,
-                        executionTime: 0,
-                        timestamp: new Date().toISOString(),
-                        totalRequests: phase.requests.length,
-                        successfulRequests: 0,
-                        failedRequests: phase.requests.length,
-                        responses: [],
-                        error: phaseError.message
-                    };
-
-                    phaseResults.push(phaseResult);
-                    totalRequests += phase.requests.length;
-                    failedRequests += phase.requests.length;
-
-                    if (logPhaseResults) {
-                        console.error(
-                            `stable-request: [Workflow: ${workflowId}] Phase ${phaseId} failed:`,
-                            phaseError.message
-                        );
-                    }
-
-                    try {
-                        await safelyExecuteUnknownFunction(
-                            handlePhaseError, {
-                                workflowId,
-                                phaseResult,
-                                error: phaseError,
-                                maxSerializableChars,
-                                params: workflowHookParams?.handlePhaseErrorParams,
-                                sharedBuffer: options.sharedBuffer
-                            }
-                        );
-                    } catch (hookError) {
-                        console.error(
-                            `stable-request: [Workflow: ${workflowId}] Error in handlePhaseError hook:`,
-                            hookError
-                        );
-                    }
+                    await handlePhaseExecutionError(phaseId, i, phaseError, phase);
 
                     if (stopOnFirstPhaseError) {
                         if (logPhaseResults) {

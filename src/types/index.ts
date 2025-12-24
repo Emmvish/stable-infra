@@ -215,6 +215,7 @@ export interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType =
   requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[];
   concurrentExecution?: boolean;
   stopOnFirstError?: boolean;
+  markConcurrentPhase?: boolean;
   commonConfig?: Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, 
     'concurrentExecution' | 'stopOnFirstError' | 'requestGroups'>;
 }
@@ -226,6 +227,7 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   stopOnFirstPhaseError?: boolean;
   logPhaseResults?: boolean;
   concurrentPhaseExecution?: boolean;
+  enableMixedExecution?: boolean;
   handlePhaseCompletion?: (
     options: HandlePhaseCompletionHookOptions<ResponseDataType>
   ) => any | Promise<any>;
