@@ -145,23 +145,18 @@ Most HTTP clients answer only one question:
 ### Full workflow orchestration
 
 🧩 **Multi-phase workflows with shared state (`stableWorkflow`)**
-    
   Model real-world business flows as deterministic, observable execution graphs.
 
 🔀 **Mix concurrent and sequential execution**
-
   Parallelize where safe, serialize where correctness matters.
 
 🛑 **Stop early or degrade gracefully**
-    
   Stop execution early or continue based on business criticality.
 
 📈 **Phase-level metrics and hooks**
-    
   Track execution time, success rates, and failure boundaries per phase.
 
 🧭 **Deterministic, observable execution paths**
-    
   Every decision is explicit, traceable, and reproducible.
 
 ---
