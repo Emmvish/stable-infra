@@ -18,6 +18,9 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
         concurrentExecution = true,
         stopOnFirstError = false,
         requestGroups = [],
+        maxConcurrentRequests,
+        rateLimit,
+        circuitBreaker,
     } = options;
 
     if (!Array.isArray(requests) || requests.length === 0) {
@@ -28,6 +31,9 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
         stopOnFirstError,
         requestGroups,
         sharedBuffer: options.sharedBuffer,
+        ...(maxConcurrentRequests !== undefined && { maxConcurrentRequests }),
+        ...(rateLimit !== undefined && { rateLimit }),
+        ...(circuitBreaker !== undefined && { circuitBreaker }),
         ...extractCommonOptions<RequestDataType, ResponseDataType>(options)
     }
 

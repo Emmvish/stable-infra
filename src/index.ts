@@ -5,6 +5,7 @@ export {
 } from './core/index.js';
 
 export {
+    CircuitBreakerState,
     INVALID_AXIOS_RESPONSES,
     REQUEST_METHODS,
     RESPONSE_ERRORS,
@@ -17,6 +18,7 @@ export type {
     API_GATEWAY_REQUEST,
     API_GATEWAY_REQUEST_OPTIONS_TYPE,
     API_GATEWAY_RESPONSE,
+    CircuitBreakerConfig,
     CONCURRENT_REQUEST_EXECUTION_OPTIONS,
     ERROR_LOG,
     FinalErrorAnalysisHookOptions,
@@ -26,6 +28,7 @@ export type {
     HandleSuccessfulAttemptDataHookOptions,
     HookParams,
     PreExecutionHookOptions,
+    RateLimitConfig,
     RequestPreExecutionOptions,
     ReqFnResponse,
     REQUEST_DATA,
@@ -46,6 +49,9 @@ export type {
 } from './types/index.js';
 
 export {
+    CircuitBreaker,
+    CircuitBreakerOpenError,
+    ConcurrencyLimiter,
     delay,
     executeConcurrently,
     executePhase,
@@ -56,6 +62,7 @@ export {
     isRetryableError,
     prepareApiRequestData,
     prepareApiRequestOptions,
+    RateLimiter,
     reqFn,
     safelyExecuteUnknownFunction,
     safelyStringify,

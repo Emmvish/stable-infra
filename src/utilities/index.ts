@@ -1,3 +1,5 @@
+export { CircuitBreaker, CircuitBreakerOpenError } from './circuit-breaker.js';
+export { ConcurrencyLimiter } from './concurrency-limiter.js';
 export { delay } from './delay.js';
 export { executeConcurrently } from './execute-concurrently.js';
 export { executePhase } from './execute-phase.js';
@@ -8,6 +10,7 @@ export { getNewDelayTime } from './get-new-delay-time.js';
 export { isRetryableError } from './is-retryable-error.js';
 export { prepareApiRequestData } from './prepare-api-request-data.js';
 export { prepareApiRequestOptions } from './prepare-api-request-options.js';
+export { RateLimiter } from './rate-limiter.js';
 export { reqFn } from './req-fn.js';
 export { safelyExecuteUnknownFunction } from './safely-execute-unknown-function.js';
 export { safelyStringify } from './safely-stringify.js';

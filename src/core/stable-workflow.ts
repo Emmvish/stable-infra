@@ -6,7 +6,8 @@ import {
 import { 
     executePhase,
     safelyExecuteUnknownFunction, 
-    safelyStringify
+    safelyStringify,
+    CircuitBreaker
 } from '../utilities/index.js';
 
 export async function stableWorkflow<RequestDataType = any, ResponseDataType = any>(
@@ -46,6 +47,16 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
     let totalRequests = 0;
     let successfulRequests = 0;
     let failedRequests = 0;
+
+    // Create workflow-level circuit breaker instance if configured
+    const workflowCircuitBreaker = commonGatewayOptions.circuitBreaker
+        ? new CircuitBreaker(commonGatewayOptions.circuitBreaker)
+        : null;
+    
+    // If workflow has circuit breaker, pass the instance (not config) to phases
+    const commonGatewayOptionsWithBreaker = workflowCircuitBreaker
+        ? { ...commonGatewayOptions, circuitBreaker: workflowCircuitBreaker as any }
+        : commonGatewayOptions;
 
     try {
         const processPhaseResult = (phaseResult: STABLE_WORKFLOW_RESULT<ResponseDataType>['phases'][number]) => {
@@ -128,7 +139,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                             phase,
                             index,
                             workflowId,
-                            commonGatewayOptions,
+                            commonGatewayOptionsWithBreaker,
                             requestGroups,
                             logPhaseResults,
                             handlePhaseCompletion,
@@ -174,7 +185,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                             currentPhase,
                             i,
                             workflowId,
-                            commonGatewayOptions,
+                            commonGatewayOptionsWithBreaker,
                             requestGroups,
                             logPhaseResults,
                             handlePhaseCompletion,
@@ -215,7 +226,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                     phase,
                     i,
                     workflowId,
-                    commonGatewayOptions,
+                    commonGatewayOptionsWithBreaker,
                     requestGroups,
                     logPhaseResults,
                     handlePhaseCompletion,
@@ -254,7 +265,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                         phase,
                         i,
                         workflowId,
-                        commonGatewayOptions,
+                        commonGatewayOptionsWithBreaker,
                         requestGroups,
                         logPhaseResults,
                         handlePhaseCompletion,

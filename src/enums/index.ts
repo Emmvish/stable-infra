@@ -1,3 +1,9 @@
+export enum CircuitBreakerState {
+    CLOSED = 'CLOSED',
+    OPEN = 'OPEN',
+    HALF_OPEN = 'HALF_OPEN'
+}
+
 export enum INVALID_AXIOS_RESPONSES {
   RESET = 'ECONNRESET',
   TIMEDOUT = 'ETIMEDOUT',

@@ -33,6 +33,9 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
   requestGroups?: RequestGroup<RequestDataType, ResponseDataType>[];
   stopOnFirstError?: boolean;
   sharedBuffer?: Record<string, any>;
+  maxConcurrentRequests?: number;
+  rateLimit?: RateLimitConfig;
+  circuitBreaker?: CircuitBreakerConfig;
 }
 
 export type API_GATEWAY_REQUEST_OPTIONS_TYPE<
@@ -216,6 +219,9 @@ export interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType =
   concurrentExecution?: boolean;
   stopOnFirstError?: boolean;
   markConcurrentPhase?: boolean;
+  maxConcurrentRequests?: number;
+  rateLimit?: RateLimitConfig;
+  circuitBreaker?: CircuitBreakerConfig;
   commonConfig?: Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, 
     'concurrentExecution' | 'stopOnFirstError' | 'requestGroups'>;
 }
@@ -236,6 +242,9 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   ) => any | Promise<any>;
   maxSerializableChars?: number;
   workflowHookParams?: WorkflowHookParams;
+  maxConcurrentRequests?: number;
+  rateLimit?: RateLimitConfig;
+  circuitBreaker?: CircuitBreakerConfig;
 }
 
 export interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any> {
@@ -279,4 +288,17 @@ export interface HandlePhaseCompletionHookOptions<ResponseDataType = any> {
 
 export interface HandlePhaseErrorHookOptions<ResponseDataType = any> extends HandlePhaseCompletionHookOptions<ResponseDataType> {
   error: any;
+}
+
+export interface RateLimitConfig {
+  maxRequests: number;
+  windowMs: number;
+}
+
+export interface CircuitBreakerConfig {
+  failureThresholdPercentage: number;
+  minimumRequests: number;
+  recoveryTimeoutMs: number;
+  successThresholdPercentage?: number;
+  halfOpenMaxRequests?: number;
 }

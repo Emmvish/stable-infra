@@ -26,6 +26,21 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
         sharedBuffer
     };
 
+    // Phase-level maxConcurrentRequests overrides workflow-level
+    if (phase.maxConcurrentRequests !== undefined) {
+        phaseGatewayOptions.maxConcurrentRequests = phase.maxConcurrentRequests;
+    }
+
+    // Phase-level rateLimit overrides workflow-level
+    if (phase.rateLimit !== undefined) {
+        phaseGatewayOptions.rateLimit = phase.rateLimit;
+    }
+
+    // Phase-level circuitBreaker overrides workflow-level
+    if (phase.circuitBreaker !== undefined) {
+        phaseGatewayOptions.circuitBreaker = phase.circuitBreaker;
+    }
+
     const phaseResponses = await stableApiGateway<RequestDataType, ResponseDataType>(
         phase.requests,
         phaseGatewayOptions
