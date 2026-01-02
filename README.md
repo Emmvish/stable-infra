@@ -38,7 +38,7 @@ Start small and scale
 
 ## 📚 Table of Contents
 <!-- TOC START -->
-- [Installation] (#installation)
+- [Installation](#installation)
 - [Core Features] (#core-features)
 - [Quick Start] (#quick-start)
 - [API Reference] (#api-reference)
