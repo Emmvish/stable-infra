@@ -1,3 +1,4 @@
+export { CacheManager, getGlobalCacheManager, resetGlobalCacheManager } from './cache-manager.js';
 export { CircuitBreaker, CircuitBreakerOpenError } from './circuit-breaker.js';
 export { ConcurrencyLimiter } from './concurrency-limiter.js';
 export { delay } from './delay.js';

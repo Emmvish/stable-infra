@@ -7,7 +7,6 @@ import {
     STABLE_REQUEST
 } from "../types/index.js";
 
-
 export function prepareApiRequestOptions<RequestDataType = any, ResponseDataType = any>(
     request: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>,
     commonRequestExecutionOptions: CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType> | 

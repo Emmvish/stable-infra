@@ -87,6 +87,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     finalErrorAnalyzer = ({ reqData, error, trialMode = { enabled: false } }) => false,
     trialMode = { enabled: false },
     hookParams = {},
+    cache
   } = options;
   let attempts = givenAttempts;
   const reqData: AxiosRequestConfig<RequestDataType> = generateAxiosRequestConfig<RequestDataType>(givenReqData);
@@ -105,7 +106,16 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     do {
       attempts--;
       const currentAttempt = maxAttempts - attempts;
-      res = await reqFn<RequestDataType, ResponseDataType>(reqData, resReq, maxSerializableChars, trialMode);
+      res = await reqFn<RequestDataType, ResponseDataType>(reqData, resReq, maxSerializableChars, trialMode, cache);
+      if (res.fromCache && res.ok) {
+        if (trialMode.enabled) {
+          console.info(
+            'stable-request: Response served from cache:\n',
+            safelyStringify(res?.data, maxSerializableChars)
+          );
+        }
+        return resReq ? res?.data! : true;
+      }
       const originalResOk = res.ok;
       let performNextAttempt: boolean = false;
       if (res.ok) {

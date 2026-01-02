@@ -17,7 +17,8 @@ export const extractCommonOptionsKeys: (keyof API_GATEWAY_OPTIONS)[] = [
     'commonLogAllErrors',
     'commonLogAllSuccessfulAttempts',
     'commonMaxSerializableChars',
-    'commonTrialMode'
+    'commonTrialMode',
+    'commonCache',
 ];
 
 export const PrepareApiRequestOptionsMapping: ApiRequestOptionsMapping[] = [    
@@ -37,4 +38,6 @@ export const PrepareApiRequestOptionsMapping: ApiRequestOptionsMapping[] = [
     { localKey: 'handleErrors', commonKey: 'commonHandleErrors', groupCommonKey: 'commonHandleErrors', targetKey: 'handleErrors' },
     { localKey: 'handleSuccessfulAttemptData', commonKey: 'commonHandleSuccessfulAttemptData', groupCommonKey: 'commonHandleSuccessfulAttemptData', targetKey: 'handleSuccessfulAttemptData' },
     { localKey: 'finalErrorAnalyzer', commonKey: 'commonFinalErrorAnalyzer', groupCommonKey: 'commonFinalErrorAnalyzer', targetKey: 'finalErrorAnalyzer' },
+    { localKey: 'cache', commonKey: 'commonCache', groupCommonKey: 'commonCache', targetKey: 'cache' },
+    { localKey: 'commonBuffer', commonKey: 'sharedBuffer', groupCommonKey: 'sharedBuffer', targetKey: 'commonBuffer' },
 ];

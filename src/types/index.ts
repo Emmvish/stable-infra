@@ -29,6 +29,7 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
     options: HandleSuccessfulAttemptDataHookOptions<RequestDataType, ResponseDataType>
   ) => any | Promise<any>;
   commonPreExecution?: RequestPreExecutionOptions;
+  commonCache?: CacheConfig;
   concurrentExecution?: boolean;
   requestGroups?: RequestGroup<RequestDataType, ResponseDataType>[];
   stopOnFirstError?: boolean;
@@ -36,6 +37,11 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
   maxConcurrentRequests?: number;
   rateLimit?: RateLimitConfig;
   circuitBreaker?: CircuitBreakerConfig;
+}
+
+export interface RequestGroup<RequestDataType = any, ResponseDataType = any> {
+  id: string;
+  commonConfig?: Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, "concurrentExecution" | "stopOnFirstError" | "requestGroups" | "maxConcurrentRequests" | "rateLimit" | "circuitBreaker">
 }
 
 export type API_GATEWAY_REQUEST_OPTIONS_TYPE<
@@ -79,11 +85,6 @@ export interface ERROR_LOG {
   isRetryable: boolean;
 }
 
-export interface RequestGroup<RequestDataType = any, ResponseDataType = any> {
-  id: string;
-  commonConfig?: Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, "concurrentExecution" | "stopOnFirstError">
-}
-
 export interface ReqFnResponse<ResponseDataType = any> {
   ok: boolean;
   isRetryable: boolean;
@@ -92,6 +93,7 @@ export interface ReqFnResponse<ResponseDataType = any> {
   error?: string;
   statusCode: number;
   data?: ResponseDataType | { trialMode: TRIAL_MODE_OPTIONS };
+  fromCache?: boolean;
 }
 
 export type REQUEST_METHOD_TYPES =
@@ -193,6 +195,7 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   hookParams?: HookParams;
   preExecution?: RequestPreExecutionOptions;
   commonBuffer?: Record<string, any>;
+  cache?: CacheConfig;
 }
 
 export interface SUCCESSFUL_ATTEMPT_DATA<ResponseDataType = any> {
@@ -223,7 +226,7 @@ export interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType =
   rateLimit?: RateLimitConfig;
   circuitBreaker?: CircuitBreakerConfig;
   commonConfig?: Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, 
-    'concurrentExecution' | 'stopOnFirstError' | 'requestGroups'>;
+    'concurrentExecution' | 'stopOnFirstError' | 'requestGroups' | "maxConcurrentRequests" | "rateLimit" | "circuitBreaker">;
 }
 
 export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType = any> 
@@ -242,9 +245,6 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   ) => any | Promise<any>;
   maxSerializableChars?: number;
   workflowHookParams?: WorkflowHookParams;
-  maxConcurrentRequests?: number;
-  rateLimit?: RateLimitConfig;
-  circuitBreaker?: CircuitBreakerConfig;
 }
 
 export interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any> {
@@ -301,4 +301,23 @@ export interface CircuitBreakerConfig {
   recoveryTimeoutMs: number;
   successThresholdPercentage?: number;
   halfOpenMaxRequests?: number;
+}
+
+export interface CacheConfig {
+    enabled: boolean;
+    ttl?: number;
+    respectCacheControl?: boolean;
+    cacheableStatusCodes?: number[];
+    maxSize?: number;
+    excludeMethods?: string[];
+    keyGenerator?: (config: AxiosRequestConfig) => string;
+}
+
+export interface CachedResponse<T = any> {
+    data: T;
+    status: number;
+    statusText: string;
+    headers: Record<string, any>;
+    timestamp: number;
+    expiresAt: number;
 }

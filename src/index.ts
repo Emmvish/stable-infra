@@ -18,6 +18,8 @@ export type {
     API_GATEWAY_REQUEST,
     API_GATEWAY_REQUEST_OPTIONS_TYPE,
     API_GATEWAY_RESPONSE,
+    CacheConfig,
+    CachedResponse,
     CircuitBreakerConfig,
     CONCURRENT_REQUEST_EXECUTION_OPTIONS,
     ERROR_LOG,
@@ -49,6 +51,9 @@ export type {
 } from './types/index.js';
 
 export {
+    CacheManager,
+    getGlobalCacheManager, 
+    resetGlobalCacheManager,
     CircuitBreaker,
     CircuitBreakerOpenError,
     ConcurrencyLimiter,
