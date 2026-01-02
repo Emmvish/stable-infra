@@ -2,7 +2,8 @@ import { AxiosRequestConfig } from 'axios';
 
 import {
   RETRY_STRATEGIES,
-  RESPONSE_ERRORS
+  RESPONSE_ERRORS,
+  CircuitBreakerState
 } from '../enums/index.js';
 
 import { 
@@ -14,13 +15,15 @@ import {
 } from '../types/index.js';
 
 import {
-    generateAxiosRequestConfig,
-    getNewDelayTime,
-    delay,
-    reqFn,
-    safelyExecuteUnknownFunction,
-    safelyStringify,
-    validateTrialModeProbabilities
+  CircuitBreaker,
+  CircuitBreakerOpenError,
+  generateAxiosRequestConfig,
+  getNewDelayTime,
+  delay,
+  reqFn,
+  safelyExecuteUnknownFunction,
+  safelyStringify,
+  validateTrialModeProbabilities
 } from '../utilities/index.js';
 
 export async function stableRequest<RequestDataType = any, ResponseDataType = any>(
@@ -87,10 +90,17 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     finalErrorAnalyzer = ({ reqData, error, trialMode = { enabled: false } }) => false,
     trialMode = { enabled: false },
     hookParams = {},
-    cache
+    cache,
+    circuitBreaker
   } = options;
   let attempts = givenAttempts;
   const reqData: AxiosRequestConfig<RequestDataType> = generateAxiosRequestConfig<RequestDataType>(givenReqData);
+  let circuitBreakerInstance: CircuitBreaker | null = null;
+  if (circuitBreaker) {
+    circuitBreakerInstance = circuitBreaker instanceof CircuitBreaker
+      ? circuitBreaker
+      : new CircuitBreaker(circuitBreaker as any);
+  }
   try {
     validateTrialModeProbabilities(trialMode);
     let res: ReqFnResponse = {
@@ -106,15 +116,42 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     do {
       attempts--;
       const currentAttempt = maxAttempts - attempts;
-      res = await reqFn<RequestDataType, ResponseDataType>(reqData, resReq, maxSerializableChars, trialMode, cache);
-      if (res.fromCache && res.ok) {
-        if (trialMode.enabled) {
-          console.info(
-            'stable-request: Response served from cache:\n',
-            safelyStringify(res?.data, maxSerializableChars)
-          );
+      if (circuitBreakerInstance) {
+        const cbConfig = circuitBreakerInstance.getState().config;
+        if (cbConfig.trackIndividualAttempts || currentAttempt === 1) {
+          const canExecute = await circuitBreakerInstance.canExecute();
+          if (!canExecute) {
+            throw new CircuitBreakerOpenError(
+              `stable-request: Circuit breaker is ${circuitBreakerInstance.getState().state}. Request blocked at attempt ${currentAttempt}.`
+            );
+          }
         }
-        return resReq ? res?.data! : true;
+      }
+      try {
+        res = await reqFn<RequestDataType, ResponseDataType>(reqData, resReq, maxSerializableChars, trialMode, cache);
+        if (res.fromCache && res.ok) {
+          if (trialMode.enabled) {
+            console.info(
+              'stable-request: Response served from cache:\n',
+              safelyStringify(res?.data, maxSerializableChars)
+            );
+          }
+          return resReq ? res?.data! : true;
+        }
+        
+      } catch(attemptError: any) {
+        if (attemptError instanceof CircuitBreakerOpenError) {
+          throw attemptError;
+        }
+        if (circuitBreakerInstance && circuitBreakerInstance.getState().config.trackIndividualAttempts) {
+          circuitBreakerInstance.recordAttemptFailure();
+          if (circuitBreakerInstance.getState().state === CircuitBreakerState.OPEN) {
+            throw new CircuitBreakerOpenError(
+              `stable-request: Circuit breaker opened after attempt ${currentAttempt}. No further retries.`
+            );
+          }
+        }
+        throw attemptError;
       }
       const originalResOk = res.ok;
       let performNextAttempt: boolean = false;
@@ -147,6 +184,20 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
           performNextAttempt = true;
         }
       }
+      
+      if (circuitBreakerInstance && circuitBreakerInstance.getState().config.trackIndividualAttempts) {
+        if (res.ok && !performNextAttempt) {
+          circuitBreakerInstance.recordAttemptSuccess();
+        } else if (!res.ok || performNextAttempt) {
+          circuitBreakerInstance.recordAttemptFailure();
+          if (circuitBreakerInstance.getState().state === CircuitBreakerState.OPEN) {
+            throw new CircuitBreakerOpenError(
+              `stable-request: Circuit breaker opened after attempt ${currentAttempt}/${maxAttempts}. Blocking further retries.`
+            );
+          }
+        }
+      }
+      
       if ((!res.ok || (res.ok && performNextAttempt)) && logAllErrors) {
         const errorLog: ERROR_LOG = {
           timestamp: res.timestamp,

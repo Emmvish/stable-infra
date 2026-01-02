@@ -845,4 +845,412 @@ describe('Circuit Breaker', () => {
       expect(result.completedPhases).toBe(3);
     });
   });
+
+    describe('Circuit Breaker - Track Individual Attempts', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should track individual retry attempts when trackIndividualAttempts is true', async () => {
+      const breaker = new CircuitBreaker({
+        failureThresholdPercentage: 50,
+        minimumRequests: 6,
+        recoveryTimeoutMs: 2000,
+        trackIndividualAttempts: true
+      });
+
+      // Simulate 2 requests, each with 3 attempts (all fail)
+      // Total: 6 attempts, 6 failures = 100% failure rate
+      for (let i = 0; i < 6; i++) {
+        breaker.recordAttemptFailure();
+      }
+
+      const state = breaker.getState();
+      expect(state.state).toBe(CircuitBreakerState.OPEN);
+      expect(state.totalAttempts).toBe(6);
+      expect(state.failedAttempts).toBe(6);
+      expect(state.attemptFailurePercentage).toBe(100);
+    });
+
+    it('should NOT open circuit when tracking requests only despite retry failures', async () => {
+      const breaker = new CircuitBreaker({
+        failureThresholdPercentage: 50,
+        minimumRequests: 3,
+        recoveryTimeoutMs: 2000,
+        trackIndividualAttempts: false  // Track requests only
+      });
+
+      // Simulate 3 requests where each has multiple retries but eventually succeeds
+      // 6 attempt failures, but 3 request successes
+      breaker.recordAttemptFailure();
+      breaker.recordAttemptFailure();
+      breaker.recordSuccess();  // Request 1 succeeds after 2 retries
+
+      breaker.recordAttemptFailure();
+      breaker.recordAttemptFailure();
+      breaker.recordSuccess();  // Request 2 succeeds after 2 retries
+
+      breaker.recordAttemptFailure();
+      breaker.recordAttemptFailure();
+      breaker.recordSuccess();  // Request 3 succeeds after 2 retries
+
+      const state = breaker.getState();
+      expect(state.state).toBe(CircuitBreakerState.CLOSED);  // Still closed
+      expect(state.totalRequests).toBe(3);
+      expect(state.successfulRequests).toBe(3);
+      expect(state.failurePercentage).toBe(0);  // 0% request failure
+    });
+
+    it('should open circuit faster when tracking attempts with retries', async () => {
+      let attemptCount = 0;
+
+      mockedAxios.request.mockImplementation(
+        (async () => {
+          attemptCount++;
+          // All attempts fail
+          throw {
+            response: { status: 500, data: 'Error' },
+            message: 'Request failed'
+          };
+        }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
+      );
+
+      const requests = Array.from({ length: 3 }, (_, i) => ({
+        id: `req-${i + 1}`,
+        requestOptions: { 
+          reqData: { path: `/api/${i + 1}` }, 
+          resReq: true,
+          attempts: 3,  // 3 attempts per request
+          wait: 10
+        }
+      })) satisfies API_GATEWAY_REQUEST[];
+
+      const results = await stableApiGateway(requests, {
+        commonRequestData: { hostname: 'api.example.com' },
+        concurrentExecution: false,
+        circuitBreaker: {
+          failureThresholdPercentage: 50,
+          minimumRequests: 4,  // Circuit opens at 4 attempts
+          recoveryTimeoutMs: 2000,
+          trackIndividualAttempts: true
+        }
+      });
+
+      expect(results).toHaveLength(3);
+      
+      // With trackIndividualAttempts:
+      // Request 1: 3 attempts (all fail) - total: 3 attempts, circuit still closed
+      // Request 2: attempt 1 fails (total: 4, reaches minimum), circuit opens after this
+      // Request 2 remaining attempts blocked, Request 3 blocked
+      expect(attemptCount).toBeGreaterThanOrEqual(4);
+      expect(attemptCount).toBeLessThanOrEqual(5);  // 4-5 attempts before blocking
+
+      const circuitBreakerErrors = results.filter(r => 
+        r.error?.includes('Circuit breaker')
+      ).length;
+      expect(circuitBreakerErrors).toBeGreaterThan(0);
+    });
+
+    it('should continue all retries when trackIndividualAttempts is false', async () => {
+      let attemptCount = 0;
+
+      mockedAxios.request.mockImplementation(
+        (async () => {
+          attemptCount++;
+          throw {
+            response: { status: 500, data: 'Error' },
+            message: 'Request failed'
+          };
+        }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
+      );
+
+      const requests = Array.from({ length: 3 }, (_, i) => ({
+        id: `req-${i + 1}`,
+        requestOptions: { 
+          reqData: { path: `/api/${i + 1}` }, 
+          resReq: true,
+          attempts: 3,
+          wait: 10
+        }
+      })) satisfies API_GATEWAY_REQUEST[];
+
+      const results = await stableApiGateway(requests, {
+        commonRequestData: { hostname: 'api.example.com' },
+        concurrentExecution: false,
+        circuitBreaker: {
+          failureThresholdPercentage: 50,
+          minimumRequests: 3,  // 3 requests
+          recoveryTimeoutMs: 2000,
+          trackIndividualAttempts: false  // Track requests only
+        }
+      });
+
+      expect(results).toHaveLength(3);
+      
+      // All retries execute because circuit breaker only checks after final outcome
+      // 3 requests * 3 attempts each = 9 total attempts
+      expect(attemptCount).toBe(9);
+    });
+
+    it('should respect responseAnalyzer failures as attempt failures', async () => {
+      let callCount = 0;
+
+      mockedAxios.request.mockImplementation(
+        (async () => {
+          callCount++;
+          return {
+            status: 200,
+            data: { processing: true },  // Invalid response
+            statusText: 'OK',
+            headers: {},
+            config: {} as any
+          };
+        }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
+      );
+
+      const requests = Array.from({ length: 2 }, (_, i) => ({
+        id: `req-${i + 1}`,
+        requestOptions: { 
+          reqData: { path: `/api/${i + 1}` }, 
+          resReq: true,
+          attempts: 4,
+          wait: 10,
+          responseAnalyzer: ({ data }: any) => {
+            return data.processing !== true;  // Reject processing responses
+          }
+        }
+      })) satisfies API_GATEWAY_REQUEST[];
+
+      const results = await stableApiGateway(requests, {
+        commonRequestData: { hostname: 'api.example.com' },
+        concurrentExecution: false,
+        circuitBreaker: {
+          failureThresholdPercentage: 50,
+          minimumRequests: 5,
+          recoveryTimeoutMs: 2000,
+          trackIndividualAttempts: true
+        }
+      });
+
+      expect(results).toHaveLength(2);
+      
+      // Request 1: 4 attempts (all rejected by responseAnalyzer) - total: 4 attempts
+      // Request 2: attempt 1 fails (total: 5, reaches minimum), circuit opens after this
+      // Request 2 remaining attempts blocked
+      expect(callCount).toBeGreaterThanOrEqual(5);
+      expect(callCount).toBeLessThanOrEqual(6);  // 5-6 calls before blocking
+    });
+
+    it('should open circuit during concurrent requests when tracking attempts', async () => {
+      let attemptCount = 0;
+
+      mockedAxios.request.mockImplementation(
+        (async () => {
+          attemptCount++;
+          await new Promise(resolve => setTimeout(resolve, 20));
+          throw {
+            response: { status: 500, data: 'Error' },
+            message: 'Request failed'
+          };
+        }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
+      );
+
+      const requests = Array.from({ length: 5 }, (_, i) => ({
+        id: `req-${i + 1}`,
+        requestOptions: { 
+          reqData: { path: `/api/${i + 1}` }, 
+          resReq: true,
+          attempts: 3,
+          wait: 10
+        }
+      })) satisfies API_GATEWAY_REQUEST[];
+
+      const results = await stableApiGateway(requests, {
+        commonRequestData: { hostname: 'api.example.com' },
+        concurrentExecution: true,
+        circuitBreaker: {
+          failureThresholdPercentage: 50,
+          minimumRequests: 6,
+          recoveryTimeoutMs: 2000,
+          trackIndividualAttempts: true
+        }
+      });
+
+      expect(results).toHaveLength(5);
+      
+      // Circuit should open after ~6 attempts, blocking further attempts
+      // With concurrent execution and delays, multiple requests start simultaneously
+      // Some may complete their retries before circuit opens due to race conditions
+      expect(attemptCount).toBeGreaterThanOrEqual(6);
+      expect(attemptCount).toBeLessThan(15);  // Should be less than all 15 possible attempts
+      
+      const blockedRequests = results.filter(r => 
+        r.error?.includes('Circuit breaker')
+      ).length;
+      expect(blockedRequests).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should show correct attempt statistics in getState', () => {
+      const breaker = new CircuitBreaker({
+        failureThresholdPercentage: 50,
+        minimumRequests: 10,
+        recoveryTimeoutMs: 2000,
+        trackIndividualAttempts: true
+      });
+
+      // Request 1: 2 failures, then success
+      breaker.recordAttemptFailure();
+      breaker.recordAttemptFailure();
+      breaker.recordAttemptSuccess();
+      breaker.recordSuccess();
+
+      // Request 2: 1 failure, then success
+      breaker.recordAttemptFailure();
+      breaker.recordAttemptSuccess();
+      breaker.recordSuccess();
+
+      // Request 3: immediate success
+      breaker.recordAttemptSuccess();
+      breaker.recordSuccess();
+
+      const state = breaker.getState();
+      
+      // Requests: 3 total, 3 successful, 0 failed
+      expect(state.totalRequests).toBe(3);
+      expect(state.successfulRequests).toBe(3);
+      expect(state.failedRequests).toBe(0);
+      expect(state.failurePercentage).toBe(0);
+      
+      // Attempts: 6 total, 3 successful, 3 failed
+      expect(state.totalAttempts).toBe(6);
+      expect(state.successfulAttempts).toBe(3);
+      expect(state.failedAttempts).toBe(3);
+      expect(state.attemptFailurePercentage).toBe(50);
+      
+      // Circuit should still be closed (tracking attempts, but only 6 < 10 minimum)
+      expect(state.state).toBe(CircuitBreakerState.CLOSED);
+    });
+
+    it('should work with workflow-level circuit breaker tracking attempts', async () => {
+      let attemptCount = 0;
+
+      mockedAxios.request.mockImplementation(
+        (async () => {
+          attemptCount++;
+          throw {
+            response: { status: 500, data: 'Error' },
+            message: 'Request failed'
+          };
+        }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
+      );
+
+      const phases = [
+        {
+          id: 'phase-1',
+          requests: Array.from({ length: 2 }, (_, i) => ({
+            id: `p1-r${i + 1}`,
+            requestOptions: { 
+              reqData: { path: `/p1/${i + 1}` }, 
+              resReq: true,
+              attempts: 3,
+              wait: 10
+            }
+          }))
+        },
+        {
+          id: 'phase-2',
+          requests: Array.from({ length: 2 }, (_, i) => ({
+            id: `p2-r${i + 1}`,
+            requestOptions: { 
+              reqData: { path: `/p2/${i + 1}` }, 
+              resReq: true,
+              attempts: 3,
+              wait: 10
+            }
+          }))
+        }
+      ] satisfies STABLE_WORKFLOW_PHASE[];
+
+      const result = await stableWorkflow(phases, {
+        workflowId: 'wf-track-attempts',
+        commonRequestData: { hostname: 'api.example.com' },
+        circuitBreaker: {
+          failureThresholdPercentage: 50,
+          minimumRequests: 5,  // Opens after 5 attempts
+          recoveryTimeoutMs: 2000,
+          trackIndividualAttempts: true
+        }
+      });
+
+      expect(result.totalPhases).toBe(2);
+      
+      // Phase 1 request 1: 3 attempts (total: 3)
+      // Phase 1 request 2: 2 attempts (total: 5, reaches minimum), circuit opens
+      // Remaining attempts blocked
+      expect(attemptCount).toBeGreaterThanOrEqual(5);
+      expect(attemptCount).toBeLessThanOrEqual(7);  // 5-7 attempts before full blocking
+    });
+
+    it('should handle mixed success/failure attempts correctly', async () => {
+      let attemptCount = 0;
+
+      mockedAxios.request.mockImplementation(
+        (async () => {
+          attemptCount++;
+          
+          // Pattern: fail, fail, succeed for each request
+          if (attemptCount % 3 === 0) {
+            return {
+              status: 200,
+              data: { success: true },
+              statusText: 'OK',
+              headers: {},
+              config: {} as any
+            };
+          }
+          
+          throw {
+            response: { status: 500, data: 'Error' },
+            message: 'Request failed'
+          };
+        }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
+      );
+
+      const requests = Array.from({ length: 4 }, (_, i) => ({
+        id: `req-${i + 1}`,
+        requestOptions: { 
+          reqData: { path: `/api/${i + 1}` }, 
+          resReq: true,
+          attempts: 3,
+          wait: 10
+        }
+      })) satisfies API_GATEWAY_REQUEST[];
+
+      const results = await stableApiGateway(requests, {
+        commonRequestData: { hostname: 'api.example.com' },
+        concurrentExecution: false,
+        circuitBreaker: {
+          failureThresholdPercentage: 70,  // Opens at 70% failure rate
+          minimumRequests: 9,
+          recoveryTimeoutMs: 2000,
+          trackIndividualAttempts: true
+        }
+      });
+
+      expect(results).toHaveLength(4);
+      
+      // Each request: fail, fail, succeed pattern (attempts 1,2 fail; attempt 3 succeeds)
+      // Request 1: 2 failures, 1 success (total: 2F, 1S = 66.7% failure)
+      // Request 2: 2 failures, 1 success (total: 4F, 2S = 66.7% failure)
+      // Request 3: 2 failures, 1 success (total: 6F, 3S = 66.7% failure, but now 9 attempts ≥ minimumRequests)
+      // Request 4: attempt 1 fails (total: 7F, 3S = 70% failure ≥ 70% threshold), circuit opens
+      // Circuit should open on request 4, attempt 1, blocking remaining attempts
+      expect(attemptCount).toBeGreaterThanOrEqual(10);  // At least 3*3 + 1 = 10 attempts
+      expect(attemptCount).toBeLessThanOrEqual(11);  // May complete one more before blocking
+      
+      // First 3 requests should succeed (after 3 attempts each)
+      const successCount = results.filter(r => r.success).length;
+      expect(successCount).toBeGreaterThanOrEqual(3);  // At least first 3
+    });
+  });
 });

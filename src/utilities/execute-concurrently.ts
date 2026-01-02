@@ -16,7 +16,6 @@ export async function executeConcurrently<RequestDataType = any, ResponseDataTyp
 ): Promise<API_GATEWAY_RESPONSE<ResponseDataType>[]> {
     const responses: API_GATEWAY_RESPONSE<ResponseDataType>[] = [];
     
-    // Support both config and instance
     const circuitBreaker = requestExecutionOptions.circuitBreaker
         ? (requestExecutionOptions.circuitBreaker instanceof CircuitBreaker 
             ? requestExecutionOptions.circuitBreaker 
@@ -25,11 +24,11 @@ export async function executeConcurrently<RequestDataType = any, ResponseDataTyp
     
     const requestFunctions = requests.map((req) => {
         return async () => {
-            if (circuitBreaker) {
+            if (circuitBreaker && !circuitBreaker.getState().config.trackIndividualAttempts) {
                 const canExecute = await circuitBreaker.canExecute();
                 if (!canExecute) {
                     throw new CircuitBreakerOpenError(
-                        `Circuit breaker is ${circuitBreaker.getState().state}. Request blocked.`
+                        `stable-request: Circuit breaker is ${circuitBreaker.getState().state}. Request blocked.`
                     );
                 }
             }
@@ -37,19 +36,22 @@ export async function executeConcurrently<RequestDataType = any, ResponseDataTyp
             const finalRequestOptions = { 
                 reqData: prepareApiRequestData<RequestDataType, ResponseDataType>(req, requestExecutionOptions),
                 ...prepareApiRequestOptions<RequestDataType, ResponseDataType>(req, requestExecutionOptions),
-                commonBuffer: requestExecutionOptions.sharedBuffer ?? req.requestOptions.commonBuffer 
+                commonBuffer: requestExecutionOptions.sharedBuffer ?? req.requestOptions.commonBuffer,
+                ...(circuitBreaker ? { circuitBreaker } : {})
             };
 
             try {
                 const result = await stableRequest<RequestDataType, ResponseDataType>(finalRequestOptions);
                 
-                if (circuitBreaker) {
+                if (circuitBreaker && !circuitBreaker.getState().config.trackIndividualAttempts) {
                     circuitBreaker.recordSuccess();
                 }
                 
                 return result;
             } catch (error) {
-                if (circuitBreaker && !(error instanceof CircuitBreakerOpenError)) {
+                if (circuitBreaker && 
+                    !(error instanceof CircuitBreakerOpenError) &&
+                    !circuitBreaker.getState().config.trackIndividualAttempts) {
                     circuitBreaker.recordFailure();
                 }
                 throw error;

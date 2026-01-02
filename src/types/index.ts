@@ -7,6 +7,8 @@ import {
   VALID_REQUEST_PROTOCOLS
 } from '../enums/index.js';
 
+import { CircuitBreaker } from '../utilities/index.js'
+
 export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any> {
   commonRequestData?: Partial<REQUEST_DATA<RequestDataType>>;
   commonAttempts?: number;
@@ -196,6 +198,7 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   preExecution?: RequestPreExecutionOptions;
   commonBuffer?: Record<string, any>;
   cache?: CacheConfig;
+  circuitBreaker?: CircuitBreakerConfig | CircuitBreaker;
 }
 
 export interface SUCCESSFUL_ATTEMPT_DATA<ResponseDataType = any> {
@@ -301,6 +304,7 @@ export interface CircuitBreakerConfig {
   recoveryTimeoutMs: number;
   successThresholdPercentage?: number;
   halfOpenMaxRequests?: number;
+  trackIndividualAttempts?: boolean;
 }
 
 export interface CacheConfig {

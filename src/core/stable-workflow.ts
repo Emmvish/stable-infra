@@ -48,12 +48,10 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
     let successfulRequests = 0;
     let failedRequests = 0;
 
-    // Create workflow-level circuit breaker instance if configured
     const workflowCircuitBreaker = commonGatewayOptions.circuitBreaker
         ? new CircuitBreaker(commonGatewayOptions.circuitBreaker)
         : null;
     
-    // If workflow has circuit breaker, pass the instance (not config) to phases
     const commonGatewayOptionsWithBreaker = workflowCircuitBreaker
         ? { ...commonGatewayOptions, circuitBreaker: workflowCircuitBreaker as any }
         : commonGatewayOptions;

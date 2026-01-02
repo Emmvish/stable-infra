@@ -42,7 +42,7 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
           'stable-request: Request failed in trial mode.\nRequest data:\n',
           safelyStringify(reqData, maxSerializableChars)
         );
-        throw new Error('Request failed in trial mode.');
+        throw new Error('stable-request: Request failed in trial mode.');
       } else {
         stopTime = Date.now();
         return {

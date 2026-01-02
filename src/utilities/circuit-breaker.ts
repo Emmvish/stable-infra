@@ -9,6 +9,10 @@ export class CircuitBreaker {
     private failedRequests: number = 0;
     private successfulRequests: number = 0;
     
+    private totalAttempts: number = 0;
+    private failedAttempts: number = 0;
+    private successfulAttempts: number = 0;
+    
     private lastFailureTime: number = 0;
     private halfOpenRequests: number = 0;
     private halfOpenSuccesses: number = 0;
@@ -20,7 +24,8 @@ export class CircuitBreaker {
             minimumRequests: Math.max(1, config.minimumRequests),
             recoveryTimeoutMs: Math.max(100, config.recoveryTimeoutMs),
             successThresholdPercentage: config.successThresholdPercentage ?? 50,
-            halfOpenMaxRequests: config.halfOpenMaxRequests ?? 5
+            halfOpenMaxRequests: config.halfOpenMaxRequests ?? 5,
+            trackIndividualAttempts: config.trackIndividualAttempts ?? false
         };
     }
 
@@ -54,7 +59,7 @@ export class CircuitBreaker {
             this.halfOpenRequests++;
             this.checkHalfOpenTransition();
         } else if (this.state === CircuitBreakerState.CLOSED) {
-            if (this.totalRequests >= this.config.minimumRequests * 10) {
+            if (this.shouldResetCounters()) {
                 this.resetCounters();
             }
         }
@@ -74,12 +79,50 @@ export class CircuitBreaker {
         }
     }
 
+    recordAttemptSuccess(): void {
+        this.totalAttempts++;
+        this.successfulAttempts++;
+
+        if (this.state === CircuitBreakerState.CLOSED) {
+            if (this.config.trackIndividualAttempts) {
+                this.checkAttemptThreshold();
+            }
+            if (this.shouldResetCounters()) {
+                this.resetCounters();
+            }
+        }
+    }
+
+    recordAttemptFailure(): void {
+        this.totalAttempts++;
+        this.failedAttempts++;
+        this.lastFailureTime = Date.now();
+
+        if (this.state === CircuitBreakerState.CLOSED) {
+            if (this.config.trackIndividualAttempts) {
+                this.checkAttemptThreshold();
+            }
+        }
+    }
+
     private checkThreshold(): void {
         if (this.totalRequests < this.config.minimumRequests) {
             return;
         }
 
         const failurePercentage = (this.failedRequests / this.totalRequests) * 100;
+        
+        if (failurePercentage >= this.config.failureThresholdPercentage) {
+            this.transitionToOpen();
+        }
+    }
+
+    private checkAttemptThreshold(): void {
+        if (this.totalAttempts < this.config.minimumRequests) {
+            return;
+        }
+
+        const failurePercentage = (this.failedAttempts / this.totalAttempts) * 100;
         
         if (failurePercentage >= this.config.failureThresholdPercentage) {
             this.transitionToOpen();
@@ -114,10 +157,20 @@ export class CircuitBreaker {
         this.resetHalfOpenCounters();
     }
 
+    private shouldResetCounters(): boolean {
+        const threshold = this.config.trackIndividualAttempts 
+            ? this.totalAttempts >= this.config.minimumRequests * 10
+            : this.totalRequests >= this.config.minimumRequests * 10;
+        return threshold;
+    }
+
     private resetCounters(): void {
         this.totalRequests = 0;
         this.failedRequests = 0;
         this.successfulRequests = 0;
+        this.totalAttempts = 0;
+        this.failedAttempts = 0;
+        this.successfulAttempts = 0;
     }
 
     private resetHalfOpenCounters(): void {
@@ -132,6 +185,10 @@ export class CircuitBreaker {
         failedRequests: number;
         successfulRequests: number;
         failurePercentage: number;
+        totalAttempts: number;
+        failedAttempts: number;
+        successfulAttempts: number;
+        attemptFailurePercentage: number;
         config: Required<CircuitBreakerConfig>;
     } {
         return {
@@ -141,6 +198,12 @@ export class CircuitBreaker {
             successfulRequests: this.successfulRequests,
             failurePercentage: this.totalRequests > 0 
                 ? (this.failedRequests / this.totalRequests) * 100 
+                : 0,
+            totalAttempts: this.totalAttempts,
+            failedAttempts: this.failedAttempts,
+            successfulAttempts: this.successfulAttempts,
+            attemptFailurePercentage: this.totalAttempts > 0
+                ? (this.failedAttempts / this.totalAttempts) * 100
                 : 0,
             config: this.config
         };
