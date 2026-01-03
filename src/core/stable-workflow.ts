@@ -5,6 +5,7 @@ import {
 } from '../types/index.js';
 import { 
     executePhase,
+    executeNonLinearWorkflow,
     safelyExecuteUnknownFunction, 
     safelyStringify,
     CircuitBreaker
@@ -33,11 +34,14 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 '\nError:\n',
                 safelyStringify({ error, phaseResult }, maxSerializableChars)
             ),
+        handlePhaseDecision,
         maxSerializableChars = 1000,
         requestGroups = [],
         workflowHookParams = {},
         concurrentPhaseExecution = false,
         enableMixedExecution = false,
+        enableNonLinearExecution = false,
+        maxWorkflowIterations = 1000,
         ...commonGatewayOptions
     } = options;
 
@@ -57,6 +61,71 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
         : commonGatewayOptions;
 
     try {
+        if (enableNonLinearExecution) {
+            if (logPhaseResults) {
+                console.info(
+                    `\nstable-request: [Workflow: ${workflowId}] Starting non-linear workflow execution with ${phases.length} phases`
+                );
+            }
+
+            const nonLinearResult = await executeNonLinearWorkflow({
+                phases,
+                workflowId,
+                commonGatewayOptions: commonGatewayOptionsWithBreaker,
+                requestGroups,
+                logPhaseResults,
+                handlePhaseCompletion,
+                handlePhaseError,
+                handlePhaseDecision,
+                maxSerializableChars,
+                workflowHookParams,
+                sharedBuffer: options.sharedBuffer,
+                stopOnFirstPhaseError,
+                maxWorkflowIterations
+            });
+
+            phaseResults.push(...nonLinearResult.phaseResults);
+            totalRequests = nonLinearResult.totalRequests;
+            successfulRequests = nonLinearResult.successfulRequests;
+            failedRequests = nonLinearResult.failedRequests;
+
+            const workflowExecutionTime = Date.now() - workflowStartTime;
+            const workflowSuccess = failedRequests === 0;
+
+            const result: STABLE_WORKFLOW_RESULT<ResponseDataType> = {
+                workflowId,
+                success: workflowSuccess,
+                executionTime: workflowExecutionTime,
+                timestamp: new Date(workflowStartTime).toISOString(),
+                totalPhases: phases.length,
+                completedPhases: phaseResults.length,
+                totalRequests,
+                successfulRequests,
+                failedRequests,
+                phases: phaseResults,
+                executionHistory: nonLinearResult.executionHistory,
+                terminatedEarly: nonLinearResult.terminatedEarly,
+                terminationReason: nonLinearResult.terminationReason
+            };
+
+            if (logPhaseResults) {
+                console.info(
+                    `\nstable-request: [Workflow: ${workflowId}] Non-linear workflow completed:`,
+                    `${successfulRequests}/${totalRequests} requests successful`,
+                    `across ${phaseResults.length} phase executions`,
+                    `(${workflowExecutionTime}ms)`
+                );
+
+                if (nonLinearResult.terminatedEarly) {
+                    console.info(
+                        `stable-request: [Workflow: ${workflowId}] Workflow terminated early: ${nonLinearResult.terminationReason}`
+                    );
+                }
+            }
+
+            return result;
+        }
+
         const processPhaseResult = (phaseResult: STABLE_WORKFLOW_RESULT<ResponseDataType>['phases'][number]) => {
             phaseResults.push(phaseResult);
             totalRequests += phaseResult.totalRequests;
@@ -202,6 +271,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                             }
                             break;
                         }
+
                     } catch (phaseError: any) {
                         await handlePhaseExecutionError(currentPhaseId, i, phaseError, currentPhase);
 
@@ -311,7 +381,8 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
             totalRequests,
             successfulRequests,
             failedRequests,
-            phases: phaseResults
+            phases: phaseResults,
+            executionHistory: []
         };
 
         if (logPhaseResults) {
@@ -346,6 +417,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
             successfulRequests,
             failedRequests,
             phases: phaseResults,
+            executionHistory: [],
             error: workflowError.message
         };
     }

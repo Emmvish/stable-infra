@@ -4,6 +4,14 @@ export enum CircuitBreakerState {
     HALF_OPEN = 'HALF_OPEN'
 }
 
+export enum PHASE_DECISION_ACTIONS {
+  CONTINUE = 'continue',
+  SKIP = 'skip',
+  REPLAY = 'replay',
+  JUMP = 'jump',
+  TERMINATE = 'terminate'
+}
+
 export enum INVALID_AXIOS_RESPONSES {
   RESET = 'ECONNRESET',
   TIMEDOUT = 'ETIMEDOUT',

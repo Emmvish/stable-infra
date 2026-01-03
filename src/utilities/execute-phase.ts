@@ -1,6 +1,6 @@
 import { stableApiGateway } from '../core/index.js';
 import { safelyExecuteUnknownFunction } from './safely-execute-unknown-function';
-import { STABLE_WORKFLOW_PHASE } from '../types/index.js';
+import { STABLE_WORKFLOW_PHASE, STABLE_WORKFLOW_PHASE_RESULT } from '../types/index.js';
 
 export async function executePhase<RequestDataType = any, ResponseDataType = any>(
     phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>,
@@ -47,7 +47,7 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
     const phaseSuccessCount = phaseResponses.filter(r => r.success).length;
     const phaseFailureCount = phaseResponses.filter(r => !r.success).length;
 
-    const phaseResult = {
+    const phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType> = {
         phaseId,
         phaseIndex,
         success: phaseFailureCount === 0,

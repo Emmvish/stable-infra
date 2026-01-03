@@ -1,6 +1,7 @@
 import { AxiosRequestConfig } from 'axios';
 
 import { 
+  PHASE_DECISION_ACTIONS,
   REQUEST_METHODS,
   RESPONSE_ERRORS, 
   RETRY_STRATEGIES,
@@ -228,6 +229,12 @@ export interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType =
   maxConcurrentRequests?: number;
   rateLimit?: RateLimitConfig;
   circuitBreaker?: CircuitBreakerConfig;
+  maxReplayCount?: number;
+  allowReplay?: boolean;
+  allowSkip?: boolean;
+  phaseDecisionHook?: (
+    options: PhaseDecisionHookOptions<ResponseDataType>
+  ) => PhaseExecutionDecision | Promise<PhaseExecutionDecision>;
   commonConfig?: Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, 
     'concurrentExecution' | 'stopOnFirstError' | 'requestGroups' | "maxConcurrentRequests" | "rateLimit" | "circuitBreaker">;
 }
@@ -240,11 +247,17 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   logPhaseResults?: boolean;
   concurrentPhaseExecution?: boolean;
   enableMixedExecution?: boolean;
+  enableNonLinearExecution?: boolean;
+  maxWorkflowIterations?: number;
   handlePhaseCompletion?: (
     options: HandlePhaseCompletionHookOptions<ResponseDataType>
   ) => any | Promise<any>;
   handlePhaseError?: (
     options: HandlePhaseErrorHookOptions<ResponseDataType>
+  ) => any | Promise<any>;
+  handlePhaseDecision?: (
+    decision: PhaseExecutionDecision,
+    phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>
   ) => any | Promise<any>;
   maxSerializableChars?: number;
   workflowHookParams?: WorkflowHookParams;
@@ -260,6 +273,9 @@ export interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any> {
   successfulRequests: number;
   failedRequests: number;
   responses: API_GATEWAY_RESPONSE<ResponseDataType>[];
+  executionNumber?: number;
+  skipped?: boolean;
+  decision?: PhaseExecutionDecision;
   error?: string;
 }
 
@@ -274,12 +290,16 @@ export interface STABLE_WORKFLOW_RESULT<ResponseDataType = any> {
   successfulRequests: number;
   failedRequests: number;
   phases: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
+  executionHistory: PhaseExecutionRecord[];
+  terminatedEarly?: boolean;
+  terminationReason?: string;
   error?: string;
 }
 
 export interface WorkflowHookParams {
   handlePhaseCompletionParams?: any;
   handlePhaseErrorParams?: any;
+  handlePhaseDecisionParams?: any;
 }
 
 export interface HandlePhaseCompletionHookOptions<ResponseDataType = any> {
@@ -308,20 +328,64 @@ export interface CircuitBreakerConfig {
 }
 
 export interface CacheConfig {
-    enabled: boolean;
-    ttl?: number;
-    respectCacheControl?: boolean;
-    cacheableStatusCodes?: number[];
-    maxSize?: number;
-    excludeMethods?: string[];
-    keyGenerator?: (config: AxiosRequestConfig) => string;
+  enabled: boolean;
+  ttl?: number;
+  respectCacheControl?: boolean;
+  cacheableStatusCodes?: number[];
+  maxSize?: number;
+  excludeMethods?: string[];
+  keyGenerator?: (config: AxiosRequestConfig) => string;
 }
 
 export interface CachedResponse<T = any> {
-    data: T;
-    status: number;
-    statusText: string;
-    headers: Record<string, any>;
-    timestamp: number;
-    expiresAt: number;
+  data: T;
+  status: number;
+  statusText: string;
+  headers: Record<string, any>;
+  timestamp: number;
+  expiresAt: number;
+}
+
+export interface PhaseExecutionDecision {
+  action: PHASE_DECISION_ACTIONS;
+  targetPhaseId?: string;
+  replayCount?: number;
+  metadata?: Record<string, any>;
+}
+
+export interface PhaseDecisionHookOptions<ResponseDataType = any> {
+  workflowId: string;
+  phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>;
+  phaseId: string;
+  phaseIndex: number;
+  executionHistory: PhaseExecutionRecord[];
+  sharedBuffer?: Record<string, any>;
+  params?: any;
+  concurrentPhaseResults?: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[]; // Available when phase is part of concurrent group
+}
+
+export interface PhaseExecutionRecord {
+  phaseId: string;
+  phaseIndex: number;
+  executionNumber: number;
+  timestamp: string;
+  success: boolean;
+  executionTime: number;
+  decision?: PhaseExecutionDecision;
+}
+
+export interface NonLinearWorkflowContext<RequestDataType, ResponseDataType> {
+  phases: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>[];
+  workflowId: string;
+  commonGatewayOptions: any;
+  requestGroups: any[];
+  logPhaseResults: boolean;
+  handlePhaseCompletion: Function;
+  handlePhaseError: Function;
+  handlePhaseDecision?: Function;
+  maxSerializableChars: number;
+  workflowHookParams: any;
+  sharedBuffer?: Record<string, any>;
+  stopOnFirstPhaseError: boolean;
+  maxWorkflowIterations: number;
 }
