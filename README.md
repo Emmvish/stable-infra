@@ -32,7 +32,8 @@ All in all, it provides you with the **entire ecosystem** to build **API-integra
 | Batch or fan-out requests | `stableApiGateway` |
 | Multi-step orchestration | `stableWorkflow` |
 
-Start small and scale
+
+Start small and scale.
 
 ---
 
@@ -41,11 +42,8 @@ Start small and scale
 - [Installation](#installation)
 - [Core Features](#core-features)
 - [Quick Start](#quick-start)
-- [API Reference](#api-reference)
-  - [stableRequest](#stableRequest)
-  - [stableApiGateway](#stableApiGateway)
-  - [stableWorkflow](#stableWorkflow)
 - [Advanced Features](#advanced-features)
+  - [Non-Linear Workflows](#non-linear-workflows)
   - [Retry Strategies](#retry-strategies)
   - [Circuit Breaker](#circuit-breaker)
   - [Rate Limiting](#rate-limiting)
@@ -57,7 +55,6 @@ Start small and scale
   - [Response Analysis](#response-analysis)
   - [Error Handling](#error-handling)
 - [Advanced Use Cases](#advanced-use-cases)
-- [Configuration Options](#configuration-options)
 - [License](#license)
 <!-- TOC END -->
 
@@ -76,7 +73,7 @@ npm install @emmvish/stable-request
 - ✅ **Rate Limiting**: Control request throughput across single or multiple requests
 - ✅ **Response Caching**: Built-in TTL-based caching with global cache manager
 - ✅ **Batch Processing**: Execute multiple requests concurrently or sequentially via API Gateway
-- ✅ **Multi-Phase Workflows**: Orchestrate complex request workflows with phase dependencies
+- ✅ **Multi-Phase Non-Linear Workflows**: Orchestrate complex request workflows with phase dependencies
 - ✅ **Pre-Execution Hooks**: Transform requests before execution with dynamic configuration
 - ✅ **Shared Buffer**: Share state across requests in workflows and gateways
 - ✅ **Request Grouping**: Apply different configurations to request groups
@@ -165,84 +162,729 @@ const result = await stableWorkflow(phases, {
 console.log(`Workflow completed: ${result.successfulRequests}/${result.totalRequests} successful`);
 ```
 
-## API Reference
+### Non-Linear Workflow with Dynamic Routing
 
-### stableRequest
-
-Execute a single HTTP request with retry logic and observability.
-
-**Signature:**
 ```typescript
-async function stableRequest<RequestDataType, ResponseDataType>(
-  options: STABLE_REQUEST<RequestDataType, ResponseDataType>
-): Promise<ResponseDataType | boolean>
+import { stableWorkflow, STABLE_WORKFLOW_PHASE, PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
+
+const phases: STABLE_WORKFLOW_PHASE[] = [
+  {
+    id: 'check-status',
+    requests: [
+      { id: 'status', requestOptions: { reqData: { path: '/status' }, resReq: true } }
+    ],
+    phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+      const status = phaseResult.responses[0]?.data?.status;
+      
+      if (status === 'completed') {
+        return { action: PHASE_DECISION_ACTIONS.JUMP, targetPhaseId: 'finalize' };
+      } else if (status === 'processing') {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return { action: PHASE_DECISION_ACTIONS.REPLAY };  // Replay this phase
+      } else {
+        return { action: PHASE_DECISION_ACTIONS.JUMP, targetPhaseId: 'error-handler' };
+      }
+    },
+    allowReplay: true,
+    maxReplayCount: 10
+  },
+  {
+    id: 'process',
+    requests: [
+      { id: 'process', requestOptions: { reqData: { path: '/process' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'error-handler',
+    requests: [
+      { id: 'error', requestOptions: { reqData: { path: '/error' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'finalize',
+    requests: [
+      { id: 'final', requestOptions: { reqData: { path: '/finalize' }, resReq: true } }
+    ]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'dynamic-workflow',
+  commonRequestData: { hostname: 'api.example.com' },
+  enableNonLinearExecution: true,
+  maxWorkflowIterations: 50,
+  sharedBuffer: {}
+});
+
+console.log('Execution history:', result.executionHistory);
+console.log('Terminated early:', result.terminatedEarly);
 ```
-
-**Key Options:**
-- `reqData`: Request configuration (hostname, path, method, headers, body, etc.)
-- `resReq`: If `true`, returns response data; if `false`, returns boolean success status
-- `attempts`: Number of retry attempts (default: 1)
-- `wait`: Base wait time between retries in milliseconds (default: 1000)
-- `retryStrategy`: `FIXED`, `LINEAR`, or `EXPONENTIAL` (default: FIXED)
-- `responseAnalyzer`: Custom function to validate response content
-- `finalErrorAnalyzer`: Handle final errors gracefully (return `true` to suppress error)
-- `cache`: Enable response caching with TTL
-- `circuitBreaker`: Circuit breaker configuration
-- `preExecution`: Pre-execution hooks for dynamic request transformation
-- `commonBuffer`: Shared state object across hooks
-
-### stableApiGateway
-
-Execute multiple requests concurrently or sequentially with shared configuration.
-
-**Signature:**
-```typescript
-async function stableApiGateway<RequestDataType, ResponseDataType>(
-  requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[],
-  options: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>
-): Promise<API_GATEWAY_RESPONSE<ResponseDataType>[]>
-```
-
-**Key Options:**
-- `concurrentExecution`: Execute requests concurrently (default: true)
-- `stopOnFirstError`: Stop processing on first error (sequential mode only)
-- `maxConcurrentRequests`: Limit concurrent execution
-- `rateLimit`: Rate limiting configuration
-- `circuitBreaker`: Shared circuit breaker across requests
-- `requestGroups`: Apply different configurations to request groups
-- `sharedBuffer`: Shared state across all requests
-- `common*`: Common configuration applied to all requests (e.g., `commonAttempts`, `commonCache`)
-
-### stableWorkflow
-
-Execute multi-phase workflows with sequential or concurrent phase execution.
-
-**Signature:**
-```typescript
-async function stableWorkflow<RequestDataType, ResponseDataType>(
-  phases: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>[],
-  options: STABLE_WORKFLOW_OPTIONS<RequestDataType, ResponseDataType>
-): Promise<STABLE_WORKFLOW_RESULT<ResponseDataType>>
-```
-
-**Key Options:**
-- `workflowId`: Unique workflow identifier
-- `concurrentPhaseExecution`: Execute phases concurrently (default: false)
-- `stopOnFirstPhaseError`: Stop workflow on first phase failure
-- `enableMixedExecution`: Allow mixed concurrent/sequential phase execution
-- `handlePhaseCompletion`: Hook called after each phase completes
-- `handlePhaseError`: Hook called when phase fails
-- `sharedBuffer`: Shared state across all phases and requests
-
-**Phase Configuration:**
-- `id`: Phase identifier
-- `requests`: Array of requests in this phase
-- `concurrentExecution`: Execute phase requests concurrently
-- `stopOnFirstError`: Stop phase on first request error
-- `markConcurrentPhase`: Mark phase for concurrent execution in mixed mode
-- `commonConfig`: Phase-level configuration overrides
 
 ## Advanced Features
+
+### Non-Linear Workflows
+
+Non-linear workflows enable dynamic phase execution based on runtime decisions, allowing you to build complex orchestrations with conditional branching, polling loops, error recovery, and adaptive routing.
+
+#### Phase Decision Actions
+
+Each phase can make decisions about workflow execution:
+
+- **`continue`**: Proceed to the next sequential phase
+- **`jump`**: Jump to a specific phase by ID
+- **`replay`**: Re-execute the current phase
+- **`skip`**: Skip to a target phase or skip the next phase
+- **`terminate`**: Stop the workflow immediately
+
+#### Basic Non-Linear Workflow
+
+```typescript
+import { stableWorkflow, STABLE_WORKFLOW_PHASE, PhaseExecutionDecision, PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
+
+const phases: STABLE_WORKFLOW_PHASE[] = [
+  {
+    id: 'validate-input',
+    requests: [
+      { id: 'validate', requestOptions: { reqData: { path: '/validate' }, resReq: true } }
+    ],
+    phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+      const isValid = phaseResult.responses[0]?.data?.valid;
+      
+      if (isValid) {
+        sharedBuffer.validationPassed = true;
+        return { action: PHASE_DECISION_ACTIONS.CONTINUE };  // Go to next phase
+      } else {
+        return { 
+          action: PHASE_DECISION_ACTIONS.TERMINATE,
+          metadata: { reason: 'Validation failed' }
+        };
+      }
+    }
+  },
+  {
+    id: 'process-data',
+    requests: [
+      { id: 'process', requestOptions: { reqData: { path: '/process' }, resReq: true } }
+    ]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'validation-workflow',
+  commonRequestData: { hostname: 'api.example.com' },
+  enableNonLinearExecution: true,
+  sharedBuffer: {}
+});
+
+if (result.terminatedEarly) {
+  console.log('Workflow terminated:', result.terminationReason);
+}
+```
+
+#### Conditional Branching
+
+```typescript
+const phases: STABLE_WORKFLOW_PHASE[] = [
+  {
+    id: 'check-user-type',
+    requests: [
+      { id: 'user', requestOptions: { reqData: { path: '/user/info' }, resReq: true } }
+    ],
+    phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+      const userType = phaseResult.responses[0]?.data?.type;
+      sharedBuffer.userType = userType;
+      
+      if (userType === 'premium') {
+        return { action: PHASE_DECISION_ACTIONS.JUMP, targetPhaseId: 'premium-flow' };
+      } else if (userType === 'trial') {
+        return { action: PHASE_DECISION_ACTIONS.JUMP, targetPhaseId: 'trial-flow' };
+      } else {
+        return { action: PHASE_DECISION_ACTIONS.JUMP, targetPhaseId: 'free-flow' };
+      }
+    }
+  },
+  {
+    id: 'premium-flow',
+    requests: [
+      { id: 'premium', requestOptions: { reqData: { path: '/premium/data' }, resReq: true } }
+    ],
+    phaseDecisionHook: async () => ({ action: PHASE_DECISION_ACTIONS.JUMP, targetPhaseId: 'finalize' })
+  },
+  {
+    id: 'trial-flow',
+    requests: [
+      { id: 'trial', requestOptions: { reqData: { path: '/trial/data' }, resReq: true } }
+    ],
+    phaseDecisionHook: async () => ({ action: PHASE_DECISION_ACTIONS.JUMP, targetPhaseId: 'finalize' })
+  },
+  {
+    id: 'free-flow',
+    requests: [
+      { id: 'free', requestOptions: { reqData: { path: '/free/data' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'finalize',
+    requests: [
+      { id: 'final', requestOptions: { reqData: { path: '/finalize' }, resReq: true } }
+    ]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  enableNonLinearExecution: true,
+  sharedBuffer: {},
+  handlePhaseDecision: (decision, phaseResult) => {
+    console.log(`Phase ${phaseResult.phaseId} decided: ${decision.action}`);
+  }
+});
+```
+
+#### Polling with Replay
+
+```typescript
+const phases: STABLE_WORKFLOW_PHASE[] = [
+  {
+    id: 'poll-job-status',
+    allowReplay: true,
+    maxReplayCount: 20,
+    requests: [
+      { id: 'check', requestOptions: { reqData: { path: '/job/status' }, resReq: true } }
+    ],
+    phaseDecisionHook: async ({ phaseResult, executionHistory }) => {
+      const status = phaseResult.responses[0]?.data?.status;
+      const attempts = executionHistory.filter(h => h.phaseId === 'poll-job-status').length;
+      
+      if (status === 'completed') {
+        return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+      } else if (status === 'failed') {
+        return { action: PHASE_DECISION_ACTIONS.JUMP, targetPhaseId: 'error-recovery' };
+      } else if (attempts < 20) {
+        // Still processing, wait and replay
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return { action: PHASE_DECISION_ACTIONS.REPLAY };
+      } else {
+        return { 
+          action: PHASE_DECISION_ACTIONS.TERMINATE,
+          metadata: { reason: 'Job timeout after 20 attempts' }
+        };
+      }
+    }
+  },
+  {
+    id: 'process-results',
+    requests: [
+      { id: 'process', requestOptions: { reqData: { path: '/job/results' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'error-recovery',
+    requests: [
+      { id: 'recover', requestOptions: { reqData: { path: '/job/retry' }, resReq: true } }
+    ]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'polling-workflow',
+  commonRequestData: { hostname: 'api.example.com' },
+  enableNonLinearExecution: true,
+  maxWorkflowIterations: 100
+});
+
+console.log('Total iterations:', result.executionHistory.length);
+console.log('Phases executed:', result.completedPhases);
+```
+
+#### Retry Logic with Replay
+
+```typescript
+const phases: STABLE_WORKFLOW_PHASE[] = [
+  {
+    id: 'attempt-operation',
+    allowReplay: true,
+    maxReplayCount: 3,
+    requests: [
+      { 
+        id: 'operation',
+        requestOptions: { 
+          reqData: { path: '/risky-operation', method: 'POST' },
+          resReq: true,
+          attempts: 1  // No retries at request level
+        }
+      }
+    ],
+    phaseDecisionHook: async ({ phaseResult, executionHistory, sharedBuffer }) => {
+      const success = phaseResult.responses[0]?.success;
+      const attemptCount = executionHistory.filter(h => h.phaseId === 'attempt-operation').length;
+      
+      if (success) {
+        sharedBuffer.operationResult = phaseResult.responses[0]?.data;
+        return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+      } else if (attemptCount < 3) {
+        // Exponential backoff
+        const delay = 1000 * Math.pow(2, attemptCount);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        sharedBuffer.retryAttempts = attemptCount;
+        return { action: PHASE_DECISION_ACTIONS.REPLAY };
+      } else {
+        return {
+          action: PHASE_DECISION_ACTIONS.JUMP,
+          targetPhaseId: 'fallback-operation',
+          metadata: { reason: 'Max retries exceeded' }
+        };
+      }
+    }
+  },
+  {
+    id: 'primary-flow',
+    requests: [
+      { id: 'primary', requestOptions: { reqData: { path: '/primary' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'fallback-operation',
+    requests: [
+      { id: 'fallback', requestOptions: { reqData: { path: '/fallback' }, resReq: true } }
+    ]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  enableNonLinearExecution: true,
+  sharedBuffer: { retryAttempts: 0 },
+  logPhaseResults: true
+});
+```
+
+#### Skip Phases
+
+```typescript
+const phases: STABLE_WORKFLOW_PHASE[] = [
+  {
+    id: 'check-cache',
+    allowSkip: true,
+    requests: [
+      { id: 'cache', requestOptions: { reqData: { path: '/cache/check' }, resReq: true } }
+    ],
+    phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+      const cached = phaseResult.responses[0]?.data?.cached;
+      
+      if (cached) {
+        sharedBuffer.cachedData = phaseResult.responses[0]?.data;
+        // Skip expensive-computation and go directly to finalize
+        return { action: PHASE_DECISION_ACTIONS.SKIP, targetPhaseId: 'finalize' };
+      }
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    }
+  },
+  {
+    id: 'expensive-computation',
+    requests: [
+      { id: 'compute', requestOptions: { reqData: { path: '/compute' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'save-to-cache',
+    requests: [
+      { id: 'save', requestOptions: { reqData: { path: '/cache/save' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'finalize',
+    requests: [
+      { id: 'final', requestOptions: { reqData: { path: '/finalize' }, resReq: true } }
+    ]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  enableNonLinearExecution: true,
+  sharedBuffer: {}
+});
+```
+
+#### Execution History and Tracking
+
+```typescript
+const result = await stableWorkflow(phases, {
+  workflowId: 'tracked-workflow',
+  enableNonLinearExecution: true,
+  handlePhaseCompletion: ({ phaseResult, workflowId }) => {
+    console.log(`[${workflowId}] Phase ${phaseResult.phaseId} completed:`, {
+      executionNumber: phaseResult.executionNumber,
+      success: phaseResult.success,
+      decision: phaseResult.decision
+    });
+  },
+  handlePhaseDecision: (decision, phaseResult) => {
+    console.log(`Decision made:`, {
+      phase: phaseResult.phaseId,
+      action: decision.action,
+      target: decision.targetPhaseId,
+      metadata: decision.metadata
+    });
+  }
+});
+
+// Analyze execution history
+console.log('Total phase executions:', result.executionHistory.length);
+console.log('Unique phases executed:', new Set(result.executionHistory.map(h => h.phaseId)).size);
+console.log('Replay count:', result.executionHistory.filter(h => h.decision?.action === 'replay').length);
+
+result.executionHistory.forEach(record => {
+  console.log(`- ${record.phaseId} (attempt ${record.executionNumber}): ${record.success ? '✓' : '✗'}`);
+});
+```
+
+#### Loop Protection
+
+```typescript
+const result = await stableWorkflow(phases, {
+  enableNonLinearExecution: true,
+  maxWorkflowIterations: 50,  // Prevent infinite loops
+  handlePhaseCompletion: ({ phaseResult }) => {
+    if (phaseResult.executionNumber && phaseResult.executionNumber > 10) {
+      console.warn(`Phase ${phaseResult.phaseId} executed ${phaseResult.executionNumber} times`);
+    }
+  }
+});
+
+if (result.terminatedEarly && result.terminationReason?.includes('iterations')) {
+  console.error('Workflow hit iteration limit - possible infinite loop');
+}
+```
+
+#### Mixed Serial and Parallel Execution
+
+Non-linear workflows support mixing serial and parallel phase execution. Mark consecutive phases with `markConcurrentPhase: true` to execute them in parallel, while other phases execute serially.
+
+**Basic Mixed Execution:**
+
+```typescript
+import { stableWorkflow, STABLE_WORKFLOW_PHASE, PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
+
+const phases: STABLE_WORKFLOW_PHASE[] = [
+  {
+    id: 'init',
+    requests: [
+      { id: 'init', requestOptions: { reqData: { path: '/init' }, resReq: true } }
+    ],
+    phaseDecisionHook: async () => ({ action: PHASE_DECISION_ACTIONS.CONTINUE })
+  },
+  // These two phases execute in parallel
+  {
+    id: 'check-inventory',
+    markConcurrentPhase: true,
+    requests: [
+      { id: 'inv', requestOptions: { reqData: { path: '/inventory' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'check-pricing',
+    markConcurrentPhase: true,
+    requests: [
+      { id: 'price', requestOptions: { reqData: { path: '/pricing' }, resReq: true } }
+    ],
+    // Decision hook receives results from all concurrent phases
+    phaseDecisionHook: async ({ concurrentPhaseResults }) => {
+      const inventory = concurrentPhaseResults![0].responses[0]?.data;
+      const pricing = concurrentPhaseResults![1].responses[0]?.data;
+      
+      if (inventory.available && pricing.inBudget) {
+        return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+      }
+      return { action: PHASE_DECISION_ACTIONS.JUMP, targetPhaseId: 'out-of-stock' };
+    }
+  },
+  // This phase executes serially after the parallel group
+  {
+    id: 'process-order',
+    requests: [
+      { id: 'order', requestOptions: { reqData: { path: '/order' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'out-of-stock',
+    requests: [
+      { id: 'notify', requestOptions: { reqData: { path: '/notify' }, resReq: true } }
+    ]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'mixed-execution',
+  commonRequestData: { hostname: 'api.example.com' },
+  enableNonLinearExecution: true
+});
+```
+
+**Multiple Parallel Groups:**
+
+```typescript
+const phases: STABLE_WORKFLOW_PHASE[] = [
+  {
+    id: 'authenticate',
+    requests: [
+      { id: 'auth', requestOptions: { reqData: { path: '/auth' }, resReq: true } }
+    ]
+  },
+  // First parallel group: Data validation
+  {
+    id: 'validate-user',
+    markConcurrentPhase: true,
+    requests: [
+      { id: 'val-user', requestOptions: { reqData: { path: '/validate/user' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'validate-payment',
+    markConcurrentPhase: true,
+    requests: [
+      { id: 'val-pay', requestOptions: { reqData: { path: '/validate/payment' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'validate-shipping',
+    markConcurrentPhase: true,
+    requests: [
+      { id: 'val-ship', requestOptions: { reqData: { path: '/validate/shipping' }, resReq: true } }
+    ],
+    phaseDecisionHook: async ({ concurrentPhaseResults }) => {
+      const allValid = concurrentPhaseResults!.every(r => r.success && r.responses[0]?.data?.valid);
+      if (!allValid) {
+        return { action: PHASE_DECISION_ACTIONS.TERMINATE, metadata: { reason: 'Validation failed' } };
+      }
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    }
+  },
+  // Serial processing phase
+  {
+    id: 'calculate-total',
+    requests: [
+      { id: 'calc', requestOptions: { reqData: { path: '/calculate' }, resReq: true } }
+    ]
+  },
+  // Second parallel group: External integrations
+  {
+    id: 'notify-warehouse',
+    markConcurrentPhase: true,
+    requests: [
+      { id: 'warehouse', requestOptions: { reqData: { path: '/notify/warehouse' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'notify-shipping',
+    markConcurrentPhase: true,
+    requests: [
+      { id: 'shipping', requestOptions: { reqData: { path: '/notify/shipping' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'update-inventory',
+    markConcurrentPhase: true,
+    requests: [
+      { id: 'inventory', requestOptions: { reqData: { path: '/update/inventory' }, resReq: true } }
+    ]
+  },
+  // Final serial phase
+  {
+    id: 'finalize',
+    requests: [
+      { id: 'final', requestOptions: { reqData: { path: '/finalize' }, resReq: true } }
+    ]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'multi-parallel-workflow',
+  commonRequestData: { hostname: 'api.example.com' },
+  enableNonLinearExecution: true
+});
+
+console.log('Execution order demonstrates mixed serial/parallel execution');
+```
+
+**Decision Making with Concurrent Results:**
+
+```typescript
+const phases: STABLE_WORKFLOW_PHASE[] = [
+  {
+    id: 'api-check-1',
+    markConcurrentPhase: true,
+    requests: [
+      { id: 'api1', requestOptions: { reqData: { path: '/health/api1' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'api-check-2',
+    markConcurrentPhase: true,
+    requests: [
+      { id: 'api2', requestOptions: { reqData: { path: '/health/api2' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'api-check-3',
+    markConcurrentPhase: true,
+    requests: [
+      { id: 'api3', requestOptions: { reqData: { path: '/health/api3' }, resReq: true } }
+    ],
+    phaseDecisionHook: async ({ concurrentPhaseResults, sharedBuffer }) => {
+      // Aggregate results from all parallel phases
+      const healthScores = concurrentPhaseResults!.map(result => 
+        result.responses[0]?.data?.score || 0
+      );
+      
+      const averageScore = healthScores.reduce((a, b) => a + b, 0) / healthScores.length;
+      sharedBuffer!.healthScore = averageScore;
+      
+      if (averageScore > 0.8) {
+        return { action: PHASE_DECISION_ACTIONS.JUMP, targetPhaseId: 'optimal-path' };
+      } else if (averageScore > 0.5) {
+        return { action: PHASE_DECISION_ACTIONS.CONTINUE };  // Go to degraded-path
+      } else {
+        return { action: PHASE_DECISION_ACTIONS.JUMP, targetPhaseId: 'fallback-path' };
+      }
+    }
+  },
+  {
+    id: 'degraded-path',
+    requests: [
+      { id: 'degraded', requestOptions: { reqData: { path: '/degraded' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'optimal-path',
+    requests: [
+      { id: 'optimal', requestOptions: { reqData: { path: '/optimal' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'fallback-path',
+    requests: [
+      { id: 'fallback', requestOptions: { reqData: { path: '/fallback' }, resReq: true } }
+    ]
+  }
+];
+
+const sharedBuffer = {};
+const result = await stableWorkflow(phases, {
+  workflowId: 'adaptive-routing',
+  commonRequestData: { hostname: 'api.example.com' },
+  enableNonLinearExecution: true,
+  sharedBuffer
+});
+
+console.log('Average health score:', sharedBuffer.healthScore);
+```
+
+**Error Handling in Parallel Groups:**
+
+```typescript
+const phases: STABLE_WORKFLOW_PHASE[] = [
+  {
+    id: 'critical-check',
+    markConcurrentPhase: true,
+    requests: [
+      { 
+        id: 'check1',
+        requestOptions: { 
+          reqData: { path: '/critical/check1' },
+          resReq: true,
+          attempts: 3
+        }
+      }
+    ]
+  },
+  {
+    id: 'optional-check',
+    markConcurrentPhase: true,
+    requests: [
+      { 
+        id: 'check2',
+        requestOptions: { 
+          reqData: { path: '/optional/check2' },
+          resReq: true,
+          attempts: 1,
+          finalErrorAnalyzer: async () => true  // Suppress errors
+        }
+      }
+    ],
+    phaseDecisionHook: async ({ concurrentPhaseResults }) => {
+      // Check if critical phase succeeded
+      const criticalSuccess = concurrentPhaseResults![0].success;
+      
+      if (!criticalSuccess) {
+        return { 
+          action: PHASE_DECISION_ACTIONS.TERMINATE,
+          metadata: { reason: 'Critical check failed' }
+        };
+      }
+      
+      // Continue even if optional check failed
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    }
+  },
+  {
+    id: 'process',
+    requests: [
+      { id: 'process', requestOptions: { reqData: { path: '/process' }, resReq: true } }
+    ]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'resilient-parallel',
+  commonRequestData: { hostname: 'api.example.com' },
+  enableNonLinearExecution: true,
+  stopOnFirstPhaseError: false  // Continue even with phase errors
+});
+```
+
+**Key Points:**
+- Only **consecutive phases** with `markConcurrentPhase: true` execute in parallel
+- The **last phase** in a concurrent group can have a `phaseDecisionHook` that receives `concurrentPhaseResults`
+- Parallel groups are separated by phases **without** `markConcurrentPhase` (or phases with it set to false)
+- All decision actions work with parallel groups except `REPLAY` (not supported for concurrent groups)
+- Error handling follows normal workflow rules - use `stopOnFirstPhaseError` to control behavior
+
+#### Configuration Options
+
+**Workflow Options:**
+- `enableNonLinearExecution`: Enable non-linear workflow (required)
+- `maxWorkflowIterations`: Maximum total iterations (default: 1000)
+- `handlePhaseDecision`: Called when phase makes a decision
+- `stopOnFirstPhaseError`: Stop on phase failure (default: false)
+
+**Phase Options:**
+- `phaseDecisionHook`: Function returning `PhaseExecutionDecision`
+- `allowReplay`: Allow phase replay (default: false)
+- `allowSkip`: Allow phase skip (default: false)
+- `maxReplayCount`: Maximum replays (default: Infinity)
+
+**Decision Hook Parameters:**
+```typescript
+interface PhaseDecisionHookOptions {
+  workflowId: string;
+  phaseResult: STABLE_WORKFLOW_PHASE_RESULT;
+  phaseId: string;
+  phaseIndex: number;
+  executionHistory: PhaseExecutionRecord[];
+  sharedBuffer?: Record<string, any>;
+  params?: any;
+}
+```
+
+**Decision Object:**
+```typescript
+interface PhaseExecutionDecision {
+  action: PHASE_DECISION_ACTIONS;
+  targetPhaseId?: string;
+  replayCount?: number;
+  metadata?: Record<string, any>;
+}
+```
 
 ### Retry Strategies
 
@@ -952,83 +1594,11 @@ console.log('Products:', result.data.products?.length);
 console.log('Orders:', result.data.orders?.length);
 ```
 
-## Configuration Options
-
-### Request Data Configuration
-
-```typescript
-interface REQUEST_DATA<RequestDataType> {
-  hostname: string;
-  protocol?: 'http' | 'https';  // default: 'https'
-  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';  // default: 'GET'
-  path?: `/${string}`;
-  port?: number;  // default: 443
-  headers?: Record<string, any>;
-  body?: RequestDataType;
-  query?: Record<string, any>;
-  timeout?: number;  // default: 15000ms
-  signal?: AbortSignal;
-}
-```
-
-### Retry Configuration
-
-```typescript
-interface RetryConfig {
-  attempts?: number;  // default: 1
-  wait?: number;  // default: 1000ms
-  maxAllowedWait?: number;  // default: 60000ms
-  retryStrategy?: 'fixed' | 'linear' | 'exponential';  // default: 'fixed'
-  performAllAttempts?: boolean;  // default: false
-}
-```
-
-### Circuit Breaker Configuration
-
-```typescript
-interface CircuitBreakerConfig {
-  failureThresholdPercentage: number;  // 0-100
-  minimumRequests: number;
-  recoveryTimeoutMs: number;
-  trackIndividualAttempts?: boolean;  // default: false
-}
-```
-
-### Rate Limit Configuration
-
-```typescript
-interface RateLimitConfig {
-  maxRequests: number;
-  windowMs: number;
-}
-```
-
-### Cache Configuration
-
-```typescript
-interface CacheConfig {
-  enabled: boolean;
-  ttl?: number;  // milliseconds, default: 300000 (5 minutes)
-}
-```
-
-### Pre-Execution Configuration
-
-```typescript
-interface RequestPreExecutionOptions {
-  preExecutionHook: (options: PreExecutionHookOptions) => any | Promise<any>;
-  preExecutionHookParams?: any;
-  applyPreExecutionConfigOverride?: boolean;  // default: false
-  continueOnPreExecutionHookFailure?: boolean;  // default: false
-}
-```
-
 ## License
 
 MIT © Manish Varma
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
 ---
 
 **Made with ❤️ for developers integrating with unreliable APIs**
