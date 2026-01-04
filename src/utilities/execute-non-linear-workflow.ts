@@ -2,9 +2,9 @@ import { executePhase } from './execute-phase.js';
 import { safelyExecuteUnknownFunction } from './safely-execute-unknown-function.js';
 import { PHASE_DECISION_ACTIONS } from '../enums/index.js';
 import {
+  EXECUTE_NON_LINEAR_WORKFLOW_RESPONSE,
   NonLinearWorkflowContext,
   STABLE_WORKFLOW_PHASE, 
-  STABLE_WORKFLOW_RESULT,
   PhaseExecutionDecision,
   PhaseExecutionRecord,
   STABLE_WORKFLOW_PHASE_RESULT
@@ -12,15 +12,7 @@ import {
 
 export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDataType = any>(
   context: NonLinearWorkflowContext<RequestDataType, ResponseDataType>
-): Promise<{
-  phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
-  executionHistory: PhaseExecutionRecord[];
-  totalRequests: number;
-  successfulRequests: number;
-  failedRequests: number;
-  terminatedEarly: boolean;
-  terminationReason?: string;
-}> {
+): Promise<EXECUTE_NON_LINEAR_WORKFLOW_RESPONSE<ResponseDataType>> {
   const {
     phases,
     workflowId,

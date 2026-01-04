@@ -237,6 +237,7 @@ export interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType =
   ) => PhaseExecutionDecision | Promise<PhaseExecutionDecision>;
   commonConfig?: Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, 
     'concurrentExecution' | 'stopOnFirstError' | 'requestGroups' | "maxConcurrentRequests" | "rateLimit" | "circuitBreaker">;
+  branchId?: string;
 }
 
 export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType = any> 
@@ -246,6 +247,8 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   stopOnFirstPhaseError?: boolean;
   logPhaseResults?: boolean;
   concurrentPhaseExecution?: boolean;
+  enableBranchExecution?: boolean;
+  branches?: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>[];
   enableMixedExecution?: boolean;
   enableNonLinearExecution?: boolean;
   maxWorkflowIterations?: number;
@@ -258,6 +261,13 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   handlePhaseDecision?: (
     decision: PhaseExecutionDecision,
     phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>
+  ) => any | Promise<any>;
+  handleBranchCompletion?: (
+    options: {
+      branchId: string;
+      branchResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
+      success: boolean;
+    }
   ) => any | Promise<any>;
   maxSerializableChars?: number;
   workflowHookParams?: WorkflowHookParams;
@@ -291,6 +301,7 @@ export interface STABLE_WORKFLOW_RESULT<ResponseDataType = any> {
   failedRequests: number;
   phases: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
   executionHistory: PhaseExecutionRecord[];
+  branches?: BranchExecutionResult<ResponseDataType>[];
   terminatedEarly?: boolean;
   terminationReason?: string;
   error?: string;
@@ -388,4 +399,75 @@ export interface NonLinearWorkflowContext<RequestDataType, ResponseDataType> {
   sharedBuffer?: Record<string, any>;
   stopOnFirstPhaseError: boolean;
   maxWorkflowIterations: number;
+}
+
+export interface EXECUTE_NON_LINEAR_WORKFLOW_RESPONSE<ResponseDataType = any> {
+  phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
+  executionHistory: PhaseExecutionRecord[];
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  terminatedEarly: boolean;
+  terminationReason?: string;
+}
+
+export interface STABLE_WORKFLOW_BRANCH<RequestDataType = any, ResponseDataType = any> {
+  id: string;
+  phases: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>[];
+  executeInParallel?: boolean;
+  branchDecisionHook?: (
+    options: BranchDecisionHookOptions<ResponseDataType>
+  ) => BranchExecutionDecision | Promise<BranchExecutionDecision>;
+}
+
+export interface BranchDecisionHookOptions<ResponseDataType = any> {
+  workflowId: string;
+  branchResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
+  branchId: string;
+  executionHistory: PhaseExecutionRecord[];
+  sharedBuffer?: Record<string, any>;
+  params?: any;
+  parallelBranchResults?: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[][]; // Results from parallel branches
+}
+
+export interface BranchExecutionDecision {
+  action: PHASE_DECISION_ACTIONS;
+  targetBranchId?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface BranchExecutionResult<ResponseDataType = any> {
+  branchId: string;
+  success: boolean;
+  executionTime: number;
+  completedPhases: number;
+  phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
+  decision?: BranchExecutionDecision;
+}
+
+export interface BranchWorkflowContext<RequestDataType = any, ResponseDataType = any> {
+  branches: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>[];
+  workflowId: string;
+  commonGatewayOptions: any;
+  requestGroups: any[];
+  logPhaseResults: boolean;
+  handlePhaseCompletion: Function;
+  handlePhaseError?: Function;
+  handleBranchCompletion?: Function;
+  maxSerializableChars: number;
+  workflowHookParams: any;
+  sharedBuffer?: Record<string, any>;
+  stopOnFirstPhaseError: boolean;
+  maxWorkflowIterations: number;
+}
+
+export interface EXECUTE_BRANCH_WORKFLOW_RESPONSE<ResponseDataType = any> {
+  branchResults: BranchExecutionResult<ResponseDataType>[];
+  allPhaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
+  executionHistory: PhaseExecutionRecord[];
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  terminatedEarly: boolean;
+  terminationReason?: string;
 }

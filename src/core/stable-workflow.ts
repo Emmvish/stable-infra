@@ -4,6 +4,7 @@ import {
     STABLE_WORKFLOW_RESULT
 } from '../types/index.js';
 import { 
+    executeBranchWorkflow,
     executePhase,
     executeNonLinearWorkflow,
     safelyExecuteUnknownFunction, 
@@ -35,13 +36,16 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 safelyStringify({ error, phaseResult }, maxSerializableChars)
             ),
         handlePhaseDecision,
+        handleBranchCompletion,
         maxSerializableChars = 1000,
         requestGroups = [],
         workflowHookParams = {},
         concurrentPhaseExecution = false,
         enableMixedExecution = false,
+        enableBranchExecution = false,
         enableNonLinearExecution = false,
         maxWorkflowIterations = 1000,
+        branches,
         ...commonGatewayOptions
     } = options;
 
@@ -61,6 +65,56 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
         : commonGatewayOptions;
 
     try {
+        if (enableBranchExecution && branches && branches.length > 0) {
+            if (logPhaseResults) {
+                console.info(
+                    `\nstable-request: [Workflow: ${workflowId}] Starting branch-based workflow execution with ${branches.length} branches`
+                );
+            }
+
+            const branchResult = await executeBranchWorkflow({
+                branches,
+                workflowId,
+                commonGatewayOptions: commonGatewayOptionsWithBreaker,
+                requestGroups,
+                logPhaseResults,
+                handlePhaseCompletion,
+                handlePhaseError,
+                handleBranchCompletion,
+                maxSerializableChars,
+                workflowHookParams,
+                sharedBuffer: options.sharedBuffer,
+                stopOnFirstPhaseError,
+                maxWorkflowIterations
+            });
+
+            phaseResults.push(...branchResult.allPhaseResults);
+            totalRequests = branchResult.totalRequests;
+            successfulRequests = branchResult.successfulRequests;
+            failedRequests = branchResult.failedRequests;
+
+            const workflowExecutionTime = Date.now() - workflowStartTime;
+            const workflowSuccess = failedRequests === 0;
+
+            return {
+                workflowId,
+                success: workflowSuccess,
+                executionTime: workflowExecutionTime,
+                timestamp: new Date(workflowStartTime).toISOString(),
+                totalPhases: branchResult.allPhaseResults.length,
+                completedPhases: branchResult.allPhaseResults.length,
+                totalRequests,
+                successfulRequests,
+                failedRequests,
+                phases: phaseResults,
+                executionHistory: branchResult.executionHistory,
+                branches: branchResult.branchResults,
+                terminatedEarly: branchResult.terminatedEarly,
+                terminationReason: branchResult.terminationReason
+            };
+        }
+
+
         if (enableNonLinearExecution) {
             if (logPhaseResults) {
                 console.info(

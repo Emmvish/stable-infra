@@ -2,6 +2,7 @@ export { CacheManager, getGlobalCacheManager, resetGlobalCacheManager } from './
 export { CircuitBreaker, CircuitBreakerOpenError } from './circuit-breaker.js';
 export { ConcurrencyLimiter } from './concurrency-limiter.js';
 export { delay } from './delay.js';
+export { executeBranchWorkflow } from './execute-branch-workflow.js';
 export { executeConcurrently } from './execute-concurrently.js';
 export { executeNonLinearWorkflow } from './execute-non-linear-workflow.js';
 export { executePhase } from './execute-phase.js';
