@@ -1,6 +1,6 @@
 {
   "name": "@emmvish/stable-request",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "stable-request is a TypeScript-first HTTP workflow execution engine for real-world distributed systems — where HTTP 200 OK does not guarantee business success, and HTTP failures still deserve structured, actionable responses.",
   "type": "module",
   "main": "dist/index.js",
