@@ -44,6 +44,7 @@ Start small and scale.
 - [Quick Start](#quick-start)
 - [Advanced Features](#advanced-features)
   - [Non-Linear Workflows](#non-linear-workflows)
+  - [Branched Workflows](#branched-workflows)
   - [Retry Strategies](#retry-strategies)
   - [Circuit Breaker](#circuit-breaker)
   - [Rate Limiting](#rate-limiting)
@@ -74,6 +75,7 @@ npm install @emmvish/stable-request
 - ✅ **Response Caching**: Built-in TTL-based caching with global cache manager
 - ✅ **Batch Processing**: Execute multiple requests concurrently or sequentially via API Gateway
 - ✅ **Multi-Phase Non-Linear Workflows**: Orchestrate complex request workflows with phase dependencies
+- ✅ **Branched Workflows**: Execute parallel or serial branches with conditional routing and decision hooks
 - ✅ **Pre-Execution Hooks**: Transform requests before execution with dynamic configuration
 - ✅ **Shared Buffer**: Share state across requests in workflows and gateways
 - ✅ **Request Grouping**: Apply different configurations to request groups
@@ -553,6 +555,525 @@ const result = await stableWorkflow(phases, {
 
 if (result.terminatedEarly && result.terminationReason?.includes('iterations')) {
   console.error('Workflow hit iteration limit - possible infinite loop');
+}
+```
+
+### Branched Workflows
+
+Branched workflows enable orchestration of complex business logic by organizing phases into branches that can execute in parallel or serial order. Each branch is a self-contained workflow with its own phases, and branches can make decisions to control execution flow using JUMP, TERMINATE, or CONTINUE actions.
+
+#### Why Branched Workflows?
+
+- **Organize complex logic**: Group related phases into logical branches
+- **Parallel processing**: Execute independent branches concurrently for better performance
+- **Conditional routing**: Branches can decide whether to continue, jump to other branches, or terminate
+- **Clean architecture**: Separate concerns into distinct branches (validation, processing, error handling)
+- **Shared state**: Branches share a common buffer for state management
+
+#### Basic Branched Workflow
+
+```typescript
+import { stableWorkflow, STABLE_WORKFLOW_BRANCH } from '@emmvish/stable-request';
+
+const branches: STABLE_WORKFLOW_BRANCH[] = [
+  {
+    id: 'validation',
+    phases: [
+      {
+        id: 'validate-input',
+        requests: [
+          { id: 'validate', requestOptions: { reqData: { path: '/validate' }, resReq: true } }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'processing',
+    phases: [
+      {
+        id: 'process-data',
+        requests: [
+          { id: 'process', requestOptions: { reqData: { path: '/process' }, resReq: true } }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'finalization',
+    phases: [
+      {
+        id: 'finalize',
+        requests: [
+          { id: 'final', requestOptions: { reqData: { path: '/finalize' }, resReq: true } }
+        ]
+      }
+    ]
+  }
+];
+
+const result = await stableWorkflow([], {
+  workflowId: 'branched-workflow',
+  commonRequestData: { hostname: 'api.example.com' },
+  branches,
+  executeBranchesConcurrently: false,  // Execute branches serially
+  sharedBuffer: {}
+});
+
+console.log('Branches executed:', result.branches?.length);
+```
+
+#### Parallel vs Serial Branch Execution
+
+```typescript
+// Parallel execution - all branches run concurrently
+const result = await stableWorkflow([], {
+  workflowId: 'parallel-branches',
+  commonRequestData: { hostname: 'api.example.com' },
+  branches: [
+    { id: 'fetch-users', phases: [/* ... */] },
+    { id: 'fetch-products', phases: [/* ... */] },
+    { id: 'fetch-orders', phases: [/* ... */] }
+  ],
+  executeBranchesConcurrently: true,  // Parallel execution
+  sharedBuffer: {}
+});
+
+// Serial execution - branches run one after another
+const result = await stableWorkflow([], {
+  workflowId: 'serial-branches',
+  commonRequestData: { hostname: 'api.example.com' },
+  branches: [
+    { id: 'authenticate', phases: [/* ... */] },
+    { id: 'fetch-data', phases: [/* ... */] },
+    { id: 'process', phases: [/* ... */] }
+  ],
+  executeBranchesConcurrently: false,  // Serial execution
+  sharedBuffer: {}
+});
+```
+
+#### Branch Decision Hooks
+
+Each branch can have a decision hook to control workflow execution:
+
+```typescript
+import { BRANCH_DECISION_ACTIONS } from '@emmvish/stable-request';
+
+const branches: STABLE_WORKFLOW_BRANCH[] = [
+  {
+    id: 'validation',
+    phases: [
+      {
+        id: 'validate',
+        requests: [
+          { id: 'val', requestOptions: { reqData: { path: '/validate' }, resReq: true } }
+        ]
+      }
+    ],
+    branchDecisionHook: async ({ branchResult, sharedBuffer }) => {
+      const isValid = branchResult.phases[0]?.responses[0]?.data?.valid;
+      
+      if (!isValid) {
+        return {
+          action: BRANCH_DECISION_ACTIONS.TERMINATE,
+          metadata: { reason: 'Validation failed' }
+        };
+      }
+      
+      sharedBuffer!.validated = true;
+      return { action: BRANCH_DECISION_ACTIONS.CONTINUE };
+    }
+  },
+  {
+    id: 'processing',
+    phases: [/* ... */]
+  }
+];
+
+const result = await stableWorkflow([], {
+  workflowId: 'validation-workflow',
+  commonRequestData: { hostname: 'api.example.com' },
+  branches,
+  executeBranchesConcurrently: false,
+  sharedBuffer: {}
+});
+
+if (result.terminatedEarly) {
+  console.log('Workflow terminated:', result.terminationReason);
+}
+```
+
+#### JUMP Action - Skip Branches
+
+```typescript
+const branches: STABLE_WORKFLOW_BRANCH[] = [
+  {
+    id: 'check-cache',
+    phases: [
+      {
+        id: 'cache-check',
+        requests: [
+          { id: 'check', requestOptions: { reqData: { path: '/cache/check' }, resReq: true } }
+        ]
+      }
+    ],
+    branchDecisionHook: async ({ branchResult, sharedBuffer }) => {
+      const cached = branchResult.phases[0]?.responses[0]?.data?.cached;
+      
+      if (cached) {
+        sharedBuffer!.cachedData = branchResult.phases[0]?.responses[0]?.data;
+        // Skip expensive computation, jump directly to finalize
+        return {
+          action: BRANCH_DECISION_ACTIONS.JUMP,
+          targetBranchId: 'finalize'
+        };
+      }
+      
+      return { action: BRANCH_DECISION_ACTIONS.CONTINUE };
+    }
+  },
+  {
+    id: 'expensive-computation',
+    phases: [
+      {
+        id: 'compute',
+        requests: [
+          { id: 'compute', requestOptions: { reqData: { path: '/compute' }, resReq: true } }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'save-cache',
+    phases: [
+      {
+        id: 'save',
+        requests: [
+          { id: 'save', requestOptions: { reqData: { path: '/cache/save' }, resReq: true } }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'finalize',
+    phases: [
+      {
+        id: 'final',
+        requests: [
+          { id: 'final', requestOptions: { reqData: { path: '/finalize' }, resReq: true } }
+        ]
+      }
+    ]
+  }
+];
+
+const result = await stableWorkflow([], {
+  workflowId: 'cache-optimization',
+  commonRequestData: { hostname: 'api.example.com' },
+  branches,
+  executeBranchesConcurrently: false,
+  sharedBuffer: {}
+});
+
+// If cache hit: check-cache → finalize (skips expensive-computation and save-cache)
+// If cache miss: check-cache → expensive-computation → save-cache → finalize
+```
+
+#### Conditional Branching
+
+```typescript
+const branches: STABLE_WORKFLOW_BRANCH[] = [
+  {
+    id: 'check-user-type',
+    phases: [
+      {
+        id: 'user-info',
+        requests: [
+          { id: 'user', requestOptions: { reqData: { path: '/user/info' }, resReq: true } }
+        ]
+      }
+    ],
+    branchDecisionHook: async ({ branchResult, sharedBuffer }) => {
+      const userType = branchResult.phases[0]?.responses[0]?.data?.type;
+      sharedBuffer!.userType = userType;
+      
+      if (userType === 'premium') {
+        return { action: BRANCH_DECISION_ACTIONS.JUMP, targetBranchId: 'premium-flow' };
+      } else if (userType === 'trial') {
+        return { action: BRANCH_DECISION_ACTIONS.JUMP, targetBranchId: 'trial-flow' };
+      }
+      
+      return { action: BRANCH_DECISION_ACTIONS.CONTINUE };  // free-flow
+    }
+  },
+  {
+    id: 'free-flow',
+    phases: [
+      {
+        id: 'free-data',
+        requests: [
+          { id: 'free', requestOptions: { reqData: { path: '/free/data' }, resReq: true } }
+        ]
+      }
+    ],
+    branchDecisionHook: async () => {
+      return { action: BRANCH_DECISION_ACTIONS.JUMP, targetBranchId: 'finalize' };
+    }
+  },
+  {
+    id: 'trial-flow',
+    phases: [
+      {
+        id: 'trial-data',
+        requests: [
+          { id: 'trial', requestOptions: { reqData: { path: '/trial/data' }, resReq: true } }
+        ]
+      }
+    ],
+    branchDecisionHook: async () => {
+      return { action: BRANCH_DECISION_ACTIONS.JUMP, targetBranchId: 'finalize' };
+    }
+  },
+  {
+    id: 'premium-flow',
+    phases: [
+      {
+        id: 'premium-data',
+        requests: [
+          { id: 'premium', requestOptions: { reqData: { path: '/premium/data' }, resReq: true } }
+        ]
+      }
+    ],
+    branchDecisionHook: async () => {
+      return { action: BRANCH_DECISION_ACTIONS.JUMP, targetBranchId: 'finalize' };
+    }
+  },
+  {
+    id: 'finalize',
+    phases: [
+      {
+        id: 'final',
+        requests: [
+          { id: 'final', requestOptions: { reqData: { path: '/finalize' }, resReq: true } }
+        ]
+      }
+    ]
+  }
+];
+
+const result = await stableWorkflow([], {
+  workflowId: 'user-type-routing',
+  commonRequestData: { hostname: 'api.example.com' },
+  branches,
+  executeBranchesConcurrently: false,
+  sharedBuffer: {}
+});
+```
+
+#### Retry Logic Within Branches
+
+```typescript
+const branches: STABLE_WORKFLOW_BRANCH[] = [
+  {
+    id: 'retry-branch',
+    phases: [
+      {
+        id: 'retry-phase',
+        commonConfig: {
+          commonAttempts: 5,
+          commonWait: 100,
+          commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+        },
+        requests: [
+          {
+            id: 'retry-req',
+            requestOptions: {
+              reqData: { path: '/unstable-endpoint' },
+              resReq: true
+            }
+          }
+        ]
+      }
+    ]
+  }
+];
+
+const result = await stableWorkflow([], {
+  workflowId: 'retry-workflow',
+  commonRequestData: { hostname: 'api.example.com' },
+  branches,
+  executeBranchesConcurrently: false
+});
+```
+
+#### Error Handling in Branches
+
+```typescript
+const branches: STABLE_WORKFLOW_BRANCH[] = [
+  {
+    id: 'risky-operation',
+    phases: [
+      {
+        id: 'operation',
+        requests: [
+          {
+            id: 'op',
+            requestOptions: {
+              reqData: { path: '/risky' },
+              resReq: true,
+              attempts: 3
+            }
+          }
+        ]
+      }
+    ],
+    branchDecisionHook: async ({ branchResult }) => {
+      if (!branchResult.success) {
+        return {
+          action: BRANCH_DECISION_ACTIONS.JUMP,
+          targetBranchId: 'error-handler'
+        };
+      }
+      return { action: BRANCH_DECISION_ACTIONS.JUMP, targetBranchId: 'success-handler' };
+    }
+  },
+  {
+    id: 'success-handler',
+    phases: [
+      {
+        id: 'success',
+        requests: [
+          { id: 'success', requestOptions: { reqData: { path: '/success' }, resReq: true } }
+        ]
+      }
+    ],
+    branchDecisionHook: async () => {
+      return { action: BRANCH_DECISION_ACTIONS.TERMINATE };
+    }
+  },
+  {
+    id: 'error-handler',
+    phases: [
+      {
+        id: 'error',
+        requests: [
+          { id: 'error', requestOptions: { reqData: { path: '/error' }, resReq: true } }
+        ]
+      }
+    ]
+  }
+];
+
+const result = await stableWorkflow([], {
+  workflowId: 'error-handling-workflow',
+  commonRequestData: { hostname: 'api.example.com' },
+  branches,
+  executeBranchesConcurrently: false,
+  stopOnFirstPhaseError: false  // Continue to error handler branch
+});
+```
+
+#### Branch Completion Hooks
+
+```typescript
+const result = await stableWorkflow([], {
+  workflowId: 'tracked-branches',
+  commonRequestData: { hostname: 'api.example.com' },
+  branches,
+  executeBranchesConcurrently: true,
+  handleBranchCompletion: ({ branchResult, workflowId }) => {
+    console.log(`[${workflowId}] Branch ${branchResult.branchId} completed:`, {
+      success: branchResult.success,
+      phases: branchResult.phases.length,
+      decision: branchResult.decision?.action
+    });
+  }
+});
+```
+
+#### Mixed Parallel and Serial Branches
+
+```typescript
+const branches: STABLE_WORKFLOW_BRANCH[] = [
+  {
+    id: 'init',
+    phases: [/* initialization */]
+  },
+  {
+    id: 'parallel-1',
+    markConcurrentBranch: true,
+    phases: [/* independent task 1 */]
+  },
+  {
+    id: 'parallel-2',
+    markConcurrentBranch: true,
+    phases: [/* independent task 2 */]
+  },
+  {
+    id: 'parallel-3',
+    markConcurrentBranch: true,
+    phases: [/* independent task 3 */],
+    branchDecisionHook: async ({ concurrentBranchResults }) => {
+      // All parallel branches completed, make decision
+      const allSuccessful = concurrentBranchResults!.every(b => b.success);
+      if (!allSuccessful) {
+        return { action: BRANCH_DECISION_ACTIONS.TERMINATE };
+      }
+      return { action: BRANCH_DECISION_ACTIONS.CONTINUE };
+    }
+  },
+  {
+    id: 'finalize',
+    phases: [/* finalization */]
+  }
+];
+
+const result = await stableWorkflow([], {
+  workflowId: 'mixed-execution',
+  commonRequestData: { hostname: 'api.example.com' },
+  branches,
+  executeBranchesConcurrently: false  // Base mode is serial
+});
+
+// Execution: init → [parallel-1, parallel-2, parallel-3] → finalize
+```
+
+#### Configuration Options
+
+**Workflow Options:**
+- `branches`: Array of branch definitions
+- `executeBranchesConcurrently`: Execute all branches in parallel (default: false)
+- `handleBranchCompletion`: Called when each branch completes
+
+**Branch Options:**
+- `id`: Unique branch identifier
+- `phases`: Array of phases to execute in this branch
+- `branchDecisionHook`: Function returning `BranchExecutionDecision`
+- `markConcurrentBranch`: Mark as part of concurrent group (default: false)
+
+**Branch Decision Actions:**
+- `CONTINUE`: Proceed to next branch
+- `JUMP`: Jump to specific branch by ID
+- `TERMINATE`: Stop workflow execution
+
+**Decision Hook Parameters:**
+```typescript
+interface BranchDecisionHookOptions {
+  workflowId: string;
+  branchResult: STABLE_WORKFLOW_BRANCH_RESULT;
+  branchId: string;
+  branchIndex: number;
+  sharedBuffer?: Record<string, any>;
+  concurrentBranchResults?: STABLE_WORKFLOW_BRANCH_RESULT[];  // For concurrent groups
+}
+```
+
+**Decision Object:**
+```typescript
+interface BranchExecutionDecision {
+  action: BRANCH_DECISION_ACTIONS;
+  targetBranchId?: string;
+  metadata?: Record<string, any>;
 }
 ```
 
@@ -1599,6 +2120,7 @@ console.log('Orders:', result.data.orders?.length);
 MIT © Manish Varma
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ---
 
 **Made with ❤️ for developers integrating with unreliable APIs**
