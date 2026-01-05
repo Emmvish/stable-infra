@@ -1,7 +1,7 @@
 {
   "name": "@emmvish/stable-request",
-  "version": "1.6.3",
-  "description": "stable-request is a TypeScript-first HTTP workflow execution engine for real-world distributed systems — where HTTP 200 OK does not guarantee business success, and HTTP failures still deserve structured, actionable responses.",
+  "version": "1.6.4",
+  "description": "A production-grade HTTP Workflow Execution Engine for Node.js that transforms unreliable API calls into resilient, observable, and sophisticated multi-phase workflows with intelligent retry strategies, circuit breakers, and advanced execution patterns.",
   "type": "module",
   "main": "dist/index.js",
   "module": "./dist/index.js",
