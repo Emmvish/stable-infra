@@ -61,8 +61,6 @@ npm install @emmvish/stable-request
 
 **Requirements**: Node.js 14+ (ES Modules)
 
-**Dependencies**: Built on [Axios](https://axios-http.com/) for HTTP requests
-
 ## Quick Start
 
 ### Single Request with Retry
@@ -70,15 +68,14 @@ npm install @emmvish/stable-request
 Execute a single HTTP request with automatic retry on failure:
 
 ```typescript
-import { stableRequest, RETRY_STRATEGIES, REQUEST_METHODS } from '@emmvish/stable-request';
+import { stableRequest, RETRY_STRATEGIES } from '@emmvish/stable-request';
 
 const userData = await stableRequest({
   reqData: {
     hostname: 'api.example.com',
     path: '/users/123',
-    method: REQUEST_METHODS.GET,
     headers: { 'Authorization': 'Bearer token' }
-  },
+  },                         // 'GET' is default HTTP method, if not specified
   resReq: true,              // Return response data
   attempts: 3,               // Retry up to 3 times
   wait: 1000,                // 1 second between retries
