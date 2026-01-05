@@ -21,6 +21,7 @@ export type {
     API_GATEWAY_RESPONSE,
     BranchDecisionHookOptions,
     BranchExecutionDecision,
+    BranchExecutionRecord,
     BranchExecutionResult,
     BranchWorkflowContext,
     CacheConfig,
