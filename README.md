@@ -5,11 +5,11 @@ A production-grade HTTP Workflow Execution Engine for Node.js that transforms un
 ## Navigation
 
 - [Overview](#overview)
-- [Why stable-request?](#why-stable-request-?)
+- [Why stable-request?](#why-stable-request)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
   - [Single Request with Retry](#single-request-with-retry)
-  - [Batch Requests (API Gateway)](#batch-requests-(-api-gateway-))
+  - [Batch Requests (API Gateway)](#batch-requests-api-gateway)
   - [Multi-Phase Workflow](#multi-phase-workflow)
 - [Core Features](#core-features)
   - [Intelligent Retry Strategies](#intelligent-retry-strategies)
