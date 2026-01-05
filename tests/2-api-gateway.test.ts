@@ -205,4 +205,96 @@ describe('stableApiGateway - Batch Processing', () => {
     expect(results).toEqual([]);
     expect(mockedAxios.request).not.toHaveBeenCalled();
   });
+
+  it('should stop on first error in concurrent execution when stopOnFirstError is true', async () => {
+    const executionOrder: string[] = [];
+    let requestCount = 0;
+
+    jest.spyOn(mockedAxios, 'request').mockImplementation(async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+      const path = config.url || '';
+      requestCount++;
+      executionOrder.push(path);
+      
+      // First request fails immediately, subsequent ones have delay
+      if (path.includes('fail')) {
+        throw {
+          response: { status: 500, data: 'Error' },
+          message: 'Server Error'
+        };
+      }
+      
+      // Add delay to subsequent requests
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      return {
+        status: 200,
+        data: { success: true, path },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      };
+    });
+
+    const requests = [
+      { id: 'req-1', requestOptions: { reqData: { path: '/fail' }, resReq: true } }, // Fails first
+      { id: 'req-2', requestOptions: { reqData: { path: '/success1' }, resReq: true } },
+      { id: 'req-3', requestOptions: { reqData: { path: '/success2' }, resReq: true } },
+      { id: 'req-4', requestOptions: { reqData: { path: '/success3' }, resReq: true } },
+      { id: 'req-5', requestOptions: { reqData: { path: '/success4' }, resReq: true } }
+    ] satisfies API_GATEWAY_REQUEST[];
+
+    const results = await stableApiGateway(requests, {
+      concurrentExecution: true,
+      stopOnFirstError: true,
+      commonRequestData: {
+        hostname: 'api.example.com'
+      }
+    });
+
+    // Should have stopped launching new requests after detecting the error
+    // The first request fails, so subsequent requests should not all be launched
+    expect(results.length).toBeLessThan(requests.length);
+    expect(results[0].success).toBe(false);
+    expect(results[0].requestId).toBe('req-1');
+  });
+
+  it('should execute all requests in concurrent mode when stopOnFirstError is false', async () => {
+    mockedAxios.request
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { success: true },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      })
+      .mockRejectedValueOnce({
+        response: { status: 500, data: 'Error' },
+        message: 'Server Error'
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { success: true },
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      });
+
+    const requests = [
+      { id: 'req-1', requestOptions: { reqData: { path: '/success1' }, resReq: true } },
+      { id: 'req-2', requestOptions: { reqData: { path: '/fail' }, resReq: true } },
+      { id: 'req-3', requestOptions: { reqData: { path: '/success2' }, resReq: true } }
+    ] satisfies API_GATEWAY_REQUEST[];
+
+    const results = await stableApiGateway(requests, {
+      concurrentExecution: true,
+      stopOnFirstError: false, // Explicitly false
+      commonRequestData: {
+        hostname: 'api.example.com'
+      }
+    });
+
+    // All requests should have been executed
+    expect(results).toHaveLength(3);
+    expect(mockedAxios.request).toHaveBeenCalledTimes(3);
+  });
 });
