@@ -37,6 +37,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
             ),
         handlePhaseDecision,
         handleBranchCompletion,
+        handleBranchDecision,
         maxSerializableChars = 1000,
         requestGroups = [],
         workflowHookParams = {},
@@ -81,6 +82,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 handlePhaseCompletion,
                 handlePhaseError,
                 handleBranchCompletion,
+                handleBranchDecision,
                 maxSerializableChars,
                 workflowHookParams,
                 sharedBuffer: options.sharedBuffer,
@@ -109,6 +111,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 phases: phaseResults,
                 executionHistory: branchResult.executionHistory,
                 branches: branchResult.branchResults,
+                branchExecutionHistory: branchResult.branchExecutionHistory,
                 terminatedEarly: branchResult.terminatedEarly,
                 terminationReason: branchResult.terminationReason
             };

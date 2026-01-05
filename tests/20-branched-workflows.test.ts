@@ -46,7 +46,7 @@ describe('Branched Workflows', () => {
       const branches: STABLE_WORKFLOW_BRANCH[] = [
         {
           id: 'branch-1',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'phase-1-1',
@@ -64,7 +64,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'branch-2',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'phase-2-1',
@@ -82,7 +82,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'branch-3',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'phase-3-1',
@@ -142,7 +142,7 @@ describe('Branched Workflows', () => {
       const branches: STABLE_WORKFLOW_BRANCH[] = [
         {
           id: 'branch-1',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'phase-1-1',
@@ -156,7 +156,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'branch-2',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'phase-2-1',
@@ -214,7 +214,7 @@ describe('Branched Workflows', () => {
       const branches: STABLE_WORKFLOW_BRANCH[] = [
         {
           id: 'branch-1',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 'phase-1',
@@ -224,7 +224,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'branch-2',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 'phase-2',
@@ -234,7 +234,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'branch-3',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 'phase-3',
@@ -283,7 +283,7 @@ describe('Branched Workflows', () => {
       const branches: STABLE_WORKFLOW_BRANCH[] = [
         {
           id: 'parallel-1',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'p1-phase',
@@ -293,7 +293,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'parallel-2',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'p2-phase',
@@ -303,7 +303,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'serial-1',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 's1-phase',
@@ -313,7 +313,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'serial-2',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 's2-phase',
@@ -366,7 +366,7 @@ describe('Branched Workflows', () => {
       const branches: STABLE_WORKFLOW_BRANCH[] = [
         {
           id: 'branch-1',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'phase-1',
@@ -380,7 +380,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'branch-2',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'phase-2',
@@ -419,7 +419,7 @@ describe('Branched Workflows', () => {
       const branches: STABLE_WORKFLOW_BRANCH[] = [
         {
           id: 'branch-1',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'phase-1',
@@ -439,7 +439,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'branch-2',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 'phase-2',
@@ -474,7 +474,7 @@ describe('Branched Workflows', () => {
       const branches: STABLE_WORKFLOW_BRANCH[] = [
         {
           id: 'branch-1',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 'phase-1',
@@ -490,7 +490,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'branch-2',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 'phase-2',
@@ -500,7 +500,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'branch-3',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 'phase-3',
@@ -563,7 +563,7 @@ describe('Branched Workflows', () => {
       const branches: STABLE_WORKFLOW_BRANCH[] = [
         {
           id: 'data-setter',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'set-phase',
@@ -578,7 +578,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'data-consumer',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 'consume-phase',
@@ -626,7 +626,7 @@ describe('Branched Workflows', () => {
       const branches: STABLE_WORKFLOW_BRANCH[] = [
         {
           id: 'branch-1',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'phase-1',
@@ -641,7 +641,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'branch-2',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'phase-2',
@@ -656,7 +656,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'branch-3',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 'phase-3',
@@ -704,7 +704,7 @@ describe('Branched Workflows', () => {
       const branches: STABLE_WORKFLOW_BRANCH[] = [
         {
           id: 'branch-1',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'phase-1',
@@ -714,7 +714,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'branch-2',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'phase-2',
@@ -766,7 +766,7 @@ describe('Branched Workflows', () => {
       const branches: STABLE_WORKFLOW_BRANCH[] = [
         {
           id: 'failing-branch',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'phase-1',
@@ -776,7 +776,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'success-branch',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'phase-2',
@@ -809,7 +809,7 @@ describe('Branched Workflows', () => {
       const branches: STABLE_WORKFLOW_BRANCH[] = [
         {
           id: 'branch-1',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 'phase-1',
@@ -819,7 +819,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'branch-2',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 'phase-2',
@@ -881,7 +881,7 @@ describe('Branched Workflows', () => {
       const branches: STABLE_WORKFLOW_BRANCH[] = [
         {
           id: 'validation',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'user-check',
@@ -896,7 +896,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'inventory-check',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [
             {
               id: 'inventory',
@@ -910,7 +910,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'decision',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 'decide',
@@ -932,7 +932,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'process-order',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 'validate',
@@ -953,7 +953,7 @@ describe('Branched Workflows', () => {
         },
         {
           id: 'error-handling',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 'error',
@@ -1019,7 +1019,7 @@ describe('Branched Workflows', () => {
       const branches: STABLE_WORKFLOW_BRANCH[] = [
         {
           id: 'retry-branch',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [
             {
               id: 'retry-phase',
@@ -1080,17 +1080,17 @@ describe('Branched Workflows', () => {
       const parallelBranches: STABLE_WORKFLOW_BRANCH[] = [
         {
           id: 'p1',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [{ id: 'ph1', requests: [{ id: 'r1', requestOptions: { reqData: { path: '/p1' }, resReq: true } }] }]
         },
         {
           id: 'p2',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [{ id: 'ph2', requests: [{ id: 'r2', requestOptions: { reqData: { path: '/p2' }, resReq: true } }] }]
         },
         {
           id: 'p3',
-          executeInParallel: true,
+          markConcurrentBranch: true,
           phases: [{ id: 'ph3', requests: [{ id: 'r3', requestOptions: { reqData: { path: '/p3' }, resReq: true } }] }]
         }
       ];
@@ -1111,17 +1111,17 @@ describe('Branched Workflows', () => {
       const serialBranches: STABLE_WORKFLOW_BRANCH[] = [
         {
           id: 's1',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [{ id: 'sh1', requests: [{ id: 'sr1', requestOptions: { reqData: { path: '/s1' }, resReq: true } }] }]
         },
         {
           id: 's2',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [{ id: 'sh2', requests: [{ id: 'sr2', requestOptions: { reqData: { path: '/s2' }, resReq: true } }] }]
         },
         {
           id: 's3',
-          executeInParallel: false,
+          markConcurrentBranch: false,
           phases: [{ id: 'sh3', requests: [{ id: 'sr3', requestOptions: { reqData: { path: '/s3' }, resReq: true } }] }]
         }
       ];

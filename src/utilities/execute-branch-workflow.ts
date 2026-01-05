@@ -8,7 +8,8 @@ import {
   BranchExecutionResult,
   BranchExecutionDecision,
   BranchWorkflowContext,
-  PhaseExecutionRecord
+  PhaseExecutionRecord,
+  BranchExecutionRecord
 } from '../types/index.js';
 
 export async function executeBranchWorkflow<RequestDataType = any, ResponseDataType = any>(
@@ -23,6 +24,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     handlePhaseCompletion,
     handlePhaseError = () => {},
     handleBranchCompletion,
+    handleBranchDecision,
     maxSerializableChars,
     workflowHookParams,
     sharedBuffer,
@@ -33,60 +35,228 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
   const branchResults: BranchExecutionResult<ResponseDataType>[] = [];
   const allPhaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[] = [];
   const executionHistory: PhaseExecutionRecord[] = [];
+  const branchExecutionHistory: BranchExecutionRecord[] = [];
+  const branchExecutionCounts: Map<string, number> = new Map();
   
   let totalRequests = 0;
   let successfulRequests = 0;
   let failedRequests = 0;
   let terminatedEarly = false;
   let terminationReason: string | undefined;
+  let iterationCount = 0;
 
-  const parallelBranches: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>[] = [];
-  const serialBranches: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>[] = [];
-
-  branches.forEach(branch => {
-    if (branch.executeInParallel) {
-      parallelBranches.push(branch);
-    } else {
-      serialBranches.push(branch);
-    }
-  });
-
-  if (parallelBranches.length > 0) {
-    if (logPhaseResults) {
-      console.info(
-        `\nstable-request: [Workflow: ${workflowId}] Executing ${parallelBranches.length} branches in parallel: [${parallelBranches.map(b => b.id).join(', ')}]`
-      );
+  const mergeBranchConfig = (branch: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>) => {
+    if (!branch.commonConfig) {
+      return commonGatewayOptions;
     }
 
-    const parallelPromises = parallelBranches.map(async (branch) => {
-      const branchStartTime = Date.now();
+    return {
+      ...commonGatewayOptions,
+      ...branch.commonConfig
+    };
+  };
+
+  const executeSingleBranch = async (
+    branch: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>,
+    branchIndex: number,
+    executionNumber: number
+  ) => {
+    const branchStartTime = Date.now();
+    
+    try {
+      const branchConfig = mergeBranchConfig(branch);
       
-      try {
-        const result = await executeNonLinearWorkflow({
-          phases: branch.phases,
-          workflowId: `${workflowId}-branch-${branch.id}`,
-          commonGatewayOptions,
-          requestGroups,
-          logPhaseResults,
-          handlePhaseCompletion,
-          handlePhaseError,
-          handlePhaseDecision: workflowHookParams?.handlePhaseDecision,
-          maxSerializableChars,
-          workflowHookParams,
-          sharedBuffer,
-          stopOnFirstPhaseError,
-          maxWorkflowIterations
+      const result = await executeNonLinearWorkflow({
+        phases: branch.phases,
+        workflowId: `${workflowId}-branch-${branch.id}`,
+        commonGatewayOptions: branchConfig,
+        requestGroups,
+        logPhaseResults,
+        handlePhaseCompletion,
+        handlePhaseError,
+        handlePhaseDecision: workflowHookParams?.handlePhaseDecision,
+        maxSerializableChars,
+        workflowHookParams,
+        sharedBuffer,
+        stopOnFirstPhaseError,
+        maxWorkflowIterations
+      });
+
+      const branchExecutionTime = Date.now() - branchStartTime;
+
+      const branchResult: BranchExecutionResult<ResponseDataType> = {
+        branchId: branch.id,
+        branchIndex,
+        success: result.failedRequests === 0,
+        executionTime: branchExecutionTime,
+        completedPhases: result.phaseResults.length,
+        phaseResults: result.phaseResults,
+        executionNumber
+      };
+
+      return {
+        branchResult,
+        phaseResults: result.phaseResults,
+        executionHistory: result.executionHistory,
+        totalRequests: result.totalRequests,
+        successfulRequests: result.successfulRequests,
+        failedRequests: result.failedRequests
+      };
+    } catch (error: any) {
+      console.error(
+        `stable-request: [Workflow: ${workflowId}] Branch ${branch.id} failed:`,
+        error
+      );
+
+      return {
+        branchResult: {
+          branchId: branch.id,
+          branchIndex,
+          success: false,
+          executionTime: Date.now() - branchStartTime,
+          completedPhases: 0,
+          phaseResults: [],
+          executionNumber,
+          error: error?.message || 'Branch execution failed',
+          decision: undefined
+        },
+        phaseResults: [],
+        executionHistory: [],
+        totalRequests: 0,
+        successfulRequests: 0,
+        failedRequests: 1
+      };
+    }
+  };
+
+  let currentBranchId: string | null = branches[0]?.id || null;
+
+  while (currentBranchId !== null && iterationCount < maxWorkflowIterations) {
+    iterationCount++;
+
+    const branchIndex = branches.findIndex(b => b.id === currentBranchId);
+    if (branchIndex === -1) {
+      console.error(
+        `stable-request: [Workflow: ${workflowId}] Branch '${currentBranchId}' not found`
+      );
+      terminatedEarly = true;
+      terminationReason = `Branch '${currentBranchId}' not found`;
+      break;
+    }
+
+    const currentBranch = branches[branchIndex];
+    const executionNumber = (branchExecutionCounts.get(currentBranchId) || 0) + 1;
+    branchExecutionCounts.set(currentBranchId, executionNumber);
+
+    const maxReplayCount = currentBranch.maxReplayCount ?? Infinity;
+    if (executionNumber > maxReplayCount + 1) {
+      if (logPhaseResults) {
+        console.warn(
+          `stable-request: [Workflow: ${workflowId}] Branch '${currentBranchId}' exceeded max replay count (${maxReplayCount}). Skipping.`
+        );
+      }
+
+      const skippedResult: BranchExecutionResult<ResponseDataType> = {
+        branchId: currentBranchId,
+        branchIndex,
+        success: false,
+        executionTime: 0,
+        completedPhases: 0,
+        phaseResults: [],
+        executionNumber,
+        skipped: true,
+        error: `Exceeded max replay count of ${maxReplayCount}`
+      };
+
+      branchResults.push(skippedResult);
+
+      branchExecutionHistory.push({
+        branchId: currentBranchId,
+        branchIndex,
+        executionNumber,
+        timestamp: new Date().toISOString(),
+        success: false,
+        executionTime: 0
+      });
+
+      currentBranchId = branches[branchIndex + 1]?.id || null;
+      continue;
+    }
+
+    const isConcurrent = currentBranch.markConcurrentBranch;
+    
+    if (isConcurrent) {
+      const concurrentGroup: { 
+        branch: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>; 
+        index: number;
+        executionNumber: number;
+      }[] = [
+        { branch: currentBranch, index: branchIndex, executionNumber }
+      ];
+      
+      let j = branchIndex + 1;
+      while (j < branches.length && branches[j].markConcurrentBranch) {
+        const concurrentBranch = branches[j];
+        const concurrentExecNum = (branchExecutionCounts.get(concurrentBranch.id) || 0) + 1;
+        branchExecutionCounts.set(concurrentBranch.id, concurrentExecNum);
+        concurrentGroup.push({ branch: concurrentBranch, index: j, executionNumber: concurrentExecNum });
+        j++;
+      }
+
+      if (logPhaseResults) {
+        const branchIds = concurrentGroup.map(({ branch }) => branch.id).join(', ');
+        console.info(
+          `\nstable-request: [Workflow: ${workflowId}] Executing ${concurrentGroup.length} branches in parallel: [${branchIds}]`
+        );
+      }
+
+      const groupPromises = concurrentGroup.map(({ branch, index, executionNumber }) => 
+        executeSingleBranch(branch, index, executionNumber)
+      );
+      const groupResults = await Promise.all(groupPromises);
+
+      const concurrentBranchResults: BranchExecutionResult<ResponseDataType>[] = [];
+      let concurrentGroupJumpTarget: string | null = null;
+      let concurrentGroupSkipTarget: string | null = null;
+      let shouldTerminate = false;
+      
+      for (let k = 0; k < groupResults.length; k++) {
+        const result = groupResults[k];
+        const { branch, index, executionNumber } = concurrentGroup[k];
+        
+        concurrentBranchResults.push(result.branchResult);
+        branchResults.push(result.branchResult);
+        allPhaseResults.push(...result.phaseResults);
+        executionHistory.push(...result.executionHistory);
+        totalRequests += result.totalRequests;
+        successfulRequests += result.successfulRequests;
+        failedRequests += result.failedRequests;
+        branchExecutionHistory.push({
+          branchId: branch.id,
+          branchIndex: index,
+          executionNumber,
+          timestamp: new Date().toISOString(),
+          success: result.branchResult.success,
+          executionTime: result.branchResult.executionTime
         });
 
-        const branchExecutionTime = Date.now() - branchStartTime;
-
-        const branchResult: BranchExecutionResult<ResponseDataType> = {
-          branchId: branch.id,
-          success: result.failedRequests === 0,
-          executionTime: branchExecutionTime,
-          completedPhases: result.phaseResults.length,
-          phaseResults: result.phaseResults
-        };
+        if (handleBranchCompletion) {
+          try {
+            await safelyExecuteUnknownFunction(
+              handleBranchCompletion,
+              {
+                branchId: result.branchResult.branchId,
+                branchResults: result.branchResult.phaseResults,
+                success: result.branchResult.success
+              }
+            );
+          } catch (hookError) {
+            console.error(
+              `stable-request: [Workflow: ${workflowId}] Error in handleBranchCompletion hook:`,
+              hookError
+            );
+          }
+        }
 
         if (branch.branchDecisionHook) {
           try {
@@ -96,17 +266,56 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
                 workflowId,
                 branchResults: result.phaseResults,
                 branchId: branch.id,
+                branchIndex: index,
+                executionNumber,
                 executionHistory: result.executionHistory,
+                branchExecutionHistory,
                 sharedBuffer,
-                params: workflowHookParams?.handleBranchDecisionParams
+                params: workflowHookParams?.handleBranchDecisionParams,
+                concurrentBranchResults: concurrentBranchResults
               }
             );
 
-            branchResult.decision = decision;
+            result.branchResult.decision = decision;
 
-            if (decision.action === PHASE_DECISION_ACTIONS.TERMINATE) {
-              terminatedEarly = true;
-              terminationReason = decision.metadata?.reason || `Branch ${branch.id} terminated workflow`;
+            const historyRecord = branchExecutionHistory.find(
+              h => h.branchId === branch.id && h.executionNumber === executionNumber
+            );
+            if (historyRecord) {
+              historyRecord.decision = decision;
+            }
+
+            if (handleBranchDecision) {
+              try {
+                await safelyExecuteUnknownFunction(
+                  handleBranchDecision,
+                  decision,
+                  result.branchResult
+                );
+              } catch (hookError) {
+                console.error(
+                  `stable-request: [Workflow: ${workflowId}] Error in handleBranchDecision hook:`,
+                  hookError
+                );
+              }
+            }
+
+            if (k === groupResults.length - 1) {
+              if (decision.action === PHASE_DECISION_ACTIONS.TERMINATE) {
+                shouldTerminate = true;
+                terminationReason = decision.metadata?.reason || `Branch ${branch.id} terminated workflow`;
+              } else if (decision.action === PHASE_DECISION_ACTIONS.JUMP) {
+                concurrentGroupJumpTarget = decision.targetBranchId || null;
+              } else if (decision.action === PHASE_DECISION_ACTIONS.SKIP) {
+                concurrentGroupSkipTarget = decision.targetBranchId || null;
+              }
+
+              if (logPhaseResults && decision.action !== PHASE_DECISION_ACTIONS.CONTINUE) {
+                console.info(
+                  `stable-request: [Workflow: ${workflowId}] Concurrent group decision: ${decision.action}`,
+                  decision.targetBranchId ? `-> ${decision.targetBranchId}` : ''
+                );
+              }
             }
           } catch (decisionError) {
             console.error(
@@ -116,46 +325,78 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
           }
         }
 
-        return {
-          branchResult,
-          phaseResults: result.phaseResults,
-          executionHistory: result.executionHistory,
-          totalRequests: result.totalRequests,
-          successfulRequests: result.successfulRequests,
-          failedRequests: result.failedRequests
-        };
-      } catch (error: any) {
-        console.error(
-          `stable-request: [Workflow: ${workflowId}] Branch ${branch.id} failed:`,
-          error
-        );
-
-        return {
-          branchResult: {
-            branchId: branch.id,
-            success: false,
-            executionTime: Date.now() - branchStartTime,
-            completedPhases: 0,
-            phaseResults: []
-          },
-          phaseResults: [],
-          executionHistory: [],
-          totalRequests: 0,
-          successfulRequests: 0,
-          failedRequests: 1
-        };
+        if (stopOnFirstPhaseError && result.failedRequests > 0) {
+          shouldTerminate = true;
+          terminationReason = `Branch ${branch.id} in concurrent group failed`;
+          break;
+        }
       }
-    });
 
-    const parallelResults = await Promise.all(parallelPromises);
+      if (shouldTerminate) {
+        terminatedEarly = true;
+        break;
+      }
 
-    for (const result of parallelResults) {
+      if (concurrentGroupJumpTarget) {
+        currentBranchId = concurrentGroupJumpTarget;
+      } else if (concurrentGroupSkipTarget) {
+        const skipTargetIndex = branches.findIndex(b => b.id === concurrentGroupSkipTarget);
+        if (skipTargetIndex !== -1) {
+          for (let skipIdx = j; skipIdx < skipTargetIndex; skipIdx++) {
+            const skippedBranch = branches[skipIdx];
+            const skippedResult: BranchExecutionResult<ResponseDataType> = {
+              branchId: skippedBranch.id,
+              branchIndex: skipIdx,
+              success: true,
+              executionTime: 0,
+              completedPhases: 0,
+              phaseResults: [],
+              executionNumber: 1,
+              skipped: true
+            };
+            branchResults.push(skippedResult);
+
+            branchExecutionHistory.push({
+              branchId: skippedBranch.id,
+              branchIndex: skipIdx,
+              executionNumber: 1,
+              timestamp: new Date().toISOString(),
+              success: true,
+              executionTime: 0,
+              decision: { action: PHASE_DECISION_ACTIONS.SKIP }
+            });
+          }
+          currentBranchId = concurrentGroupSkipTarget;
+        } else {
+          currentBranchId = branches[j]?.id || null;
+        }
+      } else {
+        currentBranchId = branches[j]?.id || null;
+      }
+
+    } else {
+      if (logPhaseResults) {
+        console.info(
+          `\nstable-request: [Workflow: ${workflowId}] Executing branch: ${currentBranch.id} (execution #${executionNumber})`
+        );
+      }
+
+      const result = await executeSingleBranch(currentBranch, branchIndex, executionNumber);
+      
       branchResults.push(result.branchResult);
       allPhaseResults.push(...result.phaseResults);
       executionHistory.push(...result.executionHistory);
       totalRequests += result.totalRequests;
       successfulRequests += result.successfulRequests;
       failedRequests += result.failedRequests;
+      branchExecutionHistory.push({
+        branchId: currentBranchId,
+        branchIndex,
+        executionNumber,
+        timestamp: new Date().toISOString(),
+        success: result.branchResult.success,
+        executionTime: result.branchResult.executionTime
+      });
 
       if (handleBranchCompletion) {
         try {
@@ -174,198 +415,200 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
           );
         }
       }
-    }
 
-    if (terminatedEarly) {
-      return {
-        branchResults,
-        allPhaseResults,
-        executionHistory,
-        totalRequests,
-        successfulRequests,
-        failedRequests,
-        terminatedEarly,
-        terminationReason
-      };
-    }
-  }
+      let decision: BranchExecutionDecision = { action: PHASE_DECISION_ACTIONS.CONTINUE };
 
-  let branchIndex = 0;
-  while (branchIndex < serialBranches.length) {
-    const branch = serialBranches[branchIndex];
-    
-    if (logPhaseResults) {
-      console.info(
-        `\nstable-request: [Workflow: ${workflowId}] Executing branch: ${branch.id}`
-      );
-    }
-
-    const branchStartTime = Date.now();
-
-    try {
-      const result = await executeNonLinearWorkflow({
-        phases: branch.phases,
-        workflowId: `${workflowId}-branch-${branch.id}`,
-        commonGatewayOptions,
-        requestGroups,
-        logPhaseResults,
-        handlePhaseCompletion,
-        handlePhaseError,
-        handlePhaseDecision: workflowHookParams?.handlePhaseDecision,
-        maxSerializableChars,
-        workflowHookParams,
-        sharedBuffer,
-        stopOnFirstPhaseError,
-        maxWorkflowIterations
-      });
-
-      const branchExecutionTime = Date.now() - branchStartTime;
-
-      const branchResult: BranchExecutionResult<ResponseDataType> = {
-        branchId: branch.id,
-        success: result.failedRequests === 0,
-        executionTime: branchExecutionTime,
-        completedPhases: result.phaseResults.length,
-        phaseResults: result.phaseResults
-      };
-
-      let shouldJump = false;
-      let jumpTargetIndex = -1;
-
-      if (branch.branchDecisionHook) {
+      if (currentBranch.branchDecisionHook) {
         try {
-          const decision: BranchExecutionDecision = await safelyExecuteUnknownFunction(
-            branch.branchDecisionHook,
+          decision = await safelyExecuteUnknownFunction(
+            currentBranch.branchDecisionHook,
             {
               workflowId,
               branchResults: result.phaseResults,
-              branchId: branch.id,
+              branchId: currentBranch.id,
+              branchIndex,
+              executionNumber,
               executionHistory: result.executionHistory,
+              branchExecutionHistory,
               sharedBuffer,
-              params: workflowHookParams?.handleBranchDecisionParams,
-              parallelBranchResults: branchResults
-                .filter(br => parallelBranches.some(pb => pb.id === br.branchId))
-                .map(br => br.phaseResults)
+              params: workflowHookParams?.handleBranchDecisionParams
             }
           );
 
-          branchResult.decision = decision;
+          result.branchResult.decision = decision;
 
-          if (decision.action === PHASE_DECISION_ACTIONS.TERMINATE) {
-            terminatedEarly = true;
-            terminationReason = decision.metadata?.reason || `Branch ${branch.id} terminated workflow`;
-            
-            branchResults.push(branchResult);
-            allPhaseResults.push(...result.phaseResults);
-            executionHistory.push(...result.executionHistory);
-            totalRequests += result.totalRequests;
-            successfulRequests += result.successfulRequests;
-            failedRequests += result.failedRequests;
-
-            break;
+          const historyRecord = branchExecutionHistory.find(
+            h => h.branchId === currentBranchId && h.executionNumber === executionNumber
+          );
+          if (historyRecord) {
+            historyRecord.decision = decision;
           }
 
-          if (decision.action === PHASE_DECISION_ACTIONS.JUMP && decision.targetBranchId) {
-            const targetBranchIndex = serialBranches.findIndex(b => b.id === decision.targetBranchId);
-            if (targetBranchIndex !== -1 && targetBranchIndex > branchIndex) {
-              if (logPhaseResults) {
-                console.info(
-                  `stable-request: [Workflow: ${workflowId}] Jumping from branch ${branch.id} to ${decision.targetBranchId}`
-                );
-              }
-              shouldJump = true;
-              jumpTargetIndex = targetBranchIndex;
-            } else if (targetBranchIndex === -1) {
-              console.warn(
-                `stable-request: [Workflow: ${workflowId}] Target branch ${decision.targetBranchId} not found`
+          if (logPhaseResults) {
+            console.info(
+              `stable-request: [Workflow: ${workflowId}] Branch '${currentBranchId}' decision: ${decision.action}`,
+              decision.targetBranchId ? `-> ${decision.targetBranchId}` : ''
+            );
+          }
+
+          if (handleBranchDecision) {
+            try {
+              await safelyExecuteUnknownFunction(
+                handleBranchDecision,
+                decision,
+                result.branchResult
               );
-            } else if (targetBranchIndex <= branchIndex) {
-              console.warn(
-                `stable-request: [Workflow: ${workflowId}] Cannot jump backwards to ${decision.targetBranchId}`
+            } catch (hookError) {
+              console.error(
+                `stable-request: [Workflow: ${workflowId}] Error in handleBranchDecision hook:`,
+                hookError
               );
             }
           }
         } catch (decisionError) {
           console.error(
-            `stable-request: [Workflow: ${workflowId}] Error in branch decision hook for ${branch.id}:`,
+            `stable-request: [Workflow: ${workflowId}] Error in branch decision hook for ${currentBranch.id}:`,
             decisionError
           );
+          decision = { action: PHASE_DECISION_ACTIONS.CONTINUE };
         }
       }
 
-      branchResults.push(branchResult);
-      allPhaseResults.push(...result.phaseResults);
-      executionHistory.push(...result.executionHistory);
-      totalRequests += result.totalRequests;
-      successfulRequests += result.successfulRequests;
-      failedRequests += result.failedRequests;
+      switch (decision.action) {
+        case PHASE_DECISION_ACTIONS.TERMINATE:
+          terminatedEarly = true;
+          terminationReason = decision.metadata?.reason || `Branch ${currentBranchId} terminated workflow`;
+          currentBranchId = null;
+          break;
 
-      if (handleBranchCompletion) {
-        try {
-          await safelyExecuteUnknownFunction(
-            handleBranchCompletion,
-            {
-              branchId: branchResult.branchId,
-              branchResults: branchResult.phaseResults,
-              success: branchResult.success
+        case PHASE_DECISION_ACTIONS.JUMP:
+          if (decision.targetBranchId) {
+            const targetIndex = branches.findIndex(b => b.id === decision.targetBranchId);
+            if (targetIndex === -1) {
+              console.error(
+                `stable-request: [Workflow: ${workflowId}] Jump target branch '${decision.targetBranchId}' not found`
+              );
+              terminatedEarly = true;
+              terminationReason = `Jump target branch '${decision.targetBranchId}' not found`;
+              currentBranchId = null;
+            } else {
+              currentBranchId = decision.targetBranchId;
             }
-          );
-        } catch (hookError) {
-          console.error(
-            `stable-request: [Workflow: ${workflowId}] Error in handleBranchCompletion hook:`,
-            hookError
-          );
-        }
-      }
+          } else {
+            currentBranchId = branches[branchIndex + 1]?.id || null;
+          }
+          break;
 
-      if (shouldJump) {
-        // Jump to target branch (skip intermediate branches)
-        branchIndex = jumpTargetIndex;
-        continue;
+        case PHASE_DECISION_ACTIONS.SKIP:
+          if (!currentBranch.allowSkip && currentBranch.allowSkip !== undefined) {
+            console.warn(
+              `stable-request: [Workflow: ${workflowId}] Branch '${currentBranchId}' attempted to skip but allowSkip is false. Continuing normally.`
+            );
+            currentBranchId = branches[branchIndex + 1]?.id || null;
+            break;
+          }
+
+          if (decision.targetBranchId) {
+            const skipTargetIndex = branches.findIndex(b => b.id === decision.targetBranchId);
+            if (skipTargetIndex !== -1) {
+              for (let skipIdx = branchIndex + 1; skipIdx < skipTargetIndex; skipIdx++) {
+                const skippedBranch = branches[skipIdx];
+                const skippedResult: BranchExecutionResult<ResponseDataType> = {
+                  branchId: skippedBranch.id,
+                  branchIndex: skipIdx,
+                  success: true,
+                  executionTime: 0,
+                  completedPhases: 0,
+                  phaseResults: [],
+                  executionNumber: 1,
+                  skipped: true
+                };
+                branchResults.push(skippedResult);
+
+                branchExecutionHistory.push({
+                  branchId: skippedBranch.id,
+                  branchIndex: skipIdx,
+                  executionNumber: 1,
+                  timestamp: new Date().toISOString(),
+                  success: true,
+                  executionTime: 0,
+                  decision: { action: PHASE_DECISION_ACTIONS.SKIP }
+                });
+              }
+              currentBranchId = decision.targetBranchId;
+            } else {
+              currentBranchId = branches[branchIndex + 1]?.id || null;
+            }
+          } else {
+            const nextBranch = branches[branchIndex + 1];
+            if (nextBranch) {
+              const skippedResult: BranchExecutionResult<ResponseDataType> = {
+                branchId: nextBranch.id,
+                branchIndex: branchIndex + 1,
+                success: true,
+                executionTime: 0,
+                completedPhases: 0,
+                phaseResults: [],
+                executionNumber: 1,
+                skipped: true
+              };
+              branchResults.push(skippedResult);
+
+              branchExecutionHistory.push({
+                branchId: nextBranch.id,
+                branchIndex: branchIndex + 1,
+                executionNumber: 1,
+                timestamp: new Date().toISOString(),
+                success: true,
+                executionTime: 0,
+                decision: { action: PHASE_DECISION_ACTIONS.SKIP }
+              });
+            }
+            currentBranchId = branches[branchIndex + 2]?.id || null;
+          }
+          break;
+
+        case PHASE_DECISION_ACTIONS.REPLAY:
+          if (!currentBranch.allowReplay && currentBranch.allowReplay !== undefined) {
+            console.warn(
+              `stable-request: [Workflow: ${workflowId}] Branch '${currentBranchId}' attempted to replay but allowReplay is false. Continuing normally.`
+            );
+            currentBranchId = branches[branchIndex + 1]?.id || null;
+            break;
+          }
+          currentBranchId = currentBranch.id;
+          break;
+
+        case PHASE_DECISION_ACTIONS.CONTINUE:
+        default:
+          currentBranchId = branches[branchIndex + 1]?.id || null;
+          break;
       }
 
       if (stopOnFirstPhaseError && result.failedRequests > 0) {
-        if (logPhaseResults) {
-          console.error(
-            `stable-request: [Workflow: ${workflowId}] Branch ${branch.id} has failures. Stopping workflow.`
-          );
-        }
         terminatedEarly = true;
-        terminationReason = `Branch ${branch.id} failed`;
-        break;
-      }
-
-    } catch (error: any) {
-      console.error(
-        `stable-request: [Workflow: ${workflowId}] Branch ${branch.id} failed:`,
-        error
-      );
-
-      const branchResult: BranchExecutionResult<ResponseDataType> = {
-        branchId: branch.id,
-        success: false,
-        executionTime: Date.now() - branchStartTime,
-        completedPhases: 0,
-        phaseResults: []
-      };
-
-      branchResults.push(branchResult);
-      failedRequests += 1;
-
-      if (stopOnFirstPhaseError) {
-        terminatedEarly = true;
-        terminationReason = `Branch ${branch.id} failed with error`;
+        terminationReason = `Branch ${currentBranch.id} failed`;
         break;
       }
     }
+  }
+
+  if (iterationCount >= maxWorkflowIterations) {
+    terminatedEarly = true;
+    terminationReason = `Exceeded maximum workflow iterations (${maxWorkflowIterations})`;
     
-    branchIndex++;
+    if (logPhaseResults) {
+      console.warn(
+        `stable-request: [Workflow: ${workflowId}] ${terminationReason}`
+      );
+    }
   }
 
   return {
     branchResults,
     allPhaseResults,
     executionHistory,
+    branchExecutionHistory,
     totalRequests,
     successfulRequests,
     failedRequests,
