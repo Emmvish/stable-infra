@@ -70,13 +70,13 @@ npm install @emmvish/stable-request
 Execute a single HTTP request with automatic retry on failure:
 
 ```typescript
-import { stableRequest, RETRY_STRATEGIES } from '@emmvish/stable-request';
+import { stableRequest, RETRY_STRATEGIES, REQUEST_METHODS } from '@emmvish/stable-request';
 
 const userData = await stableRequest({
   reqData: {
     hostname: 'api.example.com',
     path: '/users/123',
-    method: 'GET',
+    method: REQUEST_METHODS.GET,
     headers: { 'Authorization': 'Bearer token' }
   },
   resReq: true,              // Return response data
@@ -140,7 +140,7 @@ results.forEach(result => {
 Orchestrate complex workflows with multiple phases:
 
 ```typescript
-import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
+import { stableWorkflow, PHASE_DECISION_ACTIONS, REQUEST_METHODS } from '@emmvish/stable-request';
 
 const phases = [
   {
@@ -151,7 +151,7 @@ const phases = [
         requestOptions: { 
           reqData: { 
             path: '/auth/login',
-            method: 'POST',
+            method: REQUEST_METHODS.POST,
             body: { username: 'user', password: 'pass' }
           }, 
           resReq: true 
@@ -174,7 +174,7 @@ const phases = [
       { 
         id: 'update-analytics', 
         requestOptions: { 
-          reqData: { path: '/analytics', method: 'POST' }, 
+          reqData: { path: '/analytics', method: REQUEST_METHODS.POST }, 
           resReq: false 
         } 
       }
@@ -789,7 +789,7 @@ const phases = [
     requests: [{
       id: 'login',
       requestOptions: {
-        reqData: { path: '/login', method: 'POST' },
+        reqData: { path: '/login', method: REQUEST_METHODS.POST },
         resReq: true,
         preExecution: {
           preExecutionHook: ({ commonBuffer }) => {
@@ -1023,7 +1023,7 @@ const syncPhases = [
       { 
         id: 'transform', 
         requestOptions: { 
-          reqData: { path: '/transform', method: 'POST' }, 
+          reqData: { path: '/transform', method: REQUEST_METHODS.POST }, 
           resReq: true 
         } 
       }
@@ -1033,8 +1033,8 @@ const syncPhases = [
     id: 'upload-to-destination',
     concurrentExecution: true,
     requests: [
-      { id: 'upload-users', requestOptions: { reqData: { path: '/dest/users', method: 'POST' }, resReq: false } },
-      { id: 'upload-orders', requestOptions: { reqData: { path: '/dest/orders', method: 'POST' }, resReq: false } }
+      { id: 'upload-users', requestOptions: { reqData: { path: '/dest/users', method: REQUEST_METHODS.POST }, resReq: false } },
+      { id: 'upload-orders', requestOptions: { reqData: { path: '/dest/orders', method: REQUEST_METHODS.POST }, resReq: false } }
     ]
   }
 ];
@@ -1133,7 +1133,7 @@ await stableWorkflow(pollingPhases, {
 ### Webhook Retry with Circuit Breaker
 
 ```typescript
-import { CircuitBreaker } from '@emmvish/stable-request';
+import { CircuitBreaker, REQUEST_METHODS } from '@emmvish/stable-request';
 
 const webhookBreaker = new CircuitBreaker({
   failureThreshold: 3,
@@ -1147,7 +1147,7 @@ async function sendWebhook(eventData: any) {
       reqData: {
         hostname: 'webhook.example.com',
         path: '/events',
-        method: 'POST',
+        method: REQUEST_METHODS.POST,
         body: eventData
       },
       attempts: 5,
