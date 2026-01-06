@@ -301,7 +301,7 @@ Each example can be customized by modifying:
 
 ## Learn More
 
-- [Main README](../readme.md) - Library overview and quick start
+- [Main README](../README.md) - Library overview and quick start
 - [API Reference](../docs/api-references.md) - Complete API documentation
 - [Test Suite](../tests/) - Additional usage examples
 
