@@ -25,6 +25,7 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
   commonWait?: number;
   commonMaxAllowedWait?: number;
   commonRetryStrategy?: RETRY_STRATEGY_TYPES;
+  commonJitter?: number;
   commonLogAllErrors?: boolean;
   commonLogAllSuccessfulAttempts?: boolean;
   commonMaxSerializableChars?: number;
@@ -198,6 +199,7 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   wait?: number;
   maxAllowedWait?: number;
   retryStrategy?: RETRY_STRATEGY_TYPES;
+  jitter?: number;
   logAllErrors?: boolean;
   handleErrors?: (
     options: HandleErrorHookOptions<RequestDataType>

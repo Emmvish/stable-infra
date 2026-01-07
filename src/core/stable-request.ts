@@ -93,7 +93,8 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     trialMode = { enabled: false },
     hookParams = {},
     cache,
-    circuitBreaker
+    circuitBreaker,
+    jitter = 0
   } = options;
   let attempts = givenAttempts;
   const reqData: AxiosRequestConfig<RequestDataType> = generateAxiosRequestConfig<RequestDataType>(givenReqData);
@@ -283,7 +284,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
           (originalResOk && performNextAttempt) ||
           performAllAttempts)
       ) {
-        await delay(getNewDelayTime(retryStrategy, wait, currentAttempt), maxAllowedWait);
+        await delay(getNewDelayTime(retryStrategy, wait, currentAttempt, jitter), maxAllowedWait);
       }
     } while (
       attempts > 0 &&

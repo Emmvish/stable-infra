@@ -59,8 +59,9 @@ function stableRequest<RequestDataType = any, ResponseDataType = any>(
 | `resReq` | `boolean` | No | `false` | If `true`, returns the response data. If `false`, returns `true` on success or `false` on failure. |
 | `attempts` | `number` | No | `1` | Maximum number of attempts (including the initial request). Must be ≥ 1. |
 | `wait` | `number` | No | `0` | Base wait time in milliseconds between retry attempts. |
-| `maxAllowedWait` | `number` | No | `60000` | Maximum allowed wait time between retries (caps the backoff calculation). |
+| `maxAllowedWait` | `number` | No | `Infinity` | Maximum allowed wait time between retries (caps the backoff calculation). |
 | `retryStrategy` | `RETRY_STRATEGY_TYPES` | No | `FIXED` | Retry backoff strategy: `FIXED`, `LINEAR`, or `EXPONENTIAL`. |
+| `jitter` | `number` | No | `0` | If `non-zero`, applies randomized jitter to retry delays to prevent thundering herd issues. |
 | `performAllAttempts` | `boolean` | No | `false` | If `true`, performs all attempts even if one succeeds (useful for testing). |
 | `logAllErrors` | `boolean` | No | `false` | If `true`, logs all error attempts to console. |
 | `logAllSuccessfulAttempts` | `boolean` | No | `false` | If `true`, logs all successful attempts to console. |
@@ -99,6 +100,7 @@ const userData = await stableRequest({
   attempts: 3,
   wait: 1000,
   retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+  jitter: 0.5,              // Enable jitter to avoid thundering herd
   responseAnalyzer: async ({ data }) => {
     return data.status === 'success';
   },
@@ -136,8 +138,9 @@ Array of request objects to execute. See [API_GATEWAY_REQUEST](#api_gateway_requ
 | `commonRequestData` | `Partial<REQUEST_DATA>` | No | `{}` | Common request configuration applied to all requests (hostname, headers, etc.). |
 | `commonAttempts` | `number` | No | `1` | Default number of retry attempts for all requests. |
 | `commonWait` | `number` | No | `0` | Default wait time between retries for all requests. |
-| `commonMaxAllowedWait` | `number` | No | `60000` | Default maximum wait time for all requests. |
+| `commonMaxAllowedWait` | `number` | No | `Infinity` | Default maximum wait time for all requests. |
 | `commonRetryStrategy` | `RETRY_STRATEGY_TYPES` | No | `FIXED` | Default retry strategy for all requests. |
+| `commonJitter` | `number` | No | `0` | Default jitter setting for all requests. Randomizes retry delays. |
 | `commonResReq` | `boolean` | No | `false` | Default value for `resReq` for all requests. |
 | `commonLogAllErrors` | `boolean` | No | `false` | Default logging setting for errors. |
 | `commonLogAllSuccessfulAttempts` | `boolean` | No | `false` | Default logging setting for successes. |
