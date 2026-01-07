@@ -2299,4 +2299,115 @@ describe('Non-Linear Workflow Execution', () => {
       expect(executionOrder).toEqual(['/p1', '/p2']);
     });
   });
+
+  describe('Backward Jumping with Conditional Logic', () => {
+    it('should jump backward to a previous phase conditionally and continue forward on second pass', async () => {
+      const executionOrder: string[] = [];
+      const sharedBuffer: Record<string, any> = {};
+
+      mockedAxios.request.mockImplementation(
+        (async (config: AxiosRequestConfig) => {
+          const path = config.url || '';
+          executionOrder.push(path);
+          
+          return {
+            status: 200,
+            data: { path, timestamp: Date.now() },
+            statusText: 'OK',
+            headers: {},
+            config: config as any
+          };
+        }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
+      );
+
+      const phases = [
+        {
+          id: 'phase-1-init',
+          requests: [
+            { id: 'r1', requestOptions: { reqData: { path: '/init' }, resReq: true } }
+          ]
+        },
+        {
+          id: 'phase-2-process',
+          requests: [
+            { id: 'r2', requestOptions: { reqData: { path: '/process' }, resReq: true } }
+          ]
+        },
+        {
+          id: 'phase-3-validate',
+          requests: [
+            { id: 'r3', requestOptions: { reqData: { path: '/validate' }, resReq: true } }
+          ],
+          phaseDecisionHook: async ({ sharedBuffer, executionHistory }: PhaseDecisionHookOptions) => {
+            // Count how many times this phase has been executed
+            // Note: executionHistory includes records up to but NOT including the current execution
+            const validationExecutions = executionHistory.filter(
+              record => record.phaseId === 'phase-3-validate'
+            ).length;
+            
+            // First time (validationExecutions === 0): jump back to phase-2-process
+            if (validationExecutions === 0) {
+              if (sharedBuffer) {
+                sharedBuffer.jumpedBack = true;
+              }
+              return { 
+                action: PHASE_DECISION_ACTIONS.JUMP, 
+                targetPhaseId: 'phase-2-process' 
+              };
+            }
+            
+            // Second time (validationExecutions === 1): continue forward
+            return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+          }
+        },
+        {
+          id: 'phase-4-finalize',
+          requests: [
+            { id: 'r4', requestOptions: { reqData: { path: '/finalize' }, resReq: true } }
+          ]
+        }
+      ] satisfies STABLE_WORKFLOW_PHASE[];
+
+      const result = await stableWorkflow(phases, {
+        workflowId: 'wf-backward-jump',
+        commonRequestData: { hostname: 'api.example.com' },
+        enableNonLinearExecution: true,
+        sharedBuffer
+      });
+
+      expect(result.success).toBe(true);
+      expect(sharedBuffer.jumpedBack).toBe(true);
+      
+      // Expected order:
+      // 1. /init (phase-1-init)
+      // 2. /process (phase-2-process, first time)
+      // 3. /validate (phase-3-validate, first time - decides to jump back)
+      // 4. /process (phase-2-process, second time - after backward jump)
+      // 5. /validate (phase-3-validate, second time - decides to continue)
+      // 6. /finalize (phase-4-finalize)
+      expect(executionOrder).toEqual([
+        '/init',
+        '/process',
+        '/validate',
+        '/process',    // backward jump executed
+        '/validate',   // validation phase executed again
+        '/finalize'
+      ]);
+
+      // Verify execution history shows the backward jump
+      expect(result.executionHistory).toHaveLength(6);
+      expect(result.executionHistory[0].phaseId).toBe('phase-1-init');
+      expect(result.executionHistory[1].phaseId).toBe('phase-2-process');
+      expect(result.executionHistory[2].phaseId).toBe('phase-3-validate');
+      expect(result.executionHistory[3].phaseId).toBe('phase-2-process'); // jumped back
+      expect(result.executionHistory[4].phaseId).toBe('phase-3-validate'); // executed again
+      expect(result.executionHistory[5].phaseId).toBe('phase-4-finalize');
+      
+      // Verify execution numbers
+      expect(result.executionHistory[1].executionNumber).toBe(1); // phase-2 first execution
+      expect(result.executionHistory[3].executionNumber).toBe(2); // phase-2 second execution
+      expect(result.executionHistory[2].executionNumber).toBe(1); // phase-3 first execution
+      expect(result.executionHistory[4].executionNumber).toBe(2); // phase-3 second execution
+    });
+  });
 });
