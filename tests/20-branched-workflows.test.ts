@@ -3,9 +3,7 @@ import axios from 'axios';
 import { stableWorkflow } from '../src/core/index.js';
 import { PHASE_DECISION_ACTIONS, RETRY_STRATEGIES } from '../src/enums/index.js';
 import type {
-  STABLE_WORKFLOW_BRANCH,
-  STABLE_WORKFLOW_PHASE,
-  API_GATEWAY_REQUEST
+  STABLE_WORKFLOW_BRANCH
 } from '../src/types/index.js';
 
 // Mock axios

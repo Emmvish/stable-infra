@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { stableApiGateway } from '../src/core/index.js';
-import { RETRY_STRATEGIES, REQUEST_METHODS } from '../src/enums/index.js';
+import { REQUEST_METHODS } from '../src/enums/index.js';
 import { API_GATEWAY_REQUEST } from '../src/types/index.js';
 
 jest.mock('axios');

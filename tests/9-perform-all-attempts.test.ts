@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import axios, { AxiosResponse } from 'axios';
+import axios from 'axios';
 import { stableRequest } from '../src/core/index.js';
 
 jest.mock('axios');
