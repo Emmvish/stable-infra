@@ -238,7 +238,7 @@ Array of workflow phases to execute. See [STABLE_WORKFLOW_PHASE](#stable_workflo
 | `handlePhaseCompletion` | `Function` | No | `undefined` | Hook called after each phase completes successfully. |
 | `handlePhaseError` | `Function` | No | `undefined` | Hook called when a phase encounters an error. |
 | `handlePhaseDecision` | `Function` | No | `undefined` | Hook called when a phase makes a non-linear decision. |
-| `handleBranchCompletion` | `Function` | No | `undefined` | Hook called when a branch completes. |
+| `handleBranchCompletion` | `Function` | No | `undefined` | Hook called when a branch completes. Receives `{ workflowId, branchId, branchResults, success }`. |
 | `handleBranchDecision` | `Function` | No | `undefined` | Hook called when a branch makes a decision. |
 | `workflowHookParams` | `WorkflowHookParams` | No | `{}` | Custom parameters passed to workflow-level hooks. |
 | `sharedBuffer` | `Record<string, any>` | No | `{}` | Shared buffer accessible across all phases and branches. |
@@ -929,6 +929,19 @@ interface TRIAL_MODE_OPTIONS {
 }
 ```
 
+#### `ExecutionContext`
+
+```typescript
+interface ExecutionContext {
+  workflowId?: string;   // Workflow identifier
+  branchId?: string;     // Branch identifier (if executing within a branch)
+  phaseId?: string;      // Phase identifier (if executing within a phase)
+  requestId?: string;    // Request identifier (if executing a specific request)
+}
+```
+
+Execution context information passed through the request chain. Used for logging and traceability. All fields are optional and populated based on execution level.
+
 ---
 
 ### Hook Option Types
@@ -999,6 +1012,7 @@ interface PreExecutionHookOptions {
 ```typescript
 interface HandlePhaseCompletionHookOptions<ResponseDataType = any> {
   workflowId: string;
+  branchId?: string;  // Present if phase executed within a branch
   phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>;
   maxSerializableChars?: number;
   params?: any;
@@ -1015,6 +1029,7 @@ Extends `HandlePhaseCompletionHookOptions` with additional `error` property.
 ```typescript
 interface PhaseDecisionHookOptions<ResponseDataType = any> {
   workflowId: string;
+  branchId?: string;  // Present if phase executed within a branch
   phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>;
   phaseId: string;
   phaseIndex: number;
@@ -1195,6 +1210,8 @@ interface SUCCESSFUL_ATTEMPT_DATA<ResponseDataType = any> {
 
 ```typescript
 interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any> {
+  workflowId: string;     // Workflow identifier
+  branchId?: string;      // Branch identifier (if phase executed within a branch)
   phaseId: string;
   phaseIndex: number;
   success: boolean;
@@ -1229,6 +1246,7 @@ interface PhaseExecutionRecord {
 
 ```typescript
 interface BranchExecutionResult<ResponseDataType = any> {
+  workflowId: string;     // Workflow identifier
   branchId: string;
   branchIndex: number;
   success: boolean;

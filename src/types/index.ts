@@ -10,6 +10,13 @@ import {
 
 import { CircuitBreaker } from '../utilities/index.js'
 
+export interface ExecutionContext {
+  workflowId?: string;
+  branchId?: string;
+  phaseId?: string;
+  requestId?: string;
+}
+
 export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any> {
   commonRequestData?: Partial<REQUEST_DATA<RequestDataType>>;
   commonAttempts?: number;
@@ -40,6 +47,7 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
   maxConcurrentRequests?: number;
   rateLimit?: RateLimitConfig;
   circuitBreaker?: CircuitBreakerConfig;
+  executionContext?: Partial<ExecutionContext>;
 }
 
 export interface RequestGroup<RequestDataType = any, ResponseDataType = any> {
@@ -76,7 +84,9 @@ export type ApiRequestOptionsMapping = {
   targetKey: string;
 };
 
-export type CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, ResponseDataType = any> = Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, "concurrentExecution">;
+export type CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, ResponseDataType = any> = Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, "concurrentExecution"> & {
+  executionContext?: Partial<ExecutionContext>;
+};
 
 export interface ERROR_LOG {
   timestamp: string;
@@ -123,7 +133,9 @@ type RESPONSE_ERROR_TYPES = RESPONSE_ERRORS.HTTP_ERROR | RESPONSE_ERRORS.INVALID
 
 export type RETRY_STRATEGY_TYPES = RETRY_STRATEGIES.FIXED | RETRY_STRATEGIES.LINEAR | RETRY_STRATEGIES.EXPONENTIAL;
 
-export type SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, ResponseDataType = any> = Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, "concurrentExecution">
+export type SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, ResponseDataType = any> = Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, "concurrentExecution"> & {
+  executionContext?: Partial<ExecutionContext>;
+};
 
 interface ObservabilityHooksOptions<RequestDataType = any> {
   reqData: AxiosRequestConfig<RequestDataType>;
@@ -131,12 +143,14 @@ interface ObservabilityHooksOptions<RequestDataType = any> {
   maxSerializableChars?: number;
   preExecutionResult?: any;
   commonBuffer?: Record<string, any>;
+  executionContext?: ExecutionContext;
 }
 
 interface AnalysisHookOptions<RequestDataType = any> extends Omit<ObservabilityHooksOptions<RequestDataType>, "maxSerializableChars"> {
   trialMode?: TRIAL_MODE_OPTIONS;
   params?: any;
   preExecutionResult?: any;
+  executionContext?: ExecutionContext;
   commonBuffer?: Record<string, any>;
 }
 
@@ -199,6 +213,7 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   preExecution?: RequestPreExecutionOptions;
   commonBuffer?: Record<string, any>;
   cache?: CacheConfig;
+  executionContext?: ExecutionContext;
   circuitBreaker?: CircuitBreakerConfig | CircuitBreaker;
 }
 
@@ -264,6 +279,7 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   ) => any | Promise<any>;
   handleBranchCompletion?: (
     options: {
+      workflowId: string;
       branchId: string;
       branchResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
       success: boolean;
@@ -278,6 +294,8 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
 }
 
 export interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any> {
+  workflowId: string;
+  branchId?: string;
   phaseId: string;
   phaseIndex: number;
   success: boolean;
@@ -320,6 +338,7 @@ export interface WorkflowHookParams {
 
 export interface HandlePhaseCompletionHookOptions<ResponseDataType = any> {
   workflowId: string;
+  branchId?: string;
   phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>;
   maxSerializableChars?: number;
   params?: any;
@@ -371,6 +390,7 @@ export interface PhaseExecutionDecision {
 
 export interface PhaseDecisionHookOptions<ResponseDataType = any> {
   workflowId: string;
+  branchId?: string;
   phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>;
   phaseId: string;
   phaseIndex: number;
@@ -393,6 +413,7 @@ export interface PhaseExecutionRecord {
 export interface NonLinearWorkflowContext<RequestDataType, ResponseDataType> {
   phases: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>[];
   workflowId: string;
+  branchId?: string;
   commonGatewayOptions: any;
   requestGroups: any[];
   logPhaseResults: boolean;
@@ -450,6 +471,7 @@ export interface BranchExecutionDecision {
 }
 
 export interface BranchExecutionResult<ResponseDataType = any> {
+  workflowId: string;
   branchId: string;
   branchIndex: number;
   success: boolean;

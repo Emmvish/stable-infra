@@ -17,6 +17,7 @@ import {
 import {
   CircuitBreaker,
   CircuitBreakerOpenError,
+  formatLogContext,
   generateAxiosRequestConfig,
   getNewDelayTime,
   delay,
@@ -36,7 +37,8 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
       applyPreExecutionConfigOverride: false,
       continueOnPreExecutionHookFailure: false,
     },
-    commonBuffer = {}
+    commonBuffer = {},
+    executionContext
   } = options;
   let preExecutionResult: Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>> | unknown;
   try {
@@ -69,18 +71,18 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     maxAllowedWait = 60000,
     retryStrategy = RETRY_STRATEGIES.FIXED,
     logAllErrors = false,
-    handleErrors = ({ reqData, errorLog, maxSerializableChars = 1000 }) => 
+    handleErrors = ({ reqData, errorLog, maxSerializableChars = 1000, executionContext }) => 
       console.error(
-        'stable-request:\n',
+        `${formatLogContext(executionContext)}stable-request:\n`,
         'Request data:\n',
         safelyStringify(reqData, maxSerializableChars),
         '\nError log:\n',
         safelyStringify(errorLog, maxSerializableChars)
       ),
     logAllSuccessfulAttempts = false,
-    handleSuccessfulAttemptData = ({ reqData, successfulAttemptData, maxSerializableChars = 1000 }) =>
+    handleSuccessfulAttemptData = ({ reqData, successfulAttemptData, maxSerializableChars = 1000, executionContext }) =>
       console.info(
-        'stable-request:\n',
+        `${formatLogContext(executionContext)}stable-request:\n`,
         'Request data:\n',
         safelyStringify(reqData, maxSerializableChars),
         '\nSuccessful attempt:\n',
@@ -128,11 +130,11 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
         }
       }
       try {
-        res = await reqFn<RequestDataType, ResponseDataType>(reqData, resReq, maxSerializableChars, trialMode, cache);
+        res = await reqFn<RequestDataType, ResponseDataType>(reqData, resReq, maxSerializableChars, trialMode, cache, executionContext);
         if (res.fromCache && res.ok) {
           if (trialMode.enabled) {
             console.info(
-              'stable-request: Response served from cache:\n',
+              `${formatLogContext(executionContext)}stable-request: Response served from cache:\n`,
               safelyStringify(res?.data, maxSerializableChars)
             );
           }
@@ -165,18 +167,19 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
               trialMode,
               params: hookParams?.responseAnalyzerParams,
               preExecutionResult,
-              commonBuffer
+              commonBuffer,
+              executionContext
             }
           ));
         } catch (e: any) {
           console.error(
-            `stable-request: Unable to analyze the response returned on attempt #${currentAttempt}. Response: ${safelyStringify(
+            `${formatLogContext(executionContext)}stable-request: Unable to analyze the response returned on attempt #${currentAttempt}. Response: ${safelyStringify(
               res?.data,
               maxSerializableChars
             )}`
           );
           console.error(
-            `stable-request: Error message provided by your responseAnalyzer: ${safelyStringify(
+            `${formatLogContext(executionContext)}stable-request: Error message provided by your responseAnalyzer: ${safelyStringify(
               e.message,
               maxSerializableChars
             )}`
@@ -224,12 +227,13 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
               maxSerializableChars,
               params: hookParams?.handleErrorsParams,
               preExecutionResult,
-              commonBuffer
+              commonBuffer,
+              executionContext
             }
           );
         } catch (e: any) {
           console.error(
-            `stable-request: Unable to report errors due to issues with error handler! Error message provided by your handleErrors: ${safelyStringify(
+            `${formatLogContext(executionContext)}stable-request: Unable to report errors due to issues with error handler! Error message provided by your handleErrors: ${safelyStringify(
               e.message,
               maxSerializableChars
             )}`
@@ -256,12 +260,13 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
                 maxSerializableChars,
                 params: hookParams?.handleSuccessfulAttemptDataParams,
                 preExecutionResult,
-                commonBuffer
+                commonBuffer,
+                executionContext
               }
             );
           } catch (e: any) {
             console.error(
-              `stable-request: Unable to report successful attempts due to issues with successful attempt data handler! Error message provided by your handleSuccessfulAttemptData: ${safelyStringify(
+              `${formatLogContext(executionContext)}stable-request: Unable to report successful attempts due to issues with successful attempt data handler! Error message provided by your handleSuccessfulAttemptData: ${safelyStringify(
                 e.message,
                 maxSerializableChars
               )}`
@@ -288,7 +293,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     if (performAllAttempts && hadAtLeastOneSuccess) {
       if (trialMode.enabled) {
         console.info(
-          'stable-request: Final response (performAllAttempts mode):\n',
+          `${formatLogContext(executionContext)}stable-request: Final response (performAllAttempts mode):\n`,
           safelyStringify(lastSuccessfulAttemptData as Record<string, any>, maxSerializableChars)
         );
       }
@@ -297,7 +302,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
       if (trialMode.enabled) {
         const finalResponse = res?.data ?? lastSuccessfulAttemptData;
         console.info(
-          'stable-request: Final response:\n',
+          `${formatLogContext(executionContext)}stable-request: Final response:\n`,
           safelyStringify(finalResponse, maxSerializableChars)
         );
       }
@@ -315,7 +320,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     }
   } catch (e: any) {
     if (trialMode.enabled) {
-      console.error('stable-request: Final error:\n', e.message);
+      console.error(`${formatLogContext(executionContext)}stable-request: Final error:\n`, e.message);
     }
     let errorAnalysisResult = false;
     try {
@@ -327,12 +332,13 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
           trialMode,
           params: hookParams?.finalErrorAnalyzerParams,
           preExecutionResult,
-          commonBuffer
+          commonBuffer,
+          executionContext
         }
       );
     } catch(errorAnalysisError: any) {
       console.error(
-        `stable-request: Unable to analyze the final error returned. Error message provided by your finalErrorAnalyzer: ${safelyStringify(
+        `${formatLogContext(executionContext)}stable-request: Unable to analyze the final error returned. Error message provided by your finalErrorAnalyzer: ${safelyStringify(
           errorAnalysisError.message,
           maxSerializableChars
         )}`

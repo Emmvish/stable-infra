@@ -1,5 +1,6 @@
 import { executeNonLinearWorkflow } from './execute-non-linear-workflow.js';
 import { safelyExecuteUnknownFunction } from './safely-execute-unknown-function.js';
+import { formatLogContext } from './format-log-context.js';
 import { PHASE_DECISION_ACTIONS } from '../enums/index.js';
 import {
   STABLE_WORKFLOW_BRANCH,
@@ -69,6 +70,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       const result = await executeNonLinearWorkflow({
         phases: branch.phases,
         workflowId: `${workflowId}-branch-${branch.id}`,
+        branchId: branch.id,
         commonGatewayOptions: branchConfig,
         requestGroups,
         logPhaseResults,
@@ -85,6 +87,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       const branchExecutionTime = Date.now() - branchStartTime;
 
       const branchResult: BranchExecutionResult<ResponseDataType> = {
+        workflowId,
         branchId: branch.id,
         branchIndex,
         success: result.failedRequests === 0,
@@ -104,12 +107,13 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       };
     } catch (error: any) {
       console.error(
-        `stable-request: [Workflow: ${workflowId}] Branch ${branch.id} failed:`,
+        `${formatLogContext({ workflowId })}stable-request: Branch ${branch.id} failed:`,
         error
       );
 
       return {
         branchResult: {
+          workflowId,
           branchId: branch.id,
           branchIndex,
           success: false,
@@ -137,7 +141,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     const branchIndex = branches.findIndex(b => b.id === currentBranchId);
     if (branchIndex === -1) {
       console.error(
-        `stable-request: [Workflow: ${workflowId}] Branch '${currentBranchId}' not found`
+        `${formatLogContext({ workflowId })}stable-request: Branch '${currentBranchId}' not found`
       );
       terminatedEarly = true;
       terminationReason = `Branch '${currentBranchId}' not found`;
@@ -152,11 +156,12 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     if (executionNumber > maxReplayCount + 1) {
       if (logPhaseResults) {
         console.warn(
-          `stable-request: [Workflow: ${workflowId}] Branch '${currentBranchId}' exceeded max replay count (${maxReplayCount}). Skipping.`
+          `${formatLogContext({ workflowId })}stable-request: Branch '${currentBranchId}' exceeded max replay count (${maxReplayCount}). Skipping.`
         );
       }
 
       const skippedResult: BranchExecutionResult<ResponseDataType> = {
+        workflowId,
         branchId: currentBranchId,
         branchIndex,
         success: false,
@@ -206,7 +211,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       if (logPhaseResults) {
         const branchIds = concurrentGroup.map(({ branch }) => branch.id).join(', ');
         console.info(
-          `\nstable-request: [Workflow: ${workflowId}] Executing ${concurrentGroup.length} branches in parallel: [${branchIds}]`
+          `${formatLogContext({ workflowId })}\nstable-request: Executing ${concurrentGroup.length} branches in parallel: [${branchIds}]`
         );
       }
 
@@ -245,6 +250,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
             await safelyExecuteUnknownFunction(
               handleBranchCompletion,
               {
+                workflowId,
                 branchId: result.branchResult.branchId,
                 branchResults: result.branchResult.phaseResults,
                 success: result.branchResult.success
@@ -252,7 +258,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
             );
           } catch (hookError) {
             console.error(
-              `stable-request: [Workflow: ${workflowId}] Error in handleBranchCompletion hook:`,
+              `${formatLogContext({ workflowId, branchId: result.branchResult.branchId })}stable-request: Error in handleBranchCompletion hook:`,
               hookError
             );
           }
@@ -294,7 +300,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
                 );
               } catch (hookError) {
                 console.error(
-                  `stable-request: [Workflow: ${workflowId}] Error in handleBranchDecision hook:`,
+                  `${formatLogContext({ workflowId, branchId: branch.id })}stable-request: Error in handleBranchDecision hook:`,
                   hookError
                 );
               }
@@ -312,14 +318,14 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
 
               if (logPhaseResults && decision.action !== PHASE_DECISION_ACTIONS.CONTINUE) {
                 console.info(
-                  `stable-request: [Workflow: ${workflowId}] Concurrent group decision: ${decision.action}`,
+                  `${formatLogContext({ workflowId })}stable-request: Concurrent group decision: ${decision.action}`,
                   decision.targetBranchId ? `-> ${decision.targetBranchId}` : ''
                 );
               }
             }
           } catch (decisionError) {
             console.error(
-              `stable-request: [Workflow: ${workflowId}] Error in branch decision hook for ${branch.id}:`,
+              `${formatLogContext({ workflowId, branchId: branch.id })}stable-request: Error in branch decision hook for ${branch.id}:`,
               decisionError
             );
           }
@@ -345,6 +351,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
           for (let skipIdx = j; skipIdx < skipTargetIndex; skipIdx++) {
             const skippedBranch = branches[skipIdx];
             const skippedResult: BranchExecutionResult<ResponseDataType> = {
+              workflowId,
               branchId: skippedBranch.id,
               branchIndex: skipIdx,
               success: true,
@@ -377,7 +384,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     } else {
       if (logPhaseResults) {
         console.info(
-          `\nstable-request: [Workflow: ${workflowId}] Executing branch: ${currentBranch.id} (execution #${executionNumber})`
+          `${formatLogContext({ workflowId })}\nstable-request: Executing branch: ${currentBranch.id} (execution #${executionNumber})`
         );
       }
 
@@ -410,7 +417,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
           );
         } catch (hookError) {
           console.error(
-            `stable-request: [Workflow: ${workflowId}] Error in handleBranchCompletion hook:`,
+            `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-request: Error in handleBranchCompletion hook:`,
             hookError
           );
         }
@@ -446,7 +453,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
 
           if (logPhaseResults) {
             console.info(
-              `stable-request: [Workflow: ${workflowId}] Branch '${currentBranchId}' decision: ${decision.action}`,
+              `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-request: Branch '${currentBranchId}' decision: ${decision.action}`,
               decision.targetBranchId ? `-> ${decision.targetBranchId}` : ''
             );
           }
@@ -460,14 +467,14 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
               );
             } catch (hookError) {
               console.error(
-                `stable-request: [Workflow: ${workflowId}] Error in handleBranchDecision hook:`,
+                `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-request: Error in handleBranchDecision hook:`,
                 hookError
               );
             }
           }
         } catch (decisionError) {
           console.error(
-            `stable-request: [Workflow: ${workflowId}] Error in branch decision hook for ${currentBranch.id}:`,
+            `${formatLogContext({ workflowId, branchId: currentBranch.id })}stable-request: Error in branch decision hook for ${currentBranch.id}:`,
             decisionError
           );
           decision = { action: PHASE_DECISION_ACTIONS.CONTINUE };
@@ -486,7 +493,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
             const targetIndex = branches.findIndex(b => b.id === decision.targetBranchId);
             if (targetIndex === -1) {
               console.error(
-                `stable-request: [Workflow: ${workflowId}] Jump target branch '${decision.targetBranchId}' not found`
+                `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-request: Jump target branch '${decision.targetBranchId}' not found`
               );
               terminatedEarly = true;
               terminationReason = `Jump target branch '${decision.targetBranchId}' not found`;
@@ -502,7 +509,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
         case PHASE_DECISION_ACTIONS.SKIP:
           if (!currentBranch.allowSkip && currentBranch.allowSkip !== undefined) {
             console.warn(
-              `stable-request: [Workflow: ${workflowId}] Branch '${currentBranchId}' attempted to skip but allowSkip is false. Continuing normally.`
+              `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-request: Branch '${currentBranchId}' attempted to skip but allowSkip is false. Continuing normally.`
             );
             currentBranchId = branches[branchIndex + 1]?.id || null;
             break;
@@ -514,6 +521,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
               for (let skipIdx = branchIndex + 1; skipIdx < skipTargetIndex; skipIdx++) {
                 const skippedBranch = branches[skipIdx];
                 const skippedResult: BranchExecutionResult<ResponseDataType> = {
+                  workflowId,
                   branchId: skippedBranch.id,
                   branchIndex: skipIdx,
                   success: true,
@@ -543,6 +551,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
             const nextBranch = branches[branchIndex + 1];
             if (nextBranch) {
               const skippedResult: BranchExecutionResult<ResponseDataType> = {
+                workflowId,
                 branchId: nextBranch.id,
                 branchIndex: branchIndex + 1,
                 success: true,
@@ -571,7 +580,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
         case PHASE_DECISION_ACTIONS.REPLAY:
           if (!currentBranch.allowReplay && currentBranch.allowReplay !== undefined) {
             console.warn(
-              `stable-request: [Workflow: ${workflowId}] Branch '${currentBranchId}' attempted to replay but allowReplay is false. Continuing normally.`
+              `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-request: Branch '${currentBranchId}' attempted to replay but allowReplay is false. Continuing normally.`
             );
             currentBranchId = branches[branchIndex + 1]?.id || null;
             break;
@@ -599,7 +608,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     
     if (logPhaseResults) {
       console.warn(
-        `stable-request: [Workflow: ${workflowId}] ${terminationReason}`
+        `${formatLogContext({ workflowId })}stable-request: ${terminationReason}`
       );
     }
   }

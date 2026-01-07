@@ -1,5 +1,6 @@
 import { stableApiGateway } from '../core/index.js';
 import { safelyExecuteUnknownFunction } from './safely-execute-unknown-function';
+import { formatLogContext } from './format-log-context';
 import { STABLE_WORKFLOW_PHASE, STABLE_WORKFLOW_PHASE_RESULT } from '../types/index.js';
 
 export async function executePhase<RequestDataType = any, ResponseDataType = any>(
@@ -12,7 +13,8 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
     handlePhaseCompletion: Function,
     maxSerializableChars: number,
     workflowHookParams: any,
-    sharedBuffer?: Record<string, any>
+    sharedBuffer?: Record<string, any>,
+    branchId?: string
 ) {
     const phaseId = phase.id || `phase-${phaseIndex + 1}`;
     const phaseStartTime = Date.now();
@@ -23,7 +25,12 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
         concurrentExecution: phase.concurrentExecution ?? true,
         stopOnFirstError: phase.stopOnFirstError ?? false,
         requestGroups,
-        sharedBuffer
+        sharedBuffer,
+        executionContext: {
+            workflowId,
+            ...(branchId && { branchId }),
+            phaseId
+        }
     };
 
     if (phase.maxConcurrentRequests !== undefined) {
@@ -48,6 +55,8 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
     const phaseFailureCount = phaseResponses.filter(r => !r.success).length;
 
     const phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType> = {
+        workflowId,
+        ...(branchId && { branchId }),
         phaseId,
         phaseIndex,
         success: phaseFailureCount === 0,
@@ -61,7 +70,7 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
 
     if (logPhaseResults) {
         console.info(
-            `stable-request: [Workflow: ${workflowId}] Phase ${phaseId} completed:`,
+            `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Phase ${phaseId} completed:`,
             `${phaseSuccessCount}/${phaseResponses.length} successful`,
             `(${phaseExecutionTime}ms)`
         );
@@ -72,6 +81,7 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
             await safelyExecuteUnknownFunction(
                 handlePhaseCompletion, {
                     workflowId,
+                    ...(branchId && { branchId }),
                     phaseResult,
                     maxSerializableChars,
                     params: workflowHookParams?.handlePhaseCompletionParams,
@@ -80,7 +90,7 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
             );
         } catch (hookError) {
             console.error(
-                `stable-request: [Workflow: ${workflowId}] Error in handlePhaseCompletion hook:`,
+                `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Error in handlePhaseCompletion hook:`,
                 hookError
             );
         }

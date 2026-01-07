@@ -1,5 +1,6 @@
 import { executePhase } from './execute-phase.js';
 import { safelyExecuteUnknownFunction } from './safely-execute-unknown-function.js';
+import { formatLogContext } from './format-log-context.js';
 import { PHASE_DECISION_ACTIONS } from '../enums/index.js';
 import {
   EXECUTE_NON_LINEAR_WORKFLOW_RESPONSE,
@@ -16,6 +17,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
   const {
     phases,
     workflowId,
+    branchId,
     commonGatewayOptions,
     requestGroups,
     logPhaseResults,
@@ -55,7 +57,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
     if (!phaseData) {
       if (logPhaseResults) {
         console.error(
-          `stable-request: [Workflow: ${workflowId}] Phase '${currentPhaseId}' not found. Terminating workflow.`
+          `${formatLogContext({ workflowId, branchId })}stable-request: Phase '${currentPhaseId}' not found. Terminating workflow.`
         );
       }
       terminatedEarly = true;
@@ -99,13 +101,16 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
           handlePhaseCompletion,
           maxSerializableChars,
           workflowHookParams,
-          sharedBuffer
+          sharedBuffer,
+          branchId
         ).then(result => ({
           ...result,
           executionNumber,
           phaseId: id,
           phaseIndex: idx
         })).catch(error => ({
+          workflowId,
+          ...(branchId && { branchId }),
           phaseId: id,
           phaseIndex: idx,
           success: false,
@@ -160,6 +165,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
             lastConcurrentPhase.phase.phaseDecisionHook,
             {
               workflowId,
+              ...(branchId && { branchId }),
               phaseResult: lastResult,
               phaseId: lastConcurrentPhase.id,
               phaseIndex: lastConcurrentPhase.index,
@@ -176,7 +182,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
 
           if (logPhaseResults) {
             console.info(
-              `stable-request: [Workflow: ${workflowId}] Concurrent group decision: ${decision.action}`,
+              `${formatLogContext({ workflowId, branchId })}stable-request: Concurrent group decision: ${decision.action}`,
               decision.targetPhaseId ? `-> ${decision.targetPhaseId}` : ''
             );
           }
@@ -193,7 +199,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
           }
         } catch (decisionError: any) {
           console.error(
-            `stable-request: [Workflow: ${workflowId}] Error in phaseDecisionHook for concurrent group:`,
+            `${formatLogContext({ workflowId, branchId })}stable-request: Error in phaseDecisionHook for concurrent group:`,
             decisionError
           );
           decision = { action: PHASE_DECISION_ACTIONS.CONTINUE };
@@ -227,7 +233,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
         case PHASE_DECISION_ACTIONS.REPLAY:
           if (logPhaseResults) {
             console.warn(
-              `stable-request: [Workflow: ${workflowId}] Replay is not supported for concurrent phase groups. Continuing to next phase.`
+              `${formatLogContext({ workflowId, branchId })}stable-request: Replay is not supported for concurrent phase groups. Continuing to next phase.`
             );
           }
           currentPhaseId = phases[j]?.id || `phase-${j + 1}`;
@@ -239,7 +245,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
         case PHASE_DECISION_ACTIONS.JUMP:
           if (!decision.targetPhaseId) {
             console.error(
-              `stable-request: [Workflow: ${workflowId}] Jump decision requires targetPhaseId. Continuing to next phase.`
+              `${formatLogContext({ workflowId, branchId })}stable-request: Jump decision requires targetPhaseId. Continuing to next phase.`
             );
             currentPhaseId = phases[j]?.id || `phase-${j + 1}`;
             if (j >= phases.length) {
@@ -271,11 +277,13 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
     if (executionNumber > maxReplayCount + 1) {
       if (logPhaseResults) {
         console.warn(
-          `stable-request: [Workflow: ${workflowId}] Phase '${phaseId}' exceeded max replay count (${maxReplayCount}). Skipping.`
+          `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Phase '${phaseId}' exceeded max replay count (${maxReplayCount}). Skipping.`
         );
       }
       
       const skippedResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType> = {
+        workflowId,
+        ...(branchId && { branchId }),
         phaseId,
         phaseIndex,
         success: false,
@@ -302,7 +310,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
     if (logPhaseResults) {
       const executionLabel = executionNumber > 1 ? ` (execution #${executionNumber})` : '';
       console.info(
-        `\nstable-request: [Workflow: ${workflowId}] Executing Phase '${phaseId}'${executionLabel}`
+        `${formatLogContext({ workflowId, branchId, phaseId })}\nstable-request: Executing Phase '${phaseId}'${executionLabel}`
       );
     }
 
@@ -317,7 +325,8 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
         handlePhaseCompletion,
         maxSerializableChars,
         workflowHookParams,
-        sharedBuffer
+        sharedBuffer,
+        branchId
       );
 
       phaseResult.executionNumber = executionNumber;
@@ -345,6 +354,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
             phase.phaseDecisionHook,
             {
               workflowId,
+              ...(branchId && { branchId }),
               phaseResult,
               phaseId,
               phaseIndex,
@@ -363,7 +373,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
 
           if (logPhaseResults) {
             console.info(
-              `stable-request: [Workflow: ${workflowId}] Phase '${phaseId}' decision: ${decision.action}`,
+              `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Phase '${phaseId}' decision: ${decision.action}`,
               decision.targetPhaseId ? `-> ${decision.targetPhaseId}` : ''
             );
           }
@@ -380,7 +390,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
           }
         } catch (decisionError: any) {
           console.error(
-            `stable-request: [Workflow: ${workflowId}] Error in phaseDecisionHook for phase '${phaseId}':`,
+            `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Error in phaseDecisionHook for phase '${phaseId}':`,
             decisionError
           );
           decision = { action: PHASE_DECISION_ACTIONS.CONTINUE };
@@ -415,7 +425,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
         case PHASE_DECISION_ACTIONS.SKIP:
           if (!phase.allowSkip && phase.allowSkip !== undefined) {
             console.warn(
-              `stable-request: [Workflow: ${workflowId}] Phase '${phaseId}' attempted to skip but allowSkip is false. Continuing normally.`
+              `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Phase '${phaseId}' attempted to skip but allowSkip is false. Continuing normally.`
             );
             currentPhaseId = phases[phaseIndex + 1]?.id || `phase-${phaseIndex + 2}`;
             if (phaseIndex + 1 >= phases.length) {
@@ -436,7 +446,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
         case PHASE_DECISION_ACTIONS.REPLAY:
           if (!phase.allowReplay && phase.allowReplay !== undefined) {
             console.warn(
-              `stable-request: [Workflow: ${workflowId}] Phase '${phaseId}' attempted to replay but allowReplay is false. Continuing normally.`
+              `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Phase '${phaseId}' attempted to replay but allowReplay is false. Continuing normally.`
             );
             currentPhaseId = phases[phaseIndex + 1]?.id || `phase-${phaseIndex + 2}`;
             if (phaseIndex + 1 >= phases.length) {
@@ -472,11 +482,13 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
 
     } catch (phaseError: any) {
       console.error(
-        `stable-request: [Workflow: ${workflowId}] Error executing phase '${phaseId}':`,
+        `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Error executing phase '${phaseId}':`,
         phaseError
       );
 
       const errorResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType> = {
+        workflowId,
+        ...(branchId && { branchId }),
         phaseId,
         phaseIndex,
         success: false,
@@ -507,6 +519,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
           handlePhaseError,
           {
             workflowId,
+            ...(branchId && { branchId }),
             phaseResult: errorResult,
             error: phaseError,
             maxSerializableChars,
@@ -516,7 +529,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
         );
       } catch (hookError) {
         console.error(
-          `stable-request: [Workflow: ${workflowId}] Error in handlePhaseError hook:`,
+          `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Error in handlePhaseError hook:`,
           hookError
         );
       }
@@ -537,7 +550,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
   if (iterationCount >= maxWorkflowIterations && currentPhaseId) {
     if (logPhaseResults) {
       console.warn(
-        `stable-request: [Workflow: ${workflowId}] Reached max workflow iterations (${maxWorkflowIterations}). Terminating.`
+        `${formatLogContext({ workflowId, branchId })}stable-request: Reached max workflow iterations (${maxWorkflowIterations}). Terminating.`
       );
     }
     terminatedEarly = true;

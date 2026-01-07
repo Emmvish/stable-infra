@@ -1,15 +1,17 @@
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
-import { ReqFnResponse, TRIAL_MODE_OPTIONS, CacheConfig } from '../types/index.js';
+import { ReqFnResponse, TRIAL_MODE_OPTIONS, CacheConfig, ExecutionContext } from '../types/index.js';
 import { safelyStringify } from './safely-stringify.js';
 import { isRetryableError } from './is-retryable-error.js';
 import { CacheManager, getGlobalCacheManager } from './cache-manager.js';
+import { formatLogContext } from './format-log-context.js';
 
 export async function reqFn<RequestDataType = any, ResponseDataType = any>(
   reqData: AxiosRequestConfig<RequestDataType>,
   resReq = false,
   maxSerializableChars = 1000,
   trialMode: TRIAL_MODE_OPTIONS = { enabled: false },
-  cacheConfig?: CacheConfig
+  cacheConfig?: CacheConfig,
+  executionContext?: ExecutionContext
 ): Promise<ReqFnResponse<ResponseDataType>> {
   const startTime = Date.now();
   let stopTime = 0;
@@ -39,7 +41,7 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
         Math.random() <= (trialMode?.reqFailureProbability ?? 0);
       if (trialCondition) {
         console.error(
-          'stable-request: Request failed in trial mode.\nRequest data:\n',
+          `${formatLogContext(executionContext)}stable-request: Request failed in trial mode.\nRequest data:\n`,
           safelyStringify(reqData, maxSerializableChars)
         );
         throw new Error('stable-request: Request failed in trial mode.');

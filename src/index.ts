@@ -77,6 +77,7 @@ export {
     executePhase,
     executeSequentially,
     extractCommonRequestConfigOptions,
+    formatLogContext,
     generateAxiosRequestConfig,
     getNewDelayTime,
     isRetryableError,

@@ -8,6 +8,7 @@ export { executeNonLinearWorkflow } from './execute-non-linear-workflow.js';
 export { executePhase } from './execute-phase.js';
 export { executeSequentially } from './execute-sequentially.js';
 export { extractCommonRequestConfigOptions } from './extract-common-request-config-options.js';
+export { formatLogContext } from './format-log-context.js';
 export { generateAxiosRequestConfig } from './generate-axios-request-config.js';
 export { getNewDelayTime } from './get-new-delay-time.js';
 export { isRetryableError } from './is-retryable-error.js';

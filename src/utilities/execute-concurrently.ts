@@ -38,7 +38,11 @@ export async function executeConcurrently<RequestDataType = any, ResponseDataTyp
                 reqData: prepareApiRequestData<RequestDataType, ResponseDataType>(req, requestExecutionOptions),
                 ...prepareApiRequestOptions<RequestDataType, ResponseDataType>(req, requestExecutionOptions),
                 commonBuffer: requestExecutionOptions.sharedBuffer ?? req.requestOptions.commonBuffer,
-                ...(circuitBreaker ? { circuitBreaker } : {})
+                ...(circuitBreaker ? { circuitBreaker } : {}),
+                executionContext: {
+                    ...requestExecutionOptions.executionContext,
+                    requestId: req.id
+                }
             };
 
             try {

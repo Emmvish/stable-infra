@@ -9,7 +9,8 @@ import {
     executeNonLinearWorkflow,
     safelyExecuteUnknownFunction, 
     safelyStringify,
-    CircuitBreaker
+    CircuitBreaker,
+    formatLogContext
 } from '../utilities/index.js';
 
 export async function stableWorkflow<RequestDataType = any, ResponseDataType = any>(
@@ -192,6 +193,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
 
         const handlePhaseExecutionError = async (phaseId: string, phaseIndex: number, error: any, phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>) => {
             const phaseResult = {
+                workflowId,
                 phaseId,
                 phaseIndex,
                 success: false,
@@ -208,7 +210,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
 
             if (logPhaseResults) {
                 console.error(
-                    `stable-request: [Workflow: ${workflowId}] Phase ${phaseId} failed:`,
+                    `${formatLogContext({ workflowId, phaseId })}stable-request: Phase ${phaseId} failed:`,
                     error
                 );
             }
