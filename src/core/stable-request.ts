@@ -46,7 +46,8 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
       preExecution?.preExecutionHook as Function,
       {
         inputParams: preExecution?.preExecutionHookParams,
-        commonBuffer
+        commonBuffer,
+        stableRequestOptions: options
       },
       options.statePersistence,
       executionContext || {},

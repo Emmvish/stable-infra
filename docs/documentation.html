@@ -39,6 +39,13 @@
                             <li><a href="#stable-workflow">stableWorkflow</a></li>
                         </ul>
                     </li>
+                    <li><a href="#config-cascading">Configuration Cascading</a>
+                        <ul>
+                            <li><a href="#api-gateway-cascading">API Gateway Cascading</a></li>
+                            <li><a href="#workflow-cascading">Workflow Cascading</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#state-buffers">State Buffers</a></li>
                     <li><a href="#retry-strategies">Retry Strategies</a></li>
                     <li><a href="#circuit-breaker">Circuit Breaker</a></li>
                     <li><a href="#caching">Response Caching</a></li>
@@ -52,6 +59,7 @@
                         </ul>
                     </li>
                     <li><a href="#observability">Observability</a></li>
+                    <li><a href="#pre-execution">Pre-Execution Hook</a></li>
                     <li><a href="#trial-mode">Trial Mode</a></li>
                     <li><a href="#state-persistence">State Persistence</a></li>
                     <li><a href="#best-practices">Best Practices</a></li>
@@ -150,7 +158,7 @@ const userData = await stableRequest({
                             <tr>
                                 <td><code>wait</code></td>
                                 <td><code>number</code></td>
-                                <td><code>0</code></td>
+                                <td><code>1000</code></td>
                                 <td>No</td>
                                 <td>Base wait time in milliseconds between retry attempts</td>
                             </tr>
@@ -395,7 +403,7 @@ const results = await stableApiGateway(requests, {
                             <tr>
                                 <td><code>commonWait</code></td>
                                 <td><code>number</code></td>
-                                <td><code>0</code></td>
+                                <td><code>1000</code></td>
                                 <td>No</td>
                                 <td>Default wait time between retries for all requests</td>
                             </tr>
@@ -444,7 +452,7 @@ const results = await stableApiGateway(requests, {
                             <tr>
                                 <td><code>commonTrialMode</code></td>
                                 <td><code>TRIAL_MODE_OPTIONS</code></td>
-                                <td><code>undefined</code></td>
+                                <td><code>{ enabled: false }</code></td>
                                 <td>No</td>
                                 <td>Default trial mode configuration for all requests</td>
                             </tr>
@@ -623,6 +631,129 @@ console.log(`Successful: ${result.successfulRequests}`);
 console.log(`Failed: ${result.failedRequests}`);
 console.log(`Execution time: ${result.executionTime}ms`);</code></pre>
 
+                    <h4>STABLE_WORKFLOW_PHASE Interface</h4>
+                    <p>Complete parameter reference for defining individual workflow phases:</p>
+                    <div class="table-wrapper">
+                    <table class="params-table">
+                        <thead>
+                            <tr>
+                                <th>Parameter</th>
+                                <th>Type</th>
+                                <th>Default</th>
+                                <th>Required</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>id</code></td>
+                                <td><code>string</code></td>
+                                <td><code>auto-generated</code></td>
+                                <td>No</td>
+                                <td>Unique identifier for the phase. Auto-generated if not provided</td>
+                            </tr>
+                            <tr>
+                                <td><code>requests</code></td>
+                                <td><code>API_GATEWAY_REQUEST[]</code></td>
+                                <td>-</td>
+                                <td>Yes</td>
+                                <td>Array of requests to execute in this phase</td>
+                            </tr>
+                            <tr>
+                                <td><code>concurrentExecution</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>If <code>true</code>, executes all requests in this phase concurrently. If <code>false</code>, executes sequentially</td>
+                            </tr>
+                            <tr>
+                                <td><code>stopOnFirstError</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>If <code>true</code>, stops executing remaining requests in this phase after first error</td>
+                            </tr>
+                            <tr>
+                                <td><code>markConcurrentPhase</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>Mark this phase for concurrent execution in mixed execution mode. Used with <code>enableMixedExecution</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>maxConcurrentRequests</code></td>
+                                <td><code>number</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Maximum number of concurrent requests for this phase. Overrides workflow-level setting</td>
+                            </tr>
+                            <tr>
+                                <td><code>rateLimit</code></td>
+                                <td><code>RateLimitConfig</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Rate limiting configuration for this phase. Overrides workflow-level setting</td>
+                            </tr>
+                            <tr>
+                                <td><code>circuitBreaker</code></td>
+                                <td><code>CircuitBreakerConfig</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Circuit breaker configuration for this phase. Overrides workflow-level setting</td>
+                            </tr>
+                            <tr>
+                                <td><code>maxReplayCount</code></td>
+                                <td><code>number</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Maximum number of times this phase can be replayed in non-linear workflows</td>
+                            </tr>
+                            <tr>
+                                <td><code>allowReplay</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>true</code></td>
+                                <td>No</td>
+                                <td>Whether this phase can be replayed via phase decision hook</td>
+                            </tr>
+                            <tr>
+                                <td><code>allowSkip</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>true</code></td>
+                                <td>No</td>
+                                <td>Whether this phase can be skipped via phase decision hook</td>
+                            </tr>
+                            <tr>
+                                <td><code>phaseDecisionHook</code></td>
+                                <td><code>(options: PhaseDecisionHookOptions) =&gt; PhaseExecutionDecision | Promise&lt;PhaseExecutionDecision&gt;</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Hook function to determine what action to take after this phase completes. Used for non-linear workflows. Returns decision with action: CONTINUE, SKIP, JUMP, REPLAY, or TERMINATE</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonConfig</code></td>
+                                <td><code>Partial&lt;API_GATEWAY_OPTIONS&gt;</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Phase-level configuration containing all <code>common*</code> properties from API_GATEWAY_OPTIONS interface (e.g., commonAttempts, commonWait, commonRetryStrategy, commonRequestData, etc.). These settings apply to all requests in this phase and override workflow-level common settings</td>
+                            </tr>
+                            <tr>
+                                <td><code>branchId</code></td>
+                                <td><code>string</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Branch identifier when this phase is part of a branched workflow</td>
+                            </tr>
+                            <tr>
+                                <td><code>statePersistence</code></td>
+                                <td><code>StatePersistenceConfig</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>State persistence configuration for this phase. Allows saving/loading phase state to external storage</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    </div>
+
                     <h4>STABLE_WORKFLOW_OPTIONS Interface</h4>
                     <p>Complete parameter reference for the <code>stableWorkflow</code> function options. Extends all <code>API_GATEWAY_OPTIONS</code> plus workflow-specific parameters:</p>
                     <div class="table-wrapper">
@@ -773,7 +904,7 @@ console.log(`Execution time: ${result.executionTime}ms`);</code></pre>
                             <tr>
                                 <td><code>commonWait</code></td>
                                 <td><code>number</code></td>
-                                <td><code>0</code></td>
+                                <td><code>1000</code></td>
                                 <td>No</td>
                                 <td>Default wait time between retries</td>
                             </tr>
@@ -941,6 +1072,701 @@ console.log(`Execution time: ${result.executionTime}ms`);</code></pre>
                         </tbody>
                     </table>
                     </div>
+            </section>
+
+            <section id="config-cascading" class="doc-section">
+                <h2>Configuration Cascading</h2>
+                <p>Understand how configuration options cascade and override from higher levels to lower levels, allowing you to set defaults globally while customizing specific requests.</p>
+
+                <h3>Cascading Principles</h3>
+                <p>Configuration follows a hierarchical override pattern where:</p>
+                <ul>
+                    <li><strong>Lower-level configurations override higher-level ones</strong></li>
+                    <li><strong>More specific settings take precedence over general settings</strong></li>
+                    <li><strong>Request-level options always have the highest priority</strong></li>
+                </ul>
+
+                <h3 id="api-gateway-cascading">API Gateway Configuration Cascading</h3>
+                <p>In <code>stableApiGateway</code>, configuration flows from gateway options to individual requests:</p>
+                
+                <div class="hierarchy-diagram">
+                    <pre><code class="language-text">Gateway Options (common*)
+    ↓
+Request Group Options (for matching groupId)
+    ↓
+Individual Request Options
+    ↓
+<strong>Final Configuration Applied</strong></code></pre>
+                </div>
+
+                <h4>Cascading Hierarchy</h4>
+                <ol>
+                    <li><strong>Gateway-Level (Lowest Priority):</strong> <code>common*</code> options apply to all requests
+                        <ul>
+                            <li><code>commonRequestData</code> - Shared request configuration (hostname, headers, etc.)</li>
+                            <li><code>commonAttempts</code> - Default retry attempts</li>
+                            <li><code>commonWait</code> - Default wait time between retries</li>
+                            <li><code>commonRetryStrategy</code> - Default retry strategy</li>
+                            <li><code>commonJitter</code> - Default jitter setting</li>
+                            <li>And all other <code>common*</code> properties...</li>
+                        </ul>
+                    </li>
+                    <li><strong>Request Group-Level (Medium Priority):</strong> Settings for specific request groups override gateway defaults</li>
+                    <li><strong>Request-Level (Highest Priority):</strong> Individual request options override all others</li>
+                </ol>
+
+                <h4>Example: API Gateway Cascading</h4>
+                <pre><code class="language-typescript">const requests = [
+  { 
+    id: 'user-1', 
+    groupId: 'critical',
+    requestOptions: { 
+      reqData: { path: '/users/1' },
+      attempts: 7  // Overrides group and gateway settings
+    }
+  },
+  { 
+    id: 'user-2', 
+    groupId: 'critical',
+    requestOptions: { 
+      reqData: { path: '/users/2' }
+      // Uses group settings (5 attempts)
+    }
+  },
+  { 
+    id: 'analytics', 
+    groupId: 'optional',
+    requestOptions: { 
+      reqData: { path: '/analytics' }
+      // Uses group settings (1 attempt)
+    }
+  },
+  { 
+    id: 'logs', 
+    requestOptions: { 
+      reqData: { path: '/logs' }
+      // No groupId, uses gateway defaults (3 attempts)
+    }
+  }
+];
+
+await stableApiGateway(requests, {
+  // Gateway-Level (applies to all)
+  commonRequestData: { 
+    hostname: 'api.example.com',
+    headers: { 'X-API-Key': 'secret' }
+  },
+  commonAttempts: 3,              // Default for all
+  commonWait: 1000,
+  commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+  
+  // Request Group-Level (overrides gateway defaults)
+  requestGroups: [
+    {
+      groupId: 'critical',
+      commonAttempts: 5,          // Overrides gateway's 3
+      commonWait: 2000            // Overrides gateway's 1000
+    },
+    {
+      groupId: 'optional',
+      commonAttempts: 1,          // Overrides gateway's 3
+      commonWait: 500             // Overrides gateway's 1000
+    }
+  ]
+});
+
+// Final Configuration Applied:
+// user-1:     7 attempts, 1000ms wait (request-level attempts, gateway wait)
+// user-2:     5 attempts, 2000ms wait (group-level overrides)
+// analytics:  1 attempt,  500ms wait  (group-level overrides)
+// logs:       3 attempts, 1000ms wait (gateway-level defaults)</code></pre>
+
+                <h3 id="workflow-cascading">Workflow Configuration Cascading</h3>
+                <p>In <code>stableWorkflow</code>, configuration flows through multiple layers:</p>
+                
+                <div class="hierarchy-diagram">
+                    <pre><code class="language-text">Workflow Options (common*)
+    ↓
+Branch Configuration (in branched workflows)
+    ↓
+Phase Configuration (commonConfig property)
+    ↓
+Request Group Options (for matching groupId)
+    ↓
+Individual Request Options
+    ↓
+<strong>Final Configuration Applied</strong></code></pre>
+                </div>
+
+                <h4>Cascading Hierarchy</h4>
+                <ol>
+                    <li><strong>Workflow-Level (Lowest Priority):</strong> <code>common*</code> options in workflow options apply to all phases and requests</li>
+                    <li><strong>Branch-Level:</strong> In branched workflows, branch configuration overrides workflow defaults</li>
+                    <li><strong>Phase-Level:</strong> Phase <code>commonConfig</code> property overrides workflow/branch settings for that phase</li>
+                    <li><strong>Request Group-Level:</strong> Request group settings override phase/workflow defaults</li>
+                    <li><strong>Request-Level (Highest Priority):</strong> Individual request options override all others</li>
+                </ol>
+
+                <h4>Example: Workflow Cascading</h4>
+                <pre><code class="language-typescript">const phases = [
+  {
+    id: 'critical-phase',
+    requests: [
+      { 
+        id: 'auth', 
+        requestOptions: { 
+          reqData: { path: '/auth' },
+          attempts: 10  // Highest priority - overrides all
+        }
+      },
+      { 
+        id: 'validate', 
+        requestOptions: { 
+          reqData: { path: '/validate' }
+          // Uses phase commonConfig (7 attempts)
+        }
+      }
+    ],
+    // Phase-Level Configuration
+    commonConfig: {
+      commonAttempts: 7,              // Overrides workflow's 3
+      commonWait: 3000,               // Overrides workflow's 1000
+      commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+    }
+  },
+  {
+    id: 'data-fetch',
+    concurrentExecution: true,
+    requests: [
+      { 
+        id: 'users', 
+        groupId: 'important',
+        requestOptions: { 
+          reqData: { path: '/users' }
+          // Uses request group settings (5 attempts)
+        }
+      },
+      { 
+        id: 'products', 
+        requestOptions: { 
+          reqData: { path: '/products' }
+          // Uses workflow defaults (3 attempts)
+        }
+      }
+    ]
+    // No commonConfig, uses workflow defaults
+  }
+];
+
+await stableWorkflow(phases, {
+  workflowId: 'config-cascade-demo',
+  
+  // Workflow-Level (applies to all phases)
+  commonRequestData: { 
+    hostname: 'api.example.com',
+    headers: { 'Authorization': 'Bearer token' }
+  },
+  commonAttempts: 3,
+  commonWait: 1000,
+  commonRetryStrategy: RETRY_STRATEGIES.LINEAR,
+  
+  // Request Group-Level
+  requestGroups: [
+    {
+      groupId: 'important',
+      commonAttempts: 5,              // Overrides workflow's 3
+      commonWait: 2000                // Overrides workflow's 1000
+    }
+  ]
+});
+
+// Final Configuration Applied:
+// auth:     10 attempts, 3000ms wait (request > phase)
+// validate: 7 attempts,  3000ms wait (phase > workflow)
+// users:    5 attempts,  2000ms wait (group > workflow)
+// products: 3 attempts,  1000ms wait (workflow defaults)</code></pre>
+
+                <h4>Example: Branched Workflow Cascading</h4>
+                <pre><code class="language-typescript">const branches = [
+  {
+    branchId: 'payment-branch',
+    phases: [
+      {
+        id: 'authorize',
+        requests: [
+          { 
+            id: 'check-funds', 
+            requestOptions: { 
+              reqData: { path: '/payment/authorize' },
+              attempts: 8  // Request-level (highest priority)
+            }
+          }
+        ],
+        commonConfig: {
+          commonAttempts: 6,          // Phase-level
+          commonWait: 2000
+        }
+      }
+    ],
+    commonConfig: {
+      commonAttempts: 4,              // Branch-level
+      commonWait: 1500
+    }
+  },
+  {
+    branchId: 'notification-branch',
+    phases: [
+      {
+        id: 'send-email',
+        requests: [
+          { 
+            id: 'email', 
+            requestOptions: { 
+              reqData: { path: '/notify/email' }
+              // Uses branch defaults (2 attempts)
+            }
+          }
+        ]
+        // No phase commonConfig, uses branch settings
+      }
+    ],
+    commonConfig: {
+      commonAttempts: 2,              // Branch-level
+      commonWait: 500
+    }
+  }
+];
+
+await stableWorkflow([], {
+  workflowId: 'branched-cascade',
+  enableBranchExecution: true,
+  branches,
+  
+  // Workflow-Level
+  commonAttempts: 3,                  // Lowest priority
+  commonWait: 1000,
+  commonRequestData: { 
+    hostname: 'api.example.com' 
+  }
+});
+
+// Final Configuration Applied:
+// check-funds: 8 attempts, 2000ms wait (request > phase > branch > workflow)
+// email:       2 attempts, 500ms wait  (branch > workflow)</code></pre>
+
+                <h3>Configuration Precedence Rules</h3>
+                <p>When the same configuration property is defined at multiple levels:</p>
+                
+                <h4>API Gateway Priority (High to Low)</h4>
+                <pre><code class="language-text">Request Options
+    ↓
+Request Group Options
+    ↓
+Gateway common* Options</code></pre>
+
+                <h4>Workflow Priority (High to Low)</h4>
+                <pre><code class="language-text">Request Options
+    ↓
+Request Group Options
+    ↓
+Phase commonConfig
+    ↓
+Branch commonConfig (in branched workflows)
+    ↓
+Workflow common* Options</code></pre>
+            </section>
+
+            <section id="state-buffers" class="doc-section">
+                <h2>State Buffers</h2>
+                <h3>Overview</h3>
+                <p>Buffers provide a mechanism for sharing data across different parts of your workflows without relying on global variables. There are two types of buffers:</p>
+                <ul>
+                    <li><strong>commonBuffer</strong> - Request-level buffer for individual requests in <code>stableRequest</code></li>
+                    <li><strong>sharedBuffer</strong> - Gateway/Workflow-level buffer shared across all requests in <code>stableApiGateway</code> and <code>stableWorkflow</code></li>
+                </ul>
+
+                <h3>The Override Rule</h3>
+                <p class="highlight-box"><strong>Important:</strong> When both <code>commonBuffer</code> and <code>sharedBuffer</code> are present, <code>sharedBuffer</code> takes precedence and completely overrides <code>commonBuffer</code> for that execution context.</p>
+
+                <h3>commonBuffer - Request-Level State</h3>
+                <p>Used in <code>stableRequest</code> to maintain state across retry attempts and hooks for a single request.</p>
+
+                <h4>Use Cases</h4>
+                <ul>
+                    <li>Store authentication tokens obtained during pre-execution</li>
+                    <li>Track retry-specific metadata</li>
+                    <li>Pass data between request hooks (preExecution, responseAnalyzer, handleErrors)</li>
+                    <li>Accumulate information across multiple retry attempts</li>
+                </ul>
+
+                <h4>Example: Using commonBuffer</h4>
+                <pre><code class="language-typescript">await stableRequest({
+  reqData: { 
+    hostname: 'api.example.com', 
+    path: '/protected-resource' 
+  },
+  resReq: true,
+  attempts: 3,
+  
+  // Initialize buffer
+  commonBuffer: {
+    attemptCount: 0,
+    errors: []
+  },
+  
+  // Pre-execution: Modify request based on buffer
+  preExecution: {
+    handler: async ({ reqData, sharedBuffer, attempt }) => {
+      // sharedBuffer here refers to commonBuffer for stableRequest
+      sharedBuffer.attemptCount = attempt;
+      
+      // Add dynamic authentication if not already present
+      if (!sharedBuffer.authToken) {
+        sharedBuffer.authToken = await getAuthToken();
+      }
+      
+      reqData.headers = {
+        'Authorization': `Bearer ${sharedBuffer.authToken}`,
+        'X-Attempt': attempt.toString()
+      };
+      
+      return reqData;
+    }
+  },
+  
+  // Response analyzer: Use buffer to track patterns
+  responseAnalyzer: async ({ data, status, sharedBuffer }) => {
+    if (status === 401) {
+      // Auth token expired, clear it for retry
+      delete sharedBuffer.authToken;
+      return false; // Retry
+    }
+    return true;
+  },
+  
+  // Error handler: Accumulate errors in buffer
+  handleErrors: async ({ error, sharedBuffer, attempt }) => {
+    sharedBuffer.errors.push({
+      attempt,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+    console.log(`Error history:`, sharedBuffer.errors);
+  }
+});</code></pre>
+
+                <h3>sharedBuffer - Gateway/Workflow-Level State</h3>
+                <p>Used in <code>stableApiGateway</code> and <code>stableWorkflow</code> to share state across multiple requests and phases.</p>
+
+                <h4>Use Cases</h4>
+                <ul>
+                    <li>Share authentication tokens across all requests</li>
+                    <li>Pass data from one phase to another in workflows</li>
+                    <li>Accumulate results across multiple requests</li>
+                    <li>Implement workflow-level state machines</li>
+                    <li>Track global metrics (total processed items, errors, etc.)</li>
+                    <li>Store checkpoint data for workflow resumption</li>
+                </ul>
+
+                <h4>Example: API Gateway with sharedBuffer</h4>
+                <pre><code class="language-typescript">const requests = [
+  {
+    id: 'login',
+    requestOptions: {
+      reqData: { 
+        hostname: 'api.example.com',
+        path: '/auth/login',
+        method: 'POST',
+        body: { username: 'user', password: 'pass' }
+      },
+      resReq: true,
+      preExecution: {
+        handler: async ({ reqData, sharedBuffer }) => {
+          // First request - no token needed
+          return reqData;
+        }
+      }
+    }
+  },
+  {
+    id: 'get-profile',
+    requestOptions: {
+      reqData: { 
+        hostname: 'api.example.com',
+        path: '/user/profile'
+      },
+      resReq: true,
+      preExecution: {
+        handler: async ({ reqData, sharedBuffer }) => {
+          // Use token from previous request
+          reqData.headers = {
+            'Authorization': `Bearer ${sharedBuffer.authToken}`
+          };
+          return reqData;
+        }
+      }
+    }
+  },
+  {
+    id: 'get-orders',
+    requestOptions: {
+      reqData: { 
+        hostname: 'api.example.com',
+        path: '/user/orders'
+      },
+      resReq: true,
+      preExecution: {
+        handler: async ({ reqData, sharedBuffer }) => {
+          // Reuse same token
+          reqData.headers = {
+            'Authorization': `Bearer ${sharedBuffer.authToken}`
+          };
+          return reqData;
+        }
+      }
+    }
+  }
+];
+
+await stableApiGateway(requests, {
+  concurrentExecution: false, // Sequential for proper token flow
+  
+  // sharedBuffer is accessible to all requests
+  sharedBuffer: {
+    authToken: null,
+    userProfile: null,
+    totalOrders: 0
+  },
+  
+  // Common success handler updates shared state
+  commonHandleSuccessfulAttemptData: async ({ data, sharedBuffer, executionContext }) => {
+    if (executionContext.requestId === 'login') {
+      sharedBuffer.authToken = data.token;
+      console.log('Auth token stored in sharedBuffer');
+    } else if (executionContext.requestId === 'get-profile') {
+      sharedBuffer.userProfile = data;
+    } else if (executionContext.requestId === 'get-orders') {
+      sharedBuffer.totalOrders = data.length;
+    }
+  }
+});
+
+// After execution, sharedBuffer contains all accumulated data
+console.log('Total orders:', sharedBuffer.totalOrders);</code></pre>
+
+                <h4>Example: Workflow with sharedBuffer</h4>
+                <pre><code class="language-typescript">const phases = [
+  {
+    id: 'authentication',
+    requests: [{
+      id: 'auth',
+      requestOptions: {
+        reqData: { 
+          hostname: 'api.example.com',
+          path: '/auth/login',
+          method: 'POST',
+          body: { username: 'user', password: 'pass' }
+        },
+        resReq: true
+      }
+    }]
+  },
+  {
+    id: 'fetch-data',
+    concurrentExecution: true,
+    requests: [
+      { 
+        id: 'users', 
+        requestOptions: { 
+          reqData: { path: '/users' },
+          resReq: true,
+          preExecution: {
+            handler: async ({ reqData, sharedBuffer }) => {
+              // Use token from auth phase
+              reqData.headers = {
+                'Authorization': `Bearer ${sharedBuffer.authToken}`
+              };
+              return reqData;
+            }
+          }
+        }
+      },
+      { 
+        id: 'products', 
+        requestOptions: { 
+          reqData: { path: '/products' },
+          resReq: true,
+          preExecution: {
+            handler: async ({ reqData, sharedBuffer }) => {
+              // Same token for all requests
+              reqData.headers = {
+                'Authorization': `Bearer ${sharedBuffer.authToken}`
+              };
+              return reqData;
+            }
+          }
+        }
+      }
+    ]
+  },
+  {
+    id: 'process',
+    requests: [{
+      id: 'analytics',
+      requestOptions: {
+        reqData: { 
+          path: '/analytics',
+          method: 'POST',
+          body: {} // Will be populated from sharedBuffer
+        },
+        resReq: false,
+        preExecution: {
+          handler: async ({ reqData, sharedBuffer }) => {
+            // Use data from previous phases
+            reqData.body = {
+              userCount: sharedBuffer.users?.length || 0,
+              productCount: sharedBuffer.products?.length || 0
+            };
+            reqData.headers = {
+              'Authorization': `Bearer ${sharedBuffer.authToken}`
+            };
+            return reqData;
+          }
+        }
+      }
+    }]
+  }
+];
+
+await stableWorkflow(phases, {
+  workflowId: 'data-sync',
+  commonRequestData: { hostname: 'api.example.com' },
+  
+  // sharedBuffer accessible across all phases
+  sharedBuffer: {
+    authToken: null,
+    users: [],
+    products: []
+  },
+  
+  // Store successful response data in sharedBuffer
+  handlePhaseCompletion: async ({ phaseResult, sharedBuffer }) => {
+    if (phaseResult.phaseId === 'authentication') {
+      const authResponse = phaseResult.responses.find(r => r.requestId === 'auth');
+      if (authResponse?.success) {
+        sharedBuffer.authToken = authResponse.data.token;
+      }
+    } else if (phaseResult.phaseId === 'fetch-data') {
+      phaseResult.responses.forEach(response => {
+        if (response.requestId === 'users' && response.success) {
+          sharedBuffer.users = response.data;
+        } else if (response.requestId === 'products' && response.success) {
+          sharedBuffer.products = response.data;
+        }
+      });
+    }
+  }
+});</code></pre>
+
+                <h3>Override Behavior: sharedBuffer vs commonBuffer</h3>
+                <p>When a request has both <code>commonBuffer</code> in its options and is executed within a context that provides <code>sharedBuffer</code> (API Gateway or Workflow), the <code>sharedBuffer</code> completely replaces <code>commonBuffer</code>.</p>
+
+                <h4>Example: Understanding the Override</h4>
+                <pre><code class="language-typescript">const requests = [
+  {
+    id: 'request-1',
+    requestOptions: {
+      reqData: { hostname: 'api.example.com', path: '/data1' },
+      resReq: true,
+      
+      // This commonBuffer will be IGNORED
+      commonBuffer: {
+        source: 'request-level',
+        value: 'ignored'
+      },
+      
+      preExecution: {
+        handler: async ({ sharedBuffer }) => {
+          // sharedBuffer here refers to gateway's sharedBuffer, NOT commonBuffer
+          console.log(sharedBuffer.source); // Outputs: 'gateway-level'
+          console.log(sharedBuffer.value);  // Outputs: 'active'
+          
+          // Modifications affect the gateway's sharedBuffer
+          sharedBuffer.modifiedBy = 'request-1';
+          return reqData;
+        }
+      }
+    }
+  },
+  {
+    id: 'request-2',
+    requestOptions: {
+      reqData: { hostname: 'api.example.com', path: '/data2' },
+      preExecution: {
+        handler: async ({ sharedBuffer }) => {
+          // Can see modifications from request-1
+          console.log(sharedBuffer.modifiedBy); // Outputs: 'request-1'
+          return reqData;
+        }
+      }
+    }
+  }
+];
+
+await stableApiGateway(requests, {
+  concurrentExecution: false,
+  
+  // This sharedBuffer OVERRIDES all request-level commonBuffers
+  sharedBuffer: {
+    source: 'gateway-level',
+    value: 'active'
+  }
+});
+
+// Rule: sharedBuffer (gateway/workflow) > commonBuffer (request)</code></pre>
+
+                <h4>Standalone Request vs Gateway Context</h4>
+                <pre><code class="language-typescript">// Scenario 1: Standalone stableRequest - commonBuffer is used
+await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  commonBuffer: { 
+    mode: 'standalone',
+    counter: 0 
+  },
+  preExecution: {
+    handler: async ({ sharedBuffer }) => {
+      // sharedBuffer refers to commonBuffer in this context
+      console.log(sharedBuffer.mode); // 'standalone'
+      sharedBuffer.counter++;
+      return reqData;
+    }
+  }
+});
+
+// Scenario 2: Same request config in API Gateway - sharedBuffer overrides
+await stableApiGateway([{
+  id: 'req1',
+  requestOptions: {
+    reqData: { hostname: 'api.example.com', path: '/data' },
+    commonBuffer: { 
+      mode: 'standalone',  // IGNORED
+      counter: 0           // IGNORED
+    },
+    preExecution: {
+      handler: async ({ sharedBuffer }) => {
+        // sharedBuffer refers to gateway's sharedBuffer
+        console.log(sharedBuffer.mode); // 'gateway'
+        sharedBuffer.counter++;
+        return reqData;
+      }
+    }
+  }
+}], {
+  sharedBuffer: {
+    mode: 'gateway',
+    counter: 100  // This is what gets used
+  }
+});</code></pre>
             </section>
 
             <section id="retry-strategies" class="doc-section">
@@ -1372,29 +2198,22 @@ const result = await stableWorkflow([], {
     handlePhaseErrorParams: { severity: 'high' }
   },
 });</code></pre>
+            </section>
 
-                <h3>Pre-Execution Hooks</h3>
-                <p>Dynamically modify requests before execution:</p>
+            <section id="pre-execution" class="doc-section">
+                <h2>Pre-Execution Hook</h2>
+                <p>Dynamically modify requests before they are executed. The pre-execution hook allows you to inspect and transform request data based on the current execution state, making it ideal for adding dynamic headers, authentication, or conditional request modifications.</p>
+
+                <h3>Usage</h3>
                 <pre><code class="language-typescript">await stableRequest({
   reqData: { hostname: 'api.example.com', path: '/data' },
   preExecution: {
-    handler: async ({ reqData, sharedBuffer, attempt }) => {
-      // Add dynamic headers
-      reqData.headers = {
-        ...reqData.headers,
-        'X-Request-ID': generateUUID(),
-        'X-Attempt': attempt.toString()
-      };
-      
-      // Modify based on shared state
-      if (sharedBuffer.authToken) {
-        reqData.headers['Authorization'] = `Bearer ${sharedBuffer.authToken}`;
-      }
-      
-      return reqData;
+    preExecutionHook: async ({ inputParams, commonBuffer }) => {
+      const reqData = { ...inputParams.reqData, hostname: commonBuffer.hostname };
+      return { reqData };
     }
   },
-  sharedBuffer: {}
+  commonBuffer: { hostname: 'abc.com' }
 });</code></pre>
             </section>
 
@@ -1442,7 +2261,7 @@ await runTest('feature-B', 0.5);  // 50% success rate</code></pre>
                 <h3>Configuration</h3>
                 <p>State persistence is configured using the <code>StatePersistenceConfig</code> interface:</p>
                 <pre><code class="language-typescript">interface StatePersistenceConfig {
-  persistenceFunction: (options: StatePersistenceOptions) => Promise<Record<string, any>> | Record<string, any>;
+  persistenceFunction: (options: StatePersistenceOptions) =&gt; Promise&lt;Record&lt;string, any&gt;&gt; | Record&lt;string, any&gt;;
   persistenceParams?: any;  // Custom parameters passed to your persistence function
   loadBeforeHooks?: boolean;  // Load state before executing hooks (default: false)
   storeAfterHooks?: boolean;  // Store state after hook execution (default: false)
@@ -1598,130 +2417,319 @@ async function resumeWorkflow(workflowId: string) {
   
   return result;
 }</code></pre>
-       </section>
+            </section>
 
             <section id="best-practices" class="doc-section">
                 <h2>Best Practices</h2>
+                <p>Comprehensive guide to building production-ready HTTP workflows using stable-request's full feature set.</p>
 
-                <h3>1. Use Exponential Backoff for Most Cases</h3>
-                    <p>Exponential backoff with jitter is recommended for most retry scenarios to avoid overwhelming services and prevent thundering herd problems.</p>
-                    <pre><code class="language-typescript">await stableRequest({
-  reqData: { hostname: 'api.example.com', path: '/data' },
+                <h3>1. Implement Progressive Retry Strategies</h3>
+                <p>Use exponential backoff with jitter for most scenarios to prevent overwhelming services and avoid thundering herd problems.</p>
+                <pre><code class="language-typescript">import { stableRequest, RETRY_STRATEGIES } from '@emmvish/stable-request';
+
+await stableRequest({
+  reqData: { 
+    hostname: 'api.example.com', 
+    path: '/data',
+    timeout: 5000  // Always set timeouts
+  },
   attempts: 5,
   wait: 1000,
   retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
-  jitter: 500,
-  maxAllowedWait: 30000
+  jitter: 500,                    // ±500ms randomization
+  maxAllowedWait: 30000,          // Cap maximum wait time
+  logAllErrors: true              // Track all failures
 });</code></pre>
 
-                <h3>2. Implement Circuit Breakers for External Services</h3>
-                    <p>Always use circuit breakers when calling external APIs to prevent cascade failures.</p>
-                    <pre><code class="language-typescript">const externalServiceBreaker = new CircuitBreaker({
-  failureThresholdPercentage: 50,
-  minimumRequests: 5,
-  recoveryTimeoutMs: 60000
+                <h3>2. Deploy Circuit Breakers for External Dependencies</h3>
+                <p>Prevent cascade failures by implementing circuit breakers for all external API calls. Share circuit breaker instances across related requests.</p>
+                <pre><code class="language-typescript">import { CircuitBreaker } from '@emmvish/stable-request';
+
+// Create shared circuit breaker per service
+const paymentServiceBreaker = new CircuitBreaker({
+  failureThresholdPercentage: 50,   // Open after 50% failure rate
+  minimumRequests: 10,              // Need 10 requests to calculate rate
+  recoveryTimeoutMs: 60000,         // Wait 60s before testing recovery
+  successThresholdPercentage: 80,   // 80% success to close circuit
+  halfOpenMaxRequests: 3            // Test with 3 requests in half-open
 });
 
-// Share across all requests to that service
+// Use across all payment API requests
 await stableRequest({
-  reqData: { hostname: 'external-api.com', path: '/data' },
-  circuitBreaker: externalServiceBreaker
-});</code></pre>
+  reqData: { hostname: 'payment.api.com', path: '/charge' },
+  circuitBreaker: paymentServiceBreaker,
+  attempts: 3
+});
 
-                <h3>3. Use Request Grouping for Different SLAs</h3>
-                    <p>Separate critical and non-critical requests with different retry policies.</p>
-                    <pre><code class="language-typescript">await stableApiGateway(requests, {
+// Monitor circuit state
+const state = paymentServiceBreaker.getState();
+if (state.state === 'OPEN') {
+  metrics.gauge('circuit.payment.open', 1);
+}</code></pre>
+
+                <h3>3. Leverage Request Grouping for Different SLAs</h3>
+                <p>Separate requests by criticality with different retry policies and timeouts.</p>
+                <pre><code class="language-typescript">await stableApiGateway(requests, {
   requestGroups: [
     {
       groupId: 'critical',
-      commonAttempts: 5,
-      commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+      commonAttempts: 7,
+      commonWait: 2000,
+      commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+      commonJitter: 500,
+      commonMaxAllowedWait: 30000
     },
     {
       groupId: 'optional',
-      commonAttempts: 1  // Don't retry optional requests
+      commonAttempts: 1,
+      commonWait: 500
     }
   ]
 });</code></pre>
 
-                <h3>4. Enable Caching for Read Operations</h3>
-                    <p>Cache GET requests to reduce load and improve performance.</p>
-                    <pre><code class="language-typescript">const cache = new CacheManager({ ttl: 300000 });
+                <h3>4. Enable Intelligent Caching for Read Operations</h3>
+                <p>Cache GET requests with appropriate TTL and custom key generation.</p>
+                <pre><code class="language-typescript">import { CacheManager } from '@emmvish/stable-request';
+
+const apiCache = new CacheManager({ 
+  ttl: 300000,
+  maxSize: 500,
+  excludeMethods: ['POST', 'PUT', 'PATCH', 'DELETE']
+});
 
 await stableRequest({
-  reqData: { hostname: 'api.example.com', path: '/users', method: 'GET' },
-  cache: { cacheInstance: cache }
+  reqData: { path: '/users/profile', method: 'GET' },
+  cache: { cacheInstance: apiCache, ttl: 600000 }
 });</code></pre>
 
-                <h3>5. Implement Comprehensive Observability</h3>
-                    <p>Use hooks to track all request attempts and failures for debugging and monitoring.</p>
-                    <pre><code class="language-typescript">await stableRequest({
-  reqData: { hostname: 'api.example.com', path: '/data' },
-  handleErrors: async ({ errorLog }) => {
-    metrics.increment('api.errors', { endpoint: '/data' });
-    logger.error('API error:', errorLog);
+                <h3>5. Build Comprehensive Observability</h3>
+                <p>Track all request attempts, failures, and performance metrics.</p>
+                <pre><code class="language-typescript">await stableWorkflow(phases, {
+  commonHandleErrors: async ({ error, errorLog, attempt, executionContext }) =&gt; {
+    metrics.increment('api.error', {
+      endpoint: executionContext.requestId,
+      attempt: attempt.toString()
+    });
+    logger.error('Request failed', { attempt, error: errorLog });
   },
-  handleSuccessfulAttemptData: async ({ data, attempt }) => {
-    metrics.increment('api.success', { endpoint: '/data', attempt });
+  
+  handlePhaseCompletion: async ({ phaseResult }) =&gt; {
+    metrics.histogram('phase.duration', phaseResult.executionTime);
+    logger.info('Phase completed', {
+      phaseId: phaseResult.phaseId,
+      success: phaseResult.success
+    });
   }
 });</code></pre>
 
-                <h3>6. Use Shared Buffers for State Management</h3>
-                    <p>Share data across phases using sharedBuffer instead of global variables.</p>
-                    <pre><code class="language-typescript">const phases = [
-  {
-    id: 'login',
-    requests: [{
-      id: 'auth',
-      requestOptions: {
-        reqData: { path: '/auth/login' },
-        resReq: true,
-        handleSuccessfulAttemptData: async ({ data }, { sharedBuffer }) => {
-          sharedBuffer.authToken = data.token;
-        }
+                <h3>6. Master Configuration Cascading</h3>
+                <p>Leverage hierarchical configuration for sensible defaults with fine-grained control.</p>
+                <pre><code class="language-typescript">await stableWorkflow(phases, {
+  // Workflow-level defaults (lowest priority)
+  commonAttempts: 3,
+  commonWait: 1000,
+  
+  // Group-level overrides
+  requestGroups: [{
+    groupId: 'critical',
+    commonAttempts: 7  // Critical requests get more retries
+  }]
+});
+// Final cascade: Request &gt; Group &gt; Phase &gt; Workflow</code></pre>
+
+                <h3>7. Use Shared Buffers for State Management</h3>
+                <p>Share data across phases without global variables.</p>
+                <pre><code class="language-typescript">await stableWorkflow(phases, {
+  sharedBuffer: { configVersion: null, apiKey: null },
+  
+  handlePhaseCompletion: async ({ phaseResult, sharedBuffer }) =&gt; {
+    if (phaseResult.phaseId === 'fetch-config') {
+      sharedBuffer.configVersion = phaseResult.responses[0].data.version;
+      sharedBuffer.apiKey = phaseResult.responses[0].data.apiKey;
+    }
+  }
+});</code></pre>
+
+                <h3>8. Implement Smart Pre-Execution Hooks</h3>
+                <p>Dynamically modify requests based on runtime conditions.</p>
+                <pre><code class="language-typescript">await stableRequest({
+  commonBuffer: { authToken: null, tokenExpiry: null },
+  
+  preExecution: {
+    handler: async ({ reqData, sharedBuffer, attempt }) =&gt; {
+      const now = Date.now();
+      if (!sharedBuffer.authToken || now &gt;= sharedBuffer.tokenExpiry) {
+        const tokenResponse = await getAuthToken();
+        sharedBuffer.authToken = tokenResponse.token;
+        sharedBuffer.tokenExpiry = now + (tokenResponse.expiresIn * 1000);
       }
-    }]
+      
+      reqData.headers = {
+        'Authorization': `Bearer ${sharedBuffer.authToken}`,
+        'X-Attempt': attempt.toString()
+      };
+      return reqData;
+    }
+  }
+});</code></pre>
+
+                <h3>9. Leverage Non-Linear Workflows</h3>
+                <p>Implement conditional execution with phase decision hooks.</p>
+                <pre><code class="language-typescript">import { PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
+
+const phases = [{
+  id: 'process-data',
+  phaseDecisionHook: async ({ phaseResult, retryCount }) =&gt; {
+    if (phaseResult.failedRequests &gt; 0 && retryCount &lt; 3) {
+      return { action: PHASE_DECISION_ACTIONS.REPLAY };
+    }
+    if (phaseResult.successfulRequests &gt;= phaseResult.totalRequests * 0.8) {
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    }
+    return { action: PHASE_DECISION_ACTIONS.TERMINATE };
+  }
+}];
+
+await stableWorkflow(phases, {
+  enableNonLinearExecution: true,
+  maxWorkflowIterations: 1000
+});</code></pre>
+
+                <h3>10. Deploy Branched Workflows</h3>
+                <p>Execute independent service calls in parallel branches.</p>
+                <pre><code class="language-typescript">const branches = [
+  {
+    branchId: 'payment-service',
+    phases: [
+      { id: 'authorize-payment', requests: [...] },
+      { id: 'capture-payment', requests: [...] }
+    ]
   },
   {
-    id: 'fetch-data',
-    requests: [{
-      id: 'profile',
-      requestOptions: {
-        reqData: { path: '/profile' },
-        preExecution: {
-          handler: async ({ reqData, sharedBuffer }) => {
-            reqData.headers['Authorization'] = `Bearer ${sharedBuffer.authToken}`;
-            return reqData;
-          }
-        }
-      }
-    }]
+    branchId: 'notification-service',
+    concurrentBranch: true,
+    phases: [
+      { id: 'send-email', requests: [...] },
+      { id: 'send-sms', requests: [...] }
+    ]
   }
 ];
 
+await stableWorkflow([], {
+  enableBranchExecution: true,
+  branches,
+  concurrentBranchExecution: true
+});</code></pre>
+
+                <h3>11. Implement State Persistence</h3>
+                <p>Enable recovery from failures with state persistence.</p>
+                <pre><code class="language-typescript">import Redis from 'ioredis';
+const redis = new Redis();
+
+const persistToRedis = async ({ executionContext, buffer }) =&gt; {
+  const key = `workflow:${executionContext.workflowId}`;
+  if (buffer && Object.keys(buffer).length &gt; 0) {
+    await redis.setex(key, 7200, JSON.stringify(buffer));
+    return {};
+  }
+  const data = await redis.get(key);
+  return data ? JSON.parse(data) : {};
+};
+
 await stableWorkflow(phases, {
-  sharedBuffer: {}
+  commonStatePersistence: {
+    persistenceFunction: persistToRedis,
+    loadBeforeHooks: true,
+    storeAfterHooks: true
+  }
 });</code></pre>
 
-                <h3>7. Set Appropriate Timeouts</h3>
-                    <p>Always set timeout values to prevent hanging requests.</p>
-                    <pre><code class="language-typescript">await stableRequest({
-  reqData: { 
-    hostname: 'api.example.com', 
-    path: '/data',
-    timeout: 5000  // 5 second timeout
-  },
-  attempts: 3
+                <h3>12. Use Trial Mode for Testing</h3>
+                <p>Test workflow logic without real API calls.</p>
+                <pre><code class="language-typescript">await stableWorkflow(phases, {
+  commonTrialMode: {
+    trialModeOn: true,
+    successProbability: 0.7,
+    trialModeData: { mock: 'data' }
+  }
 });</code></pre>
 
-                <h3>8. Use Rate Limiting for High-Volume Operations</h3>
-                    <p>Respect API rate limits to avoid being throttled or banned.</p>
-                    <pre><code class="language-typescript">await stableApiGateway(largeRequestArray, {
+                <h3>13. Validate Responses Beyond HTTP Status</h3>
+                <p>Implement custom response validation.</p>
+                <pre><code class="language-typescript">await stableRequest({
+  responseAnalyzer: async ({ data, status }) =&gt; {
+    if (status !== 200) return false;
+    if (data.status === 'processing') return false; // Retry
+    if (data.status === 'completed') return true;
+    throw new Error(`Unexpected status: ${data.status}`);
+  }
+});</code></pre>
+
+                <h3>14. Configure Rate Limiting & Concurrency</h3>
+                <p>Respect API quotas and prevent resource exhaustion.</p>
+                <pre><code class="language-typescript">await stableApiGateway(requests, {
   concurrentExecution: true,
   maxConcurrentRequests: 10,
   rateLimit: {
     maxRequests: 100,
-    windowMs: 60000  // 100 requests per minute
+    windowMs: 60000
+  }
+});</code></pre>
+
+                <h3>15. Production-Ready Complete Example</h3>
+                <p>Combining all patterns for robust production systems.</p>
+                <pre><code class="language-typescript">import { 
+  stableWorkflow, 
+  RETRY_STRATEGIES, 
+  PHASE_DECISION_ACTIONS,
+  CircuitBreaker, 
+  CacheManager 
+} from '@emmvish/stable-request';
+
+const paymentBreaker = new CircuitBreaker({
+  failureThresholdPercentage: 50,
+  minimumRequests: 10,
+  recoveryTimeoutMs: 60000
+});
+const apiCache = new CacheManager({ ttl: 300000 });
+
+const result = await stableWorkflow([], {
+  workflowId: 'order-processing',
+  enableBranchExecution: true,
+  branches: [
+    {
+      branchId: 'payment',
+      phases: [{
+        id: 'charge',
+        requests: [{
+          id: 'payment',
+          requestOptions: {
+            reqData: { path: '/payment/charge', timeout: 10000 },
+            attempts: 7,
+            retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+            jitter: 500,
+            circuitBreaker: paymentBreaker,
+            preExecution: {
+              handler: async ({ reqData, sharedBuffer }) =&gt; {
+                reqData.body = { amount: sharedBuffer.orderAmount };
+                return reqData;
+              }
+            }
+          }
+        }],
+        statePersistence: {
+          persistenceFunction: persistToRedis,
+          loadBeforeHooks: true,
+          storeAfterHooks: true
+        }
+      }]
+    }
+  ],
+  sharedBuffer: { orderAmount: 100, completedPhases: [] },
+  maxConcurrentRequests: 10,
+  rateLimit: { maxRequests: 100, windowMs: 60000 },
+  commonHandleErrors: async ({ error, attempt, executionContext }) =&gt; {
+    metrics.increment('error', { request: executionContext.requestId });
   }
 });</code></pre>
             </section>

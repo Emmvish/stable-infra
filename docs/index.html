@@ -83,7 +83,7 @@
                 <div class="feature-card">
                     <div class="feature-icon">⚡</div>
                     <h3>Execution Flexibility</h3>
-                    <p>Sequential, concurrent, mixed, and non-linear execution patterns to match your business logic perfectly.</p>
+                    <p>Sequential, concurrent, mixed, and non-linear execution patterns with configuration cascading to match your business logic perfectly.</p>
                 </div>
                 
                 <div class="feature-card">
@@ -228,8 +228,9 @@ console.log(`Success: ${result.success}`);</code></pre>
             <div class="feature-detail">
                 <div class="feature-detail-content">
                     <h3>🔄 Intelligent Retry Strategies</h3>
-                    <p>Automatically retry failed requests with sophisticated backoff strategies:</p>
+                    <p>Automatically retry failed requests with proper response analysis / error handling and sophisticated backoff strategies:</p>
                     <ul>
+                        <li><strong>Analysis Hooks:</strong> Analyze Reponses and Settle Errors before retrying</li>
                         <li><strong>Fixed Delay:</strong> Constant wait time between retries</li>
                         <li><strong>Linear Backoff:</strong> Incrementally increasing delays (1s, 2s, 3s...)</li>
                         <li><strong>Exponential Backoff:</strong> Exponentially growing delays (1s, 2s, 4s, 8s...)</li>
@@ -240,6 +241,9 @@ console.log(`Success: ${result.success}`);</code></pre>
   attempts: 5,
   wait: 1000,
   retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+  responseAnalyzer: async ({ data }) =&gt; {
+    return data.status === 'success';  // Retry if status is not 'success'
+  },
   jitter: 500  // Add randomness
 });</code></pre>
                 </div>

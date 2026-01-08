@@ -1,6 +1,6 @@
 # API Reference
 
-Complete API documentation for `@emmvish/stable-request` `v1.7.1`
+Complete API documentation for `@emmvish/stable-request` `v1.7.2`
 
 ## Table of Contents
 
@@ -56,27 +56,29 @@ function stableRequest<RequestDataType = any, ResponseDataType = any>(
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `reqData` | `REQUEST_DATA<RequestDataType>` | ✅ Yes | - | Request configuration including hostname, path, method, headers, body, etc. |
+| `reqData` | `REQUEST_DATA<RequestDataType>` | Yes | - | Request configuration including hostname, path, method, headers, body, etc. |
 | `resReq` | `boolean` | No | `false` | If `true`, returns the response data. If `false`, returns `true` on success or `false` on failure. |
 | `attempts` | `number` | No | `1` | Maximum number of attempts (including the initial request). Must be ≥ 1. |
-| `wait` | `number` | No | `0` | Base wait time in milliseconds between retry attempts. |
-| `maxAllowedWait` | `number` | No | `Infinity` | Maximum allowed wait time between retries (caps the backoff calculation). |
+| `wait` | `number` | No | `1000` | Base wait time in milliseconds between retry attempts. |
+| `maxAllowedWait` | `number` | No | `60000` | Maximum allowed wait time between retries (caps the backoff calculation). |
 | `retryStrategy` | `RETRY_STRATEGY_TYPES` | No | `FIXED` | Retry backoff strategy: `FIXED`, `LINEAR`, or `EXPONENTIAL`. |
 | `jitter` | `number` | No | `0` | If `non-zero`, applies randomized jitter to retry delays to prevent thundering herd issues. |
 | `performAllAttempts` | `boolean` | No | `false` | If `true`, performs all attempts even if one succeeds (useful for testing). |
 | `logAllErrors` | `boolean` | No | `false` | If `true`, logs all error attempts to console. |
 | `logAllSuccessfulAttempts` | `boolean` | No | `false` | If `true`, logs all successful attempts to console. |
-| `maxSerializableChars` | `number` | No | `500` | Maximum characters to include when serializing objects in logs. |
+| `maxSerializableChars` | `number` | No | `1000` | Maximum characters to include when serializing objects in logs. |
 | `trialMode` | `TRIAL_MODE_OPTIONS` | No | `undefined` | Enables trial mode for testing without making real API calls. |
-| `responseAnalyzer` | `Function` | No | `undefined` | Custom function to validate response. Returns `true` if response is acceptable, `false` to retry. |
-| `handleErrors` | `Function` | No | `undefined` | Custom error handler called for each failed attempt. |
-| `handleSuccessfulAttemptData` | `Function` | No | `undefined` | Custom handler called for each successful attempt. |
-| `finalErrorAnalyzer` | `Function` | No | `undefined` | Analyzes the final error after all retries exhausted. Return `true` to suppress error (return `false`), `false` to throw. |
+| `responseAnalyzer` | `(options: ResponseAnalysisHookOptions) => boolean \| Promise<boolean>` | No | `undefined` | Custom function to validate response. Returns `true` if response is acceptable, `false` to retry. |
+| `handleErrors` | `(options: HandleErrorHookOptions) => any \| Promise<any>` | No | `undefined` | Custom error handler called for each failed attempt. |
+| `handleSuccessfulAttemptData` | `(options: HandleSuccessfulAttemptDataHookOptions) => any \| Promise<any>` | No | `undefined` | Custom handler called for each successful attempt. |
+| `finalErrorAnalyzer` | `(options: FinalErrorAnalysisHookOptions) => boolean \| Promise<boolean>` | No | `undefined` | Analyzes the final error after all retries exhausted. Return `true` to suppress error (return `false`), `false` to throw. |
 | `hookParams` | `HookParams` | No | `{}` | Custom parameters to pass to hook functions. |
 | `preExecution` | `RequestPreExecutionOptions` | No | `undefined` | Pre-execution hook configuration for dynamic request modification. |
 | `commonBuffer` | `Record<string, any>` | No | `undefined` | Shared buffer for storing/accessing data across requests. |
 | `cache` | `CacheConfig` | No | `undefined` | Response caching configuration. |
 | `circuitBreaker` | `CircuitBreakerConfig \| CircuitBreaker` | No | `undefined` | Circuit breaker configuration or instance. |
+| `statePersistence` | `StatePersistenceConfig` | No | `undefined` | State persistence configuration. |
+| `executionContext` | `ExecutionContext` | No | `undefined` | Execution context information (workflowId, phaseId, branchId, requestId). |
 
 #### Returns
 
@@ -138,28 +140,30 @@ Array of request objects to execute. See [API_GATEWAY_REQUEST](#api_gateway_requ
 | `stopOnFirstError` | `boolean` | No | `false` | If `true` (sequential mode), stops executing remaining requests after first error. In concurrent mode, stops launching new requests after detecting an error. |
 | `commonRequestData` | `Partial<REQUEST_DATA>` | No | `{}` | Common request configuration applied to all requests (hostname, headers, etc.). |
 | `commonAttempts` | `number` | No | `1` | Default number of retry attempts for all requests. |
-| `commonWait` | `number` | No | `0` | Default wait time between retries for all requests. |
-| `commonMaxAllowedWait` | `number` | No | `Infinity` | Default maximum wait time for all requests. |
+| `commonWait` | `number` | No | `1000` | Default wait time between retries for all requests. |
+| `commonMaxAllowedWait` | `number` | No | `60000` | Default maximum wait time for all requests. |
 | `commonRetryStrategy` | `RETRY_STRATEGY_TYPES` | No | `FIXED` | Default retry strategy for all requests. |
 | `commonJitter` | `number` | No | `0` | Default jitter setting for all requests. Randomizes retry delays. |
 | `commonResReq` | `boolean` | No | `false` | Default value for `resReq` for all requests. |
 | `commonLogAllErrors` | `boolean` | No | `false` | Default logging setting for errors. |
 | `commonLogAllSuccessfulAttempts` | `boolean` | No | `false` | Default logging setting for successes. |
-| `commonMaxSerializableChars` | `number` | No | `500` | Default max chars for serialization. |
+| `commonMaxSerializableChars` | `number` | No | `1000` | Default max chars for serialization. |
 | `commonPerformAllAttempts` | `boolean` | No | `false` | Default `performAllAttempts` for all requests. |
 | `commonTrialMode` | `TRIAL_MODE_OPTIONS` | No | `undefined` | Default trial mode configuration. |
-| `commonResponseAnalyzer` | `Function` | No | `undefined` | Default response analyzer for all requests. |
-| `commonFinalErrorAnalyzer` | `Function` | No | `undefined` | Default final error analyzer for all requests. |
-| `commonHandleErrors` | `Function` | No | `undefined` | Default error handler for all requests. |
-| `commonHandleSuccessfulAttemptData` | `Function` | No | `undefined` | Default success handler for all requests. |
+| `commonResponseAnalyzer` | `(options: ResponseAnalysisHookOptions) => boolean \| Promise<boolean>` | No | `undefined` | Default response analyzer for all requests. |
+| `commonFinalErrorAnalyzer` | `(options: FinalErrorAnalysisHookOptions) => boolean \| Promise<boolean>` | No | `undefined` | Default final error analyzer for all requests. |
+| `commonHandleErrors` | `(options: HandleErrorHookOptions) => any \| Promise<any>` | No | `undefined` | Default error handler for all requests. |
+| `commonHandleSuccessfulAttemptData` | `(options: HandleSuccessfulAttemptDataHookOptions) => any \| Promise<any>` | No | `undefined` | Default success handler for all requests. |
 | `commonPreExecution` | `RequestPreExecutionOptions` | No | `undefined` | Default pre-execution hook configuration. |
 | `commonCache` | `CacheConfig` | No | `undefined` | Default cache configuration for all requests. |
+| `commonStatePersistence` | `StatePersistenceConfig` | No | `undefined` | Default state persistence configuration for all requests. |
 | `commonHookParams` | `HookParams` | No | `{}` | Default parameters for hook functions. |
 | `requestGroups` | `RequestGroup[]` | No | `[]` | Array of request group configurations for applying settings to specific groups. |
 | `sharedBuffer` | `Record<string, any>` | No | `undefined` | Shared buffer accessible by all requests. |
 | `maxConcurrentRequests` | `number` | No | `undefined` | Maximum number of concurrent requests (concurrent mode only). |
 | `rateLimit` | `RateLimitConfig` | No | `undefined` | Rate limiting configuration. |
 | `circuitBreaker` | `CircuitBreakerConfig` | No | `undefined` | Circuit breaker configuration. |
+| `executionContext` | `Partial<ExecutionContext>` | No | `undefined` | Partial execution context information. |
 
 #### Returns
 
@@ -239,14 +243,14 @@ Array of workflow phases to execute. See [STABLE_WORKFLOW_PHASE](#stable_workflo
 | `enableBranchExecution` | `boolean` | No | `false` | Enables branch-based workflow execution. |
 | `branches` | `STABLE_WORKFLOW_BRANCH[]` | No | `[]` | Array of workflow branches (when `enableBranchExecution: true`). |
 | `maxWorkflowIterations` | `number` | No | `1000` | Maximum total phase executions to prevent infinite loops in non-linear workflows. |
-| `handlePhaseCompletion` | `Function` | No | `console.log` | Hook called after each phase completes successfully. |
-| `handlePhaseError` | `Function` | No | `console.log` | Hook called when a phase encounters an error. |
-| `handlePhaseDecision` | `Function` | No | `() => {}` | Hook called when a phase makes a non-linear decision. |
-| `handleBranchCompletion` | `Function` | No | `console.log` | Hook called when a branch completes. |
-| `handleBranchDecision` | `Function` | No | `undefined` | Hook called when a branch makes a decision. |
+| `handlePhaseCompletion` | `(options: HandlePhaseCompletionHookOptions) => any \| Promise<any>` | No | `console.log` | Hook called after each phase completes successfully. |
+| `handlePhaseError` | `(options: HandlePhaseErrorHookOptions) => any \| Promise<any>` | No | `console.log` | Hook called when a phase encounters an error. |
+| `handlePhaseDecision` | `(decision: PhaseExecutionDecision, phaseResult: STABLE_WORKFLOW_PHASE_RESULT, maxSerializableChars?: number) => any \| Promise<any>` | No | `() => {}` | Hook called when a phase makes a non-linear decision. |
+| `handleBranchCompletion` | `(options: { workflowId: string, branchId: string, branchResults: STABLE_WORKFLOW_PHASE_RESULT[], success: boolean, maxSerializableChars?: number }) => any \| Promise<any>` | No | `console.log` | Hook called when a branch completes. |
+| `handleBranchDecision` | `(decision: BranchExecutionDecision, branchResult: BranchExecutionResult, maxSerializableChars?: number) => any \| Promise<any>` | No | `undefined` | Hook called when a branch makes a decision. |
 | `workflowHookParams` | `WorkflowHookParams` | No | `{}` | Custom parameters passed to workflow-level hooks. |
 | `sharedBuffer` | `Record<string, any>` | No | `{}` | Shared buffer accessible across all phases and branches. |
-| `maxSerializableChars` | `number` | No | `500` | Maximum characters for serialization in logs. |
+| `maxSerializableChars` | `number` | No | `1000` | Maximum characters for serialization in logs. |
 | **All `API_GATEWAY_OPTIONS`** | - | No | - | All options from `stableApiGateway` (common config for all phases). |
 
 #### Returns
@@ -345,9 +349,9 @@ class CircuitBreaker {
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `failureThresholdPercentage` | `number` | ✅ Yes | - | Percentage of failures (0-100) that triggers OPEN state. |
-| `minimumRequests` | `number` | ✅ Yes | - | Minimum number of requests before evaluating failure threshold. |
-| `recoveryTimeoutMs` | `number` | ✅ Yes | - | Time in milliseconds to wait in OPEN state before transitioning to HALF_OPEN. |
+| `failureThresholdPercentage` | `number` | Yes | - | Percentage of failures (0-100) that triggers OPEN state. |
+| `minimumRequests` | `number` | Yes | - | Minimum number of requests before evaluating failure threshold. |
+| `recoveryTimeoutMs` | `number` | Yes | - | Time in milliseconds to wait in OPEN state before transitioning to HALF_OPEN. |
 | `successThresholdPercentage` | `number` | No | `50` | Percentage of successes needed in HALF_OPEN to return to CLOSED. |
 | `halfOpenMaxRequests` | `number` | No | `5` | Maximum number of requests allowed in HALF_OPEN state. |
 | `trackIndividualAttempts` | `boolean` | No | `false` | If `true`, tracks individual retry attempts. If `false`, tracks request-level success/failure. |
@@ -440,8 +444,8 @@ class RateLimiter {
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `maxRequests` | `number` | ✅ Yes | Maximum number of requests allowed in the time window. |
-| `windowMs` | `number` | ✅ Yes | Time window in milliseconds. |
+| `maxRequests` | `number` | Yes | Maximum number of requests allowed in the time window. |
+| `windowMs` | `number` | Yes | Time window in milliseconds. |
 
 #### Methods
 
@@ -512,7 +516,7 @@ class ConcurrencyLimiter {
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `limit` | `number` | ✅ Yes | Maximum number of concurrent operations. Must be ≥ 1. |
+| `limit` | `number` | Yes | Maximum number of concurrent operations. Must be ≥ 1. |
 
 #### Methods
 
@@ -580,13 +584,13 @@ class CacheManager {
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `enabled` | `boolean` | ✅ Yes | - | Enable or disable caching. |
+| `enabled` | `boolean` | Yes | - | Enable or disable caching. |
 | `ttl` | `number` | No | `300000` | Time-to-live in milliseconds (default: 5 minutes). |
 | `respectCacheControl` | `boolean` | No | `true` | Respect Cache-Control and Expires headers from responses. |
 | `cacheableStatusCodes` | `number[]` | No | `[200, 203, 204, 206, 300, 301, 404, 405, 410, 414, 501]` | HTTP status codes that should be cached. |
 | `maxSize` | `number` | No | `100` | Maximum number of cached entries. |
 | `excludeMethods` | `string[]` | No | `['POST', 'PUT', 'PATCH', 'DELETE']` | HTTP methods to exclude from caching. |
-| `keyGenerator` | `Function` | No | `undefined` | Custom function to generate cache keys. |
+| `keyGenerator` | `(config: AxiosRequestConfig) => string` | No | `undefined` | Custom function to generate cache keys. |
 
 #### Methods
 
@@ -690,7 +694,7 @@ interface REQUEST_DATA<RequestDataType = any> {
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `hostname` | `string` | ✅ Yes | - | Target hostname (without protocol). |
+| `hostname` | `string` | Yes | - | Target hostname (without protocol). |
 | `protocol` | `'http' \| 'https'` | No | `'https'` | Request protocol. |
 | `method` | `'GET' \| 'POST' \| 'PUT' \| 'PATCH' \| 'DELETE'` | No | `'GET'` | HTTP method. |
 | `path` | `` `/${string}` `` | No | `'/'` | Request path (must start with `/`). |
@@ -731,9 +735,9 @@ interface API_GATEWAY_REQUEST<RequestDataType = any, ResponseDataType = any> {
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| `id` | `string` | ✅ Yes | Unique identifier for this request. |
+| `id` | `string` | Yes | Unique identifier for this request. |
 | `groupId` | `string` | No | Optional group ID for applying group-level configuration. |
-| `requestOptions` | `API_GATEWAY_REQUEST_OPTIONS_TYPE` | ✅ Yes | Request options (similar to `STABLE_REQUEST` but `reqData` can be partial). |
+| `requestOptions` | `API_GATEWAY_REQUEST_OPTIONS_TYPE` | Yes | Request options (similar to `STABLE_REQUEST` but `reqData` can be partial). |
 
 ---
 
@@ -787,8 +791,9 @@ interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType = any> {
   allowReplay?: boolean;
   allowSkip?: boolean;
   phaseDecisionHook?: (options: PhaseDecisionHookOptions) => PhaseExecutionDecision | Promise<PhaseExecutionDecision>;
-  commonConfig?: Omit<API_GATEWAY_OPTIONS, 'concurrentExecution' | 'stopOnFirstError' | 'requestGroups'>;
+  commonConfig?: Omit<API_GATEWAY_OPTIONS, 'concurrentExecution' | 'stopOnFirstError' | 'requestGroups' | 'maxConcurrentRequests' | 'rateLimit' | 'circuitBreaker'>;
   branchId?: string;
+  statePersistence?: StatePersistenceConfig;
 }
 ```
 
@@ -797,7 +802,7 @@ interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType = any> {
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `id` | `string` | No | Auto-generated | Unique identifier for this phase. |
-| `requests` | `API_GATEWAY_REQUEST[]` | ✅ Yes | - | Array of requests to execute in this phase. |
+| `requests` | `API_GATEWAY_REQUEST[]` | Yes | - | Array of requests to execute in this phase. |
 | `concurrentExecution` | `boolean` | No | `true` | Execute requests concurrently or sequentially within this phase. |
 | `stopOnFirstError` | `boolean` | No | `false` | Stop phase execution on first request error. |
 | `markConcurrentPhase` | `boolean` | No | `false` | Mark this phase for concurrent execution in mixed execution mode. |
@@ -807,8 +812,10 @@ interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType = any> {
 | `maxReplayCount` | `number` | No | `0` | Maximum times this phase can be replayed. |
 | `allowReplay` | `boolean` | No | `false` | Allow this phase to be replayed via decision hook. |
 | `allowSkip` | `boolean` | No | `true` | Allow this phase to be skipped via decision hook. |
-| `phaseDecisionHook` | `Function` | No | `undefined` | Decision hook for non-linear execution (JUMP, SKIP, REPLAY, TERMINATE). |
+| `phaseDecisionHook` | `(options: PhaseDecisionHookOptions) => PhaseExecutionDecision \| Promise<PhaseExecutionDecision>` | No | `undefined` | Decision hook for non-linear execution (JUMP, SKIP, REPLAY, TERMINATE). |
 | `commonConfig` | `Partial<API_GATEWAY_OPTIONS>` | No | `{}` | Phase-level configuration overrides. |
+| `statePersistence` | `StatePersistenceConfig` | No | `undefined` | State persistence configuration for this phase. |
+| `branchId` | `string` | No | `undefined` | Branch identifier if this phase belongs to a branch. |
 
 ---
 
@@ -825,7 +832,8 @@ interface STABLE_WORKFLOW_BRANCH<RequestDataType = any, ResponseDataType = any> 
   maxReplayCount?: number;
   allowSkip?: boolean;
   branchDecisionHook?: (options: BranchDecisionHookOptions) => BranchExecutionDecision | Promise<BranchExecutionDecision>;
-  commonConfig?: Omit<API_GATEWAY_OPTIONS, 'concurrentExecution' | 'stopOnFirstError' | 'requestGroups'>;
+  statePersistence?: StatePersistenceConfig;
+  commonConfig?: Omit<API_GATEWAY_OPTIONS, 'concurrentExecution' | 'stopOnFirstError' | 'requestGroups' | 'maxConcurrentRequests' | 'rateLimit' | 'circuitBreaker'>;
 }
 ```
 
@@ -833,13 +841,14 @@ interface STABLE_WORKFLOW_BRANCH<RequestDataType = any, ResponseDataType = any> 
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `id` | `string` | ✅ Yes | - | Unique identifier for this branch. |
-| `phases` | `STABLE_WORKFLOW_PHASE[]` | ✅ Yes | - | Array of phases to execute in this branch. |
+| `id` | `string` | Yes | - | Unique identifier for this branch. |
+| `phases` | `STABLE_WORKFLOW_PHASE[]` | Yes | - | Array of phases to execute in this branch. |
 | `markConcurrentBranch` | `boolean` | No | `false` | Execute this branch concurrently with other marked branches. |
 | `allowReplay` | `boolean` | No | `false` | Allow this branch to be replayed. |
 | `maxReplayCount` | `number` | No | `0` | Maximum times this branch can be replayed. |
 | `allowSkip` | `boolean` | No | `true` | Allow this branch to be skipped. |
-| `branchDecisionHook` | `Function` | No | `undefined` | Decision hook for branch-level decisions. |
+| `branchDecisionHook` | `(options: BranchDecisionHookOptions) => BranchExecutionDecision \| Promise<BranchExecutionDecision>` | No | `undefined` | Decision hook for branch-level decisions. |
+| `statePersistence` | `StatePersistenceConfig` | No | `undefined` | State persistence configuration for this branch. |
 | `commonConfig` | `Partial<API_GATEWAY_OPTIONS>` | No | `{}` | Branch-level configuration overrides. |
 
 ---
@@ -915,8 +924,8 @@ See [CacheManager constructor parameters](#constructor-parameters-3).
 
 ```typescript
 interface RequestGroup<RequestDataType = any, ResponseDataType = any> {
-  groupId: string;
-  commonConfig?: Partial<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>>;
+  id: string;
+  commonConfig?: Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, "concurrentExecution" | "stopOnFirstError" | "requestGroups" | "maxConcurrentRequests" | "rateLimit" | "circuitBreaker">;
 }
 ```
 
@@ -929,7 +938,6 @@ interface TRIAL_MODE_OPTIONS {
   enabled: boolean;
   reqFailureProbability?: number;    // 0-1, probability of initial failure
   retryFailureProbability?: number;  // 0-1, probability of retry failure
-  latencyRange?: { min: number; max: number }; // Simulated latency in ms
 }
 ```
 
@@ -967,7 +975,7 @@ interface StatePersistenceConfig {
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `persistenceFunction` | `Function` | Yes | - | Function to handle state loading and storing. Should return state object when loading, or void/Promise<void> when storing. |
+| `persistenceFunction` | `(options: StatePersistenceOptions) => Promise<Record<string, any>> \| Record<string, any>` | Yes | - | Function to handle state loading and storing. Should return state object when loading, or void/Promise<void> when storing. |
 | `persistenceParams` | `any` | No | `undefined` | Custom parameters passed to the persistence function (e.g., database connection, Redis client). |
 | `loadBeforeHooks` | `boolean` | No | `false` | If `true`, loads state from persistence before executing hooks/phases. |
 | `storeAfterHooks` | `boolean` | No | `false` | If `true`, stores state to persistence after executing hooks/phases. |
@@ -1168,9 +1176,10 @@ interface HandleSuccessfulAttemptDataHookOptions<RequestDataType = any, Response
 #### `PreExecutionHookOptions`
 
 ```typescript
-interface PreExecutionHookOptions {
+interface PreExecutionHookOptions<RequestDataType = any, ResponseDataType = any> {
   inputParams?: any;
   commonBuffer?: Record<string, any>;
+  stableRequestOptions: STABLE_REQUEST<RequestDataType, ResponseDataType>;
 }
 ```
 
@@ -1204,6 +1213,7 @@ interface PhaseDecisionHookOptions<ResponseDataType = any> {
   sharedBuffer?: Record<string, any>;
   params?: any;
   concurrentPhaseResults?: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
+  maxSerializableChars?: number;
 }
 ```
 
@@ -1221,6 +1231,7 @@ interface BranchDecisionHookOptions<ResponseDataType = any> {
   sharedBuffer?: Record<string, any>;
   params?: any;
   concurrentBranchResults?: BranchExecutionResult<ResponseDataType>[];
+  maxSerializableChars?: number;
 }
 ```
 
@@ -1236,6 +1247,7 @@ interface PhaseExecutionDecision {
   targetPhaseId?: string;      // Required for JUMP and SKIP actions
   replayCount?: number;
   metadata?: Record<string, any>;
+  maxSerializableChars?: number;
 }
 ```
 
@@ -1247,6 +1259,7 @@ interface BranchExecutionDecision {
   targetBranchId?: string;     // Required for JUMP action
   metadata?: Record<string, any>;
   terminateWorkflow?: boolean; // If true, terminates entire workflow
+  maxSerializableChars?: number;
 }
 ```
 
@@ -1470,6 +1483,8 @@ interface WorkflowHookParams {
   handlePhaseCompletionParams?: any;
   handlePhaseErrorParams?: any;
   handlePhaseDecisionParams?: any;
+  handleBranchDecisionParams?: any;
+  statePersistence?: StatePersistenceConfig;
 }
 ```
 

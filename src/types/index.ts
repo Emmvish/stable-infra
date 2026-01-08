@@ -179,13 +179,14 @@ export interface HookParams {
   finalErrorAnalyzerParams?: any;
 }
 
-export interface PreExecutionHookOptions {
+export interface PreExecutionHookOptions<RequestDataType = any, ResponseDataType = any> {
   inputParams?: any;
   commonBuffer?: Record<string, any>;
+  stableRequestOptions: STABLE_REQUEST<RequestDataType, ResponseDataType>;
 }
 
-export interface RequestPreExecutionOptions {
-  preExecutionHook: (options: PreExecutionHookOptions) => any | Promise<any>;
+export interface RequestPreExecutionOptions<RequestDataType = any, ResponseDataType = any> {
+  preExecutionHook: (options: PreExecutionHookOptions<RequestDataType, ResponseDataType>) => any | Promise<any>;
   preExecutionHookParams?: any;
   applyPreExecutionConfigOverride?: boolean;
   continueOnPreExecutionHookFailure?: boolean;
