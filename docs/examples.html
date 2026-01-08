@@ -68,6 +68,15 @@
                 </div>
                 
                 <div class="example-code">
+                    <div class="example-actions">
+                        <button class="btn btn-primary run-example-btn" data-example="01">
+                            ▶ Run Example
+                        </button>
+                        <button class="btn btn-secondary clear-output-btn" data-example="01" style="display:none;">
+                            Clear Output
+                        </button>
+                    </div>
+                    <div class="example-output" id="output-01" style="display:none;"></div>
                     <h4>Workflow Structure</h4>
                     <pre><code class="language-typescript">const syncPhases: STABLE_WORKFLOW_PHASE[] = [
   // Phase 1: Fetch data concurrently
@@ -179,6 +188,15 @@ const result = await stableWorkflow(syncPhases, {
                 </div>
                 
                 <div class="example-code">
+                    <div class="example-actions">
+                        <button class="btn btn-primary run-example-btn" data-example="02">
+                            ▶ Run Example
+                        </button>
+                        <button class="btn btn-secondary clear-output-btn" data-example="02" style="display:none;">
+                            Clear Output
+                        </button>
+                    </div>
+                    <div class="example-output" id="output-02" style="display:none;"></div>
                     <h4>Branch Workflow Structure</h4>
                     <pre><code class="language-typescript">// Separate circuit breakers for each service
 const userServiceBreaker = new CircuitBreaker({
@@ -307,6 +325,15 @@ const result = await stableWorkflow([], {
                 </div>
                 
                 <div class="example-code">
+                    <div class="example-actions">
+                        <button class="btn btn-primary run-example-btn" data-example="03">
+                            ▶ Run Example
+                        </button>
+                        <button class="btn btn-secondary clear-output-btn" data-example="03" style="display:none;">
+                            Clear Output
+                        </button>
+                    </div>
+                    <div class="example-output" id="output-03" style="display:none;"></div>
                     <h4>Health Check Implementation</h4>
                     <pre><code class="language-typescript">interface ServiceHealth {
   serviceName: string;
@@ -435,6 +462,15 @@ setInterval(async () => {
                 </div>
                 
                 <div class="example-code">
+                    <div class="example-actions">
+                        <button class="btn btn-primary run-example-btn" data-example="04">
+                            ▶ Run Example
+                        </button>
+                        <button class="btn btn-secondary clear-output-btn" data-example="04" style="display:none;">
+                            Clear Output
+                        </button>
+                    </div>
+                    <div class="example-output" id="output-04" style="display:none;"></div>
                     <pre><code class="language-typescript">async function processBatchImages(imageUrls: string[]) {
   console.log(`Processing ${imageUrls.length} images...`);
   
@@ -510,6 +546,15 @@ setInterval(async () => {
                 </div>
                 
                 <div class="example-code">
+                    <div class="example-actions">
+                        <button class="btn btn-primary run-example-btn" data-example="05">
+                            ▶ Run Example
+                        </button>
+                        <button class="btn btn-secondary clear-output-btn" data-example="05" style="display:none;">
+                            Clear Output
+                        </button>
+                    </div>
+                    <div class="example-output" id="output-05" style="display:none;"></div>
                     <pre><code class="language-typescript">// Test different feature configurations
 async function testFeatureFlag(featureName: string, config: any) {
   console.log(`Testing feature: ${featureName}`);
@@ -589,6 +634,15 @@ for (const scenario of testScenarios) {
                 </div>
                 
                 <div class="example-code">
+                    <div class="example-actions">
+                        <button class="btn btn-primary run-example-btn" data-example="06">
+                            ▶ Run Example
+                        </button>
+                        <button class="btn btn-secondary clear-output-btn" data-example="06" style="display:none;">
+                            Clear Output
+                        </button>
+                    </div>
+                    <div class="example-output" id="output-06" style="display:none;"></div>
                     <h4>Imports and Setup</h4>
                     <pre><code class="language-typescript">import { 
   stableWorkflow, 
@@ -933,6 +987,397 @@ await resumeWorkflow('migration-12345');</code></pre>
 
     <script>
         hljs.highlightAll();
+        
+        // Utility functions for logging
+        function log(outputId, message, type = 'info') {
+            const output = document.getElementById(`output-${outputId}`);
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                info: '#64b5f6',
+                success: '#81c784',
+                warning: '#ffb74d',
+                error: '#e57373',
+                phase: '#ba68c8'
+            };
+            const icons = {
+                info: 'ℹ️',
+                success: '✅',
+                warning: '⚠️',
+                error: '❌',
+                phase: '📍'
+            };
+            const line = document.createElement('div');
+            line.style.marginBottom = '8px';
+            line.style.color = colors[type];
+            line.innerHTML = `<span style="color: #78909c">[${timestamp}]</span> ${icons[type]} ${message}`;
+            output.appendChild(line);
+            output.parentElement.scrollTop = output.parentElement.scrollHeight;
+        }
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Simulate API call
+        async function simulateRequest(endpoint, options = {}) {
+            await delay(300 + Math.random() * 700);
+            if (Math.random() > 0.1) { // 90% success rate
+                return { success: true, data: options.mockData || { status: 'ok' } };
+            }
+            throw new Error('Request failed');
+        }
+
+        // Example 01: Data Synchronization Pipeline
+        async function runExample01(outputId) {
+            log(outputId, '🚀 Starting Multi-Source Data Synchronization Pipeline', 'info');
+            log(outputId, 'Workflow ID: data-sync-pipeline', 'info');
+            
+            try {
+                // Phase 1: Fetch data concurrently
+                log(outputId, '📍 Phase 1: Fetching data from multiple sources', 'phase');
+                await delay(500);
+                
+                const sources = ['users', 'posts', 'comments'];
+                for (const source of sources) {
+                    log(outputId, `Fetching ${source}...`, 'info');
+                    await simulateRequest(`/${source}`);
+                    log(outputId, `✓ ${source} fetched successfully`, 'success');
+                    await delay(200);
+                }
+                log(outputId, 'Phase 1 completed in 1250ms', 'success');
+                
+                // Phase 2: Data enrichment
+                log(outputId, '📍 Phase 2: Enriching data', 'phase');
+                await delay(500);
+                log(outputId, 'Enriching posts with user data...', 'info');
+                await delay(600);
+                log(outputId, 'Enriching posts with comment counts...', 'info');
+                await delay(400);
+                log(outputId, '✓ Enriched 25 posts with author and comment data', 'success');
+                log(outputId, 'Phase 2 completed in 890ms', 'success');
+                
+                // Phase 3: Validation
+                log(outputId, '📍 Phase 3: Validating enriched data', 'phase');
+                await delay(400);
+                log(outputId, 'Running validation rules...', 'info');
+                await delay(500);
+                log(outputId, '✓ All 25 records passed validation', 'success');
+                log(outputId, 'Phase 3 completed in 650ms', 'success');
+                
+                // Phase 4: Batch upload
+                log(outputId, '📍 Phase 4: Uploading to internal system', 'phase');
+                await delay(300);
+                
+                for (let i = 1; i <= 5; i++) {
+                    log(outputId, `Uploading batch ${i}/5...`, 'info');
+                    await simulateRequest('/api/sync', { mockData: { batchId: i } });
+                    await delay(200);
+                }
+                log(outputId, '✓ All batches uploaded successfully', 'success');
+                log(outputId, 'Phase 4 completed in 1420ms', 'success');
+                
+                // Final summary
+                await delay(300);
+                log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+                log(outputId, '🎉 Workflow completed successfully!', 'success');
+                log(outputId, 'Total execution time: 4210ms', 'info');
+                log(outputId, 'Successful requests: 28/28', 'success');
+                log(outputId, 'Failed requests: 0', 'info');
+            } catch (error) {
+                log(outputId, `Workflow failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Example 02: Microservice Orchestration
+        async function runExample02(outputId) {
+            log(outputId, '🚀 Starting Microservice Orchestration', 'info');
+            log(outputId, 'Workflow ID: order-processing', 'info');
+            log(outputId, 'Mode: Concurrent branch execution', 'info');
+            
+            try {
+                log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+                
+                // Simulate concurrent branches
+                const branches = [
+                    { id: 'user-service', critical: true, phases: ['validate-user'] },
+                    { id: 'inventory-service', critical: true, phases: ['check-stock', 'reserve-items'] },
+                    { id: 'payment-service', critical: true, phases: ['authorize-payment', 'capture-payment'] },
+                    { id: 'notification-service', critical: false, phases: ['send-notifications'] }
+                ];
+                
+                log(outputId, `Starting ${branches.length} branches in parallel...`, 'info');
+                await delay(300);
+                
+                for (const branch of branches) {
+                    log(outputId, `🔀 Branch: ${branch.id} (${branch.critical ? 'CRITICAL' : 'OPTIONAL'})`, 'phase');
+                    
+                    for (const phase of branch.phases) {
+                        log(outputId, `  ➤ Phase: ${phase}`, 'info');
+                        await delay(400);
+                        
+                        try {
+                            await simulateRequest(`/${branch.id}/${phase}`);
+                            log(outputId, `  ✓ ${phase} completed`, 'success');
+                        } catch (error) {
+                            if (branch.critical) {
+                                throw new Error(`Critical branch ${branch.id} failed`);
+                            }
+                            log(outputId, `  ⚠️  ${phase} failed (non-critical)`, 'warning');
+                        }
+                        await delay(200);
+                    }
+                    
+                    log(outputId, `✓ Branch ${branch.id} completed`, 'success');
+                    await delay(300);
+                }
+                
+                log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+                log(outputId, '🎉 Order processing completed successfully!', 'success');
+                log(outputId, 'All critical branches: SUCCESS', 'success');
+                log(outputId, 'Total branches: 4', 'info');
+            } catch (error) {
+                log(outputId, `Workflow failed: ${error.message}`, 'error');
+                log(outputId, 'Initiating rollback procedures...', 'warning');
+            }
+        }
+
+        // Example 03: API Health Monitoring
+        async function runExample03(outputId) {
+            log(outputId, '🚀 Starting API Health Monitor', 'info');
+            log(outputId, 'Checking 3 services...', 'info');
+            
+            const services = [
+                { name: 'user-api', sla: 500, critical: true },
+                { name: 'order-api', sla: 1000, critical: true },
+                { name: 'notification-api', sla: 2000, critical: false }
+            ];
+            
+            log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            
+            for (const service of services) {
+                log(outputId, `Checking ${service.name}...`, 'info');
+                const startTime = Date.now();
+                
+                try {
+                    await simulateRequest(`/${service.name}/health`);
+                    const responseTime = Date.now() - startTime;
+                    const slaCompliant = responseTime <= service.sla;
+                    
+                    if (slaCompliant) {
+                        log(outputId, `✓ ${service.name}: HEALTHY (${responseTime}ms, SLA: ${service.sla}ms)`, 'success');
+                    } else {
+                        log(outputId, `⚠️  ${service.name}: SLA BREACH (${responseTime}ms > ${service.sla}ms)`, 'warning');
+                    }
+                    
+                    log(outputId, `  Circuit Breaker: CLOSED`, 'info');
+                    log(outputId, `  Consecutive Failures: 0`, 'info');
+                } catch (error) {
+                    log(outputId, `✗ ${service.name}: UNHEALTHY`, 'error');
+                    log(outputId, `  Circuit Breaker: OPEN`, 'warning');
+                }
+                
+                await delay(400);
+            }
+            
+            log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            log(outputId, '✓ Health check cycle completed', 'success');
+            log(outputId, 'Healthy services: 3/3', 'success');
+        }
+
+        // Example 04: Batch Image Processing
+        async function runExample04(outputId) {
+            log(outputId, '🚀 Starting Batch Image Processing', 'info');
+            
+            const imageCount = 20;
+            log(outputId, `Processing ${imageCount} images...`, 'info');
+            log(outputId, 'Concurrency limit: 10', 'info');
+            log(outputId, 'Rate limit: 100 requests/minute', 'info');
+            
+            log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            
+            let processed = 0;
+            let successful = 0;
+            let failed = 0;
+            
+            for (let i = 1; i <= imageCount; i++) {
+                try {
+                    await simulateRequest('/process-image', { mockData: { imageId: i } });
+                    processed++;
+                    successful++;
+                    const progress = ((processed / imageCount) * 100).toFixed(1);
+                    log(outputId, `✓ Processed image-${i}: ${progress}% complete`, 'success');
+                } catch (error) {
+                    processed++;
+                    failed++;
+                    log(outputId, `✗ Failed image-${i}`, 'error');
+                }
+                
+                if (i % 5 === 0) await delay(300);
+            }
+            
+            log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            log(outputId, '🎉 Batch processing complete!', 'success');
+            log(outputId, `Total: ${imageCount}`, 'info');
+            log(outputId, `Successful: ${successful}`, 'success');
+            log(outputId, `Failed: ${failed}`, failed > 0 ? 'warning' : 'info');
+        }
+
+        // Example 05: Feature Flag Testing
+        async function runExample05(outputId) {
+            log(outputId, '🚀 Starting Feature Flag Testing', 'info');
+            log(outputId, 'Testing 3 feature configurations with trial mode', 'info');
+            
+            const scenarios = [
+                { name: 'feature-A', successRate: 0.95 },
+                { name: 'feature-B', successRate: 0.85 },
+                { name: 'feature-C', successRate: 0.60 }
+            ];
+            
+            log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            
+            for (const scenario of scenarios) {
+                log(outputId, `Testing ${scenario.name}...`, 'info');
+                log(outputId, `  Expected success rate: ${(scenario.successRate * 100)}%`, 'info');
+                
+                let attempts = 5;
+                let successes = 0;
+                
+                for (let i = 1; i <= attempts; i++) {
+                    const success = Math.random() < scenario.successRate;
+                    if (success) {
+                        successes++;
+                        log(outputId, `  Attempt ${i}: SUCCESS`, 'success');
+                    } else {
+                        log(outputId, `  Attempt ${i}: FAILED`, 'error');
+                    }
+                    await delay(200);
+                }
+                
+                const actualRate = (successes / attempts * 100).toFixed(0);
+                log(outputId, `✓ ${scenario.name} completed: ${actualRate}% success rate`, 'success');
+                await delay(400);
+            }
+            
+            log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            log(outputId, '🎉 A/B testing completed!', 'success');
+        }
+
+        // Example 06: State Persistence Workflow
+        async function runExample06(outputId) {
+            log(outputId, '🚀 Starting Distributed Workflow with State Persistence', 'info');
+            log(outputId, 'Workflow ID: migration-12345', 'info');
+            log(outputId, 'Using Redis-based state persistence', 'info');
+            
+            log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            
+            try {
+                // Phase 1: Extract
+                log(outputId, '📍 Phase 1: Extract source data', 'phase');
+                await delay(500);
+                log(outputId, '📥 Extracting source data...', 'info');
+                await delay(600);
+                log(outputId, '✓ Extracted 100 records', 'success');
+                log(outputId, '💾 Stored state: migration:migration-12345:main:extract-source-data (TTL: 3600s)', 'info');
+                log(outputId, 'Progress: 20%', 'info');
+                await delay(300);
+                
+                // Phase 2: Transform
+                log(outputId, '📍 Phase 2: Transform data', 'phase');
+                await delay(500);
+                log(outputId, 'Loading previous state from Redis...', 'info');
+                await delay(400);
+                log(outputId, '✓ State loaded: 100 source records', 'info');
+                log(outputId, 'Transforming records...', 'info');
+                await delay(700);
+                log(outputId, '✓ Transformed 100 records', 'success');
+                log(outputId, '💾 Stored state: migration:migration-12345:main:transform-data (TTL: 3600s)', 'info');
+                log(outputId, 'Progress: 40%', 'info');
+                await delay(300);
+                
+                // Phase 3: Validate
+                log(outputId, '📍 Phase 3: Validate data', 'phase');
+                await delay(500);
+                log(outputId, 'Loading previous state from Redis...', 'info');
+                await delay(400);
+                log(outputId, 'Running validation rules...', 'info');
+                await delay(600);
+                log(outputId, '✓ All records validated', 'success');
+                log(outputId, '💾 Stored state: migration:migration-12345:main:validate-data (TTL: 3600s)', 'info');
+                log(outputId, 'Progress: 60%', 'info');
+                await delay(300);
+                
+                // Phase 4: Load
+                log(outputId, '📍 Phase 4: Load to destination', 'phase');
+                await delay(500);
+                log(outputId, 'Uploading records in batches...', 'info');
+                
+                for (let i = 1; i <= 5; i++) {
+                    await delay(400);
+                    log(outputId, `  Batch ${i}/5 uploaded (${i * 20} records)`, 'success');
+                    const progress = 60 + (i * 8);
+                    log(outputId, `  Progress: ${progress}%`, 'info');
+                }
+                
+                log(outputId, '💾 Stored final state (TTL: 7200s)', 'info');
+                log(outputId, 'Progress: 100%', 'success');
+                
+                log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+                log(outputId, '🎉 Workflow completed successfully!', 'success');
+                log(outputId, 'Total records processed: 100', 'success');
+                log(outputId, 'Workflow can be resumed from any checkpoint', 'info');
+                log(outputId, 'State persisted with distributed locking', 'info');
+            } catch (error) {
+                log(outputId, `Workflow interrupted: ${error.message}`, 'error');
+                log(outputId, '💾 State checkpoint saved - can resume later', 'warning');
+            }
+        }
+
+        // Event handlers
+        document.querySelectorAll('.run-example-btn').forEach(button => {
+            button.addEventListener('click', async function() {
+                const exampleId = this.getAttribute('data-example');
+                const output = document.getElementById(`output-${exampleId}`);
+                const clearBtn = document.querySelector(`.clear-output-btn[data-example="${exampleId}"]`);
+                
+                // Show output and clear button
+                output.style.display = 'block';
+                output.innerHTML = '';
+                clearBtn.style.display = 'inline-block';
+                
+                // Disable button during execution
+                this.disabled = true;
+                this.textContent = '⏳ Running...';
+                
+                // Run the appropriate example
+                try {
+                    switch(exampleId) {
+                        case '01': await runExample01(exampleId); break;
+                        case '02': await runExample02(exampleId); break;
+                        case '03': await runExample03(exampleId); break;
+                        case '04': await runExample04(exampleId); break;
+                        case '05': await runExample05(exampleId); break;
+                        case '06': await runExample06(exampleId); break;
+                    }
+                } catch (error) {
+                    log(exampleId, `Unexpected error: ${error.message}`, 'error');
+                }
+                
+                // Re-enable button
+                this.disabled = false;
+                this.textContent = '▶ Run Example';
+            });
+        });
+
+        // Clear output handlers
+        document.querySelectorAll('.clear-output-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const exampleId = this.getAttribute('data-example');
+                const output = document.getElementById(`output-${exampleId}`);
+                output.innerHTML = '';
+                output.style.display = 'none';
+                this.style.display = 'none';
+            });
+        });
         
         // Add copy buttons to all code blocks
         document.querySelectorAll('pre code').forEach((codeBlock) => {
