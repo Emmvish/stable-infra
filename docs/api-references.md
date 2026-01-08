@@ -1,6 +1,6 @@
 # API Reference
 
-Complete API documentation for `@emmvish/stable-request` v1.6.4
+Complete API documentation for `@emmvish/stable-request` v1.7.0
 
 ## Table of Contents
 
@@ -24,6 +24,7 @@ Complete API documentation for `@emmvish/stable-request` v1.6.4
   - [STABLE_WORKFLOW_BRANCH](#stable_workflow_branch)
   - [STABLE_WORKFLOW_RESULT](#stable_workflow_result)
   - [Configuration Types](#configuration-types)
+  - [State Persistence Types](#state-persistence-types)
   - [Hook Option Types](#hook-option-types)
   - [Decision Types](#decision-types)
 - [Enums](#enums)
@@ -87,13 +88,13 @@ function stableRequest<RequestDataType = any, ResponseDataType = any>(
 #### Example
 
 ```typescript
-import { stableRequest, RETRY_STRATEGIES } from '@emmvish/stable-request';
+import { stableRequest, RETRY_STRATEGIE, REQUEST_METHODS } from '@emmvish/stable-request';
 
 const userData = await stableRequest({
   reqData: {
     hostname: 'api.example.com',
     path: '/users/123',
-    method: 'GET',
+    method: REQUEST_METHODS.GET,
     headers: { 'Authorization': 'Bearer token' }
   },
   resReq: true,
@@ -257,7 +258,7 @@ Comprehensive workflow execution result. See [STABLE_WORKFLOW_RESULT](#stable_wo
 #### Example
 
 ```typescript
-import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
+import { stableWorkflow, PHASE_DECISION_ACTIONS, REQUEST_METHODS } from '@emmvish/stable-request';
 
 const phases = [
   {
@@ -266,7 +267,7 @@ const phases = [
       { 
         id: 'login', 
         requestOptions: { 
-          reqData: { path: '/auth/login', method: 'POST' }, 
+          reqData: { path: '/auth/login', method: REQUEST_METHODS.POST }, 
           resReq: true 
         } 
       }
@@ -286,7 +287,7 @@ const phases = [
       { 
         id: 'analytics', 
         requestOptions: { 
-          reqData: { path: '/analytics', method: 'POST' }, 
+          reqData: { path: '/analytics', method: REQUEST_METHODS.POST }, 
           resReq: false 
         } 
       }
@@ -944,6 +945,169 @@ interface ExecutionContext {
 ```
 
 Execution context information passed through the request chain. Used for logging and traceability. All fields are optional and populated based on execution level.
+
+---
+
+### State Persistence Types
+
+State persistence enables workflows to save and restore their state to external storage systems (databases, Redis, file systems). This is crucial for workflow recovery, distributed execution, and audit trails.
+
+#### `StatePersistenceConfig`
+
+Configuration for state persistence behavior.
+
+```typescript
+interface StatePersistenceConfig {
+  persistenceFunction: (options: StatePersistenceOptions) => Promise<Record<string, any>> | Record<string, any>;
+  persistenceParams?: any;
+  loadBeforeHooks?: boolean;
+  storeAfterHooks?: boolean;
+}
+```
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `persistenceFunction` | `Function` | ✅ Yes | - | Function to handle state loading and storing. Should return state object when loading, or void/Promise<void> when storing. |
+| `persistenceParams` | `any` | No | `undefined` | Custom parameters passed to the persistence function (e.g., database connection, Redis client). |
+| `loadBeforeHooks` | `boolean` | No | `false` | If `true`, loads state from persistence before executing hooks/phases. |
+| `storeAfterHooks` | `boolean` | No | `false` | If `true`, stores state to persistence after executing hooks/phases. |
+
+**Persistence Function Behavior:**
+- **Loading Mode:** Called with `buffer` as empty object `{}`. Should return the loaded state as `Record<string, any>`.
+- **Storing Mode:** Called with populated `buffer` containing current state. Should store the buffer and return void.
+
+#### `StatePersistenceOptions`
+
+Options passed to the persistence function.
+
+```typescript
+interface StatePersistenceOptions {
+  executionContext: ExecutionContext;
+  params?: any;
+  buffer: Record<string, any>;
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `executionContext` | `ExecutionContext` | Contains `workflowId`, `phaseId`, `branchId`, `requestId` for creating unique state keys. |
+| `params` | `any` | Custom parameters from `persistenceParams` config (e.g., `{ db, collection }`). |
+| `buffer` | `Record<string, any>` | The shared buffer/state to be persisted or populated with loaded state. |
+
+#### Usage Levels
+
+State persistence can be configured at multiple levels:
+
+1. **Workflow Level:** `commonStatePersistence` in `STABLE_WORKFLOW_OPTIONS`
+2. **Phase Level:** `statePersistence` in `STABLE_WORKFLOW_PHASE`
+3. **Branch Level:** `statePersistence` in `STABLE_WORKFLOW_BRANCH`
+4. **Request Level:** `statePersistence` in `STABLE_REQUEST`
+
+**Example - Database Persistence:**
+
+```typescript
+import { stableWorkflow } from '@emmvish/stable-request';
+
+const persistToMongo = async ({ executionContext, params, buffer }) => {
+  const { workflowId, phaseId } = executionContext;
+  const { db, collection } = params;
+  
+  const query = { workflowId, phaseId };
+  
+  if (Object.keys(buffer).length > 0) {
+    // Store mode
+    await db.collection(collection).updateOne(
+      query,
+      { $set: { state: buffer, updatedAt: new Date() } },
+      { upsert: true }
+    );
+    console.log(`State persisted for workflow ${workflowId}, phase ${phaseId}`);
+  } else {
+    // Load mode
+    const doc = await db.collection(collection).findOne(query);
+    return doc?.state || {};
+  }
+};
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'data-pipeline-123',
+  commonStatePersistence: {
+    persistenceFunction: persistToMongo,
+    persistenceParams: { 
+      db: mongoClient.db('workflows'),
+      collection: 'workflow_state'
+    },
+    loadBeforeHooks: true,
+    storeAfterHooks: true
+  },
+  sharedBuffer: {}
+});
+```
+
+**Example - Redis Persistence:**
+
+```typescript
+import Redis from 'ioredis';
+
+const redis = new Redis();
+
+const persistToRedis = async ({ executionContext, params, buffer }) => {
+  const { workflowId, phaseId, branchId } = executionContext;
+  const { ttl = 86400 } = params; // 24 hours default
+  
+  const key = `workflow:${workflowId}:${branchId || 'main'}:${phaseId || 'global'}`;
+  
+  if (Object.keys(buffer).length > 0) {
+    // Store with TTL
+    await redis.setex(key, ttl, JSON.stringify(buffer));
+  } else {
+    // Load
+    const data = await redis.get(key);
+    return data ? JSON.parse(data) : {};
+  }
+};
+
+const phases = [
+  {
+    id: 'data-processing',
+    requests: [...],
+    statePersistence: {
+      persistenceFunction: persistToRedis,
+      persistenceParams: { ttl: 3600 },
+      loadBeforeHooks: true,
+      storeAfterHooks: true
+    }
+  }
+];
+```
+
+**Example - File System Persistence:**
+
+```typescript
+import fs from 'fs/promises';
+import path from 'path';
+
+const persistToFile = async ({ executionContext, params, buffer }) => {
+  const { workflowId, phaseId } = executionContext;
+  const { directory = './workflow-state' } = params;
+  
+  await fs.mkdir(directory, { recursive: true });
+  const filePath = path.join(directory, `${workflowId}-${phaseId}.json`);
+  
+  if (Object.keys(buffer).length > 0) {
+    // Store
+    await fs.writeFile(filePath, JSON.stringify(buffer, null, 2));
+  } else {
+    // Load
+    try {
+      const data = await fs.readFile(filePath, 'utf-8');
+      return JSON.parse(data);
+    } catch {
+      return {}; // File doesn't exist yet
+    }
+  }
+};
+```
 
 ---
 

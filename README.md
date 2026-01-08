@@ -25,6 +25,7 @@ A production-grade HTTP Workflow Execution Engine for Node.js that transforms un
   - [Config Cascading](#config-cascading)
   - [Request Grouping](#request-grouping)
   - [Shared Buffer and Pre-Execution Hooks](#shared-buffer-and-pre-execution-hooks)
+  - [State Persistence and Recovery](#state-persistence-and-recovery)
   - [Comprehensive Observability](#comprehensive-observability)
   - [Trial Mode](#trial-mode)
 - [Common Use Cases](#common-use-cases)
@@ -853,6 +854,160 @@ console.log(sharedBuffer);                      // Updated with data from workfl
 }
 ```
 
+### State Persistence and Recovery
+
+Persist workflow state to external storage for recovery, distributed coordination, and long-running workflows.
+
+**How It Works**:
+The persistence function operates in two modes:
+- **LOAD Mode**: When `buffer` is empty/null, return the stored state
+- **STORE Mode**: When `buffer` contains data, save it to your storage
+
+**Redis Persistence with Distributed Locking**:
+
+```typescript
+import Redis from 'ioredis';
+
+const redis = new Redis();
+
+const persistToRedis = async ({ executionContext, params, buffer }) => {
+  const { workflowId, phaseId } = executionContext;
+  const { ttl = 86400, enableLocking = false } = params || {};
+  
+  const stateKey = `workflow:${workflowId}:${phaseId}`;
+  const lockKey = `lock:${stateKey}`;
+  const isStoring = buffer && Object.keys(buffer).length > 0;
+  
+  if (enableLocking) {
+    await redis.setex(lockKey, 5, Date.now().toString());
+  }
+  
+  try {
+    if (isStoring) {
+      // STORE MODE: Save with metadata
+      const stateWithMeta = {
+        ...buffer,
+        _meta: {
+          timestamp: new Date().toISOString(),
+          version: (buffer._meta?.version || 0) + 1
+        }
+      };
+      await redis.setex(stateKey, ttl, JSON.stringify(stateWithMeta));
+      console.log(`💾 State saved (v${stateWithMeta._meta.version})`);
+    } else {
+      // LOAD MODE: Retrieve state
+      const data = await redis.get(stateKey);
+      return data ? JSON.parse(data) : {};
+    }
+  } finally {
+    if (enableLocking) {
+      await redis.del(lockKey);  // Release lock
+    }
+  }
+  
+  return {};
+};
+
+// Use with workflow-level persistence (applies to all phases)
+await stableWorkflow(phases, {
+  workflowId: 'distributed-job-456',
+  commonStatePersistence: {
+    persistenceFunction: persistToRedis,
+    persistenceParams: { 
+      ttl: 3600,
+      enableLocking: true  // Enable distributed locking
+    },
+    loadBeforeHooks: true,
+    storeAfterHooks: true
+  },
+  commonRequestData: { hostname: 'api.example.com' }
+});
+```
+
+**Checkpoint-Based Recovery Pattern**:
+
+```typescript
+const createCheckpoint = async ({ executionContext, params, buffer }) => {
+  const { workflowId } = executionContext;
+  const checkpointKey = `checkpoint:${workflowId}`;
+  
+  if (buffer && Object.keys(buffer).length > 0) {
+    // STORE: Save checkpoint with completed phases
+    const existing = JSON.parse(await redis.get(checkpointKey) || '{}');
+    const checkpoint = {
+      ...existing,
+      completedPhases: [...new Set([
+        ...(existing.completedPhases || []),
+        ...(buffer.completedPhases || [])
+      ])],
+      progress: buffer.progress || existing.progress || 0,
+      lastUpdated: new Date().toISOString()
+    };
+    await redis.setex(checkpointKey, 7200, JSON.stringify(checkpoint));
+  } else {
+    // LOAD: Return checkpoint data
+    const data = await redis.get(checkpointKey);
+    return data ? JSON.parse(data) : { completedPhases: [] };
+  }
+  return {};
+};
+
+const phases = [
+  {
+    id: 'phase-1',
+    requests: [...],
+    phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+      // Skip if already completed (recovery scenario)
+      if (sharedBuffer.completedPhases?.includes('phase-1')) {
+        console.log('✅ Phase-1 already completed, skipping...');
+        return { 
+          action: PHASE_DECISION_ACTIONS.SKIP, 
+          skipToPhaseId: 'phase-2' 
+        };
+      }
+      
+      if (phaseResult.success) {
+        sharedBuffer.completedPhases = [
+          ...(sharedBuffer.completedPhases || []), 
+          'phase-1'
+        ];
+        return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+      }
+      return { action: PHASE_DECISION_ACTIONS.TERMINATE };
+    }
+  },
+  {
+    id: 'phase-2',
+    requests: [...],
+    phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+      if (sharedBuffer.completedPhases?.includes('phase-2')) {
+        return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+      }
+      if (phaseResult.success) {
+        sharedBuffer.completedPhases = [
+          ...(sharedBuffer.completedPhases || []),
+          'phase-2'
+        ];
+      }
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    }
+  }
+];
+
+await stableWorkflow(phases, {
+  workflowId: 'resumable-workflow-789',
+  enableNonLinearExecution: true,
+  sharedBuffer: { completedPhases: [] },
+  commonStatePersistence: {
+    persistenceFunction: createCheckpoint,
+    persistenceParams: { ttl: 7200 },
+    loadBeforeHooks: true,
+    storeAfterHooks: true
+  },
+  commonRequestData: { hostname: 'api.example.com' }
+});
+```
+
 ### Comprehensive Observability
 
 Built-in hooks for monitoring, logging, and analysis at every level:
@@ -1161,6 +1316,203 @@ async function sendWebhook(eventData: any) {
   }
 }
 ```
+
+### Distributed Data Migration with State Persistence
+
+```typescript
+import Redis from 'ioredis';
+import { 
+  stableWorkflow, 
+  PHASE_DECISION_ACTIONS, 
+  REQUEST_METHODS,
+  VALID_REQUEST_PROTOCOLS 
+} from '@emmvish/stable-request';
+
+const redis = new Redis();
+
+// Checkpoint persistence for recovery
+const createCheckpoint = async ({ executionContext, buffer }) => {
+  const { workflowId, phaseId } = executionContext;
+  const key = `checkpoint:${workflowId}`;
+  
+  if (buffer && Object.keys(buffer).length > 0) {
+    // Save checkpoint with progress
+    const existing = JSON.parse(await redis.get(key) || '{}');
+    const checkpoint = {
+      ...existing,
+      ...buffer,
+      completedPhases: [...new Set([
+        ...(existing.completedPhases || []),
+        ...(buffer.completedPhases || [])
+      ])],
+      lastPhase: phaseId,
+      updatedAt: new Date().toISOString()
+    };
+    await redis.setex(key, 86400, JSON.stringify(checkpoint));
+    console.log(`💾 Checkpoint: ${checkpoint.recordsProcessed}/${checkpoint.totalRecords} records`);
+  } else {
+    // Load checkpoint
+    const data = await redis.get(key);
+    return data ? JSON.parse(data) : { 
+      completedPhases: [], 
+      recordsProcessed: 0,
+      totalRecords: 0
+    };
+  }
+  return {};
+};
+
+const migrationPhases = [
+  {
+    id: 'extract',
+    requests: [{
+      id: 'fetch-data',
+      requestOptions: {
+        reqData: { 
+          protocol: VALID_REQUEST_PROTOCOLS.HTTPS,
+          hostname: 'source-api.example.com',
+          path: '/data',
+          method: REQUEST_METHODS.GET
+        },
+        resReq: true
+      }
+    }],
+    phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+      if (sharedBuffer.completedPhases?.includes('extract')) {
+        console.log('✅ Extract already completed, skipping...');
+        return { 
+          action: PHASE_DECISION_ACTIONS.SKIP, 
+          skipToPhaseId: 'transform' 
+        };
+      }
+      
+      if (phaseResult.success) {
+        const records = phaseResult.responses[0]?.data?.records || [];
+        sharedBuffer.extractedData = records;
+        sharedBuffer.totalRecords = records.length;
+        sharedBuffer.completedPhases = ['extract'];
+        return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+      }
+      return { action: PHASE_DECISION_ACTIONS.TERMINATE };
+    }
+  },
+  {
+    id: 'transform',
+    allowReplay: true,
+    maxReplayCount: 3,
+    requests: [{
+      id: 'transform-batch',
+      requestOptions: {
+        reqData: {
+          protocol: VALID_REQUEST_PROTOCOLS.HTTPS,
+          hostname: 'transform-api.example.com',
+          path: '/transform',
+          method: REQUEST_METHODS.POST
+        },
+        resReq: true,
+        preExecution: {
+          preExecutionHook: ({ commonBuffer }) => {
+            // Process in batches
+            const batchSize = 100;
+            const processed = commonBuffer.recordsProcessed || 0;
+            const batch = commonBuffer.extractedData.slice(
+              processed,
+              processed + batchSize
+            );
+            return {
+              reqData: { body: { records: batch } }
+            };
+          },
+          applyPreExecutionConfigOverride: true
+        }
+      }
+    }],
+    phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+      if (sharedBuffer.completedPhases?.includes('transform')) {
+        return { 
+          action: PHASE_DECISION_ACTIONS.SKIP, 
+          skipToPhaseId: 'load' 
+        };
+      }
+      
+      if (phaseResult.success) {
+        const transformed = phaseResult.responses[0]?.data?.transformed || [];
+        sharedBuffer.recordsProcessed = 
+          (sharedBuffer.recordsProcessed || 0) + transformed.length;
+        
+        // Continue transforming if more records remain
+        if (sharedBuffer.recordsProcessed < sharedBuffer.totalRecords) {
+          console.log(
+            `🔄 Progress: ${sharedBuffer.recordsProcessed}/${sharedBuffer.totalRecords}`
+          );
+          return { action: PHASE_DECISION_ACTIONS.REPLAY };
+        }
+        
+        // All records transformed
+        sharedBuffer.completedPhases = [
+          ...(sharedBuffer.completedPhases || []),
+          'transform'
+        ];
+        return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+      }
+      
+      return { action: PHASE_DECISION_ACTIONS.TERMINATE };
+    }
+  },
+  {
+    id: 'load',
+    requests: [{
+      id: 'upload-data',
+      requestOptions: {
+        reqData: {
+          protocol: VALID_REQUEST_PROTOCOLS.HTTPS,
+          hostname: 'dest-api.example.com',
+          path: '/import',
+          method: REQUEST_METHODS.POST
+        },
+        resReq: false
+      }
+    }],
+    phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+      if (phaseResult.success) {
+        sharedBuffer.completedPhases = [
+          ...(sharedBuffer.completedPhases || []),
+          'load'
+        ];
+      }
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    }
+  }
+];
+
+// Execute with state persistence for recovery
+const result = await stableWorkflow(migrationPhases, {
+  workflowId: 'data-migration-2024-01-08',
+  enableNonLinearExecution: true,
+  sharedBuffer: { 
+    completedPhases: [],
+    recordsProcessed: 0,
+    totalRecords: 0
+  },
+  commonStatePersistence: {
+    persistenceFunction: createCheckpoint,
+    loadBeforeHooks: true,
+    storeAfterHooks: true
+  },
+  commonAttempts: 3,
+  commonWait: 2000,
+  stopOnFirstPhaseError: true,
+  logPhaseResults: true
+});
+
+console.log(`✅ Migration completed: ${result.successfulRequests}/${result.totalRequests}`);
+console.log(`⏱️  Duration: ${result.executionTime}ms`);
+
+// To resume a failed workflow, just re-run with the same workflowId
+// It will load the checkpoint and skip completed phases
+```
+
+---
 
 ## License
 

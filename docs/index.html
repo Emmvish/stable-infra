@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A production-grade HTTP Workflow Execution Engine for Node.js with intelligent retry strategies, circuit breakers, and advanced execution patterns.">
+    <meta name="keywords" content="nodejs, http, api, gateway, workflow, retry, circuit-breaker, typescript">
+    <meta name="author" content="Manish Varma">
+    <title>Stable Request - Production-Grade HTTP Workflow Engine</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <span class="logo">⚡</span>
+                <span class="brand-name">stable-request</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html" class="active">Home</a>
+                <a href="documentation.html">Documentation</a>
+                <a href="examples.html">Examples</a>
+                <a href="https://github.com/manishvarma/stable-request" target="_blank">GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h1 class="hero-title">
+                    <span class="gradient-text">Production-Grade</span><br>
+                    HTTP Workflow Engine
+                </h1>
+                <p class="hero-subtitle">
+                    Transform unreliable API calls into resilient, observable, and sophisticated multi-phase workflows with intelligent retry strategies, circuit breakers, and advanced execution patterns.
+                </p>
+                <div class="hero-buttons">
+                    <a href="#quick-start" class="btn btn-primary">Get Started</a>
+                    <a href="documentation.html" class="btn btn-secondary">Documentation</a>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat">
+                        <div class="stat-value">40+</div>
+                        <div class="stat-label">TypeScript Types</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">100%</div>
+                        <div class="stat-label">Type Safe</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">0</div>
+                        <div class="stat-label">Dependencies*</div>
+                    </div>
+                </div>
+                <p class="hero-note">* Only Axios as peer dependency</p>
+            </div>
+        </div>
+    </header>
+
+    <section class="features">
+        <div class="container">
+            <h2 class="section-title">Why stable-request?</h2>
+            <p class="section-subtitle">Modern applications need robust API orchestration with enterprise-grade reliability</p>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🔄</div>
+                    <h3>Workflow-First Architecture</h3>
+                    <p>Organize API calls into phases, branches, and decision trees with full control over execution order and dependencies.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🛡️</div>
+                    <h3>Enterprise Resilience</h3>
+                    <p>Built-in circuit breakers, configurable retry strategies (exponential, linear, fixed), and sophisticated failure handling.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Execution Flexibility</h3>
+                    <p>Sequential, concurrent, mixed, and non-linear execution patterns to match your business logic perfectly.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Full Observability</h3>
+                    <p>Comprehensive hooks for monitoring, logging, error analysis, and execution history tracking in production.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🚀</div>
+                    <h3>Performance Optimized</h3>
+                    <p>Response caching with TTL, rate limiting, and concurrency control to maximize efficiency and respect API quotas.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Type Safety</h3>
+                    <p>Full TypeScript support with 40+ exported types ensuring compile-time safety and excellent IDE autocomplete.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="installation" id="quick-start">
+        <div class="container">
+            <h2 class="section-title">Quick Start</h2>
+            
+            <div class="install-box">
+                <h3>Installation</h3>
+                <pre><code class="language-bash">npm install @emmvish/stable-request</code></pre>
+            </div>
+
+            <div class="examples-showcase">
+                <div class="example-box">
+                    <h3>Single Request with Retry</h3>
+                    <p>Execute a single HTTP request with automatic retry on failure</p>
+                    <pre><code class="language-typescript">import { stableRequest, RETRY_STRATEGIES } from '@emmvish/stable-request';
+
+const userData = await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    path: '/users/123',
+    method: 'GET',
+    headers: { 'Authorization': 'Bearer token' }
+  },
+  resReq: true,              // Return response data
+  attempts: 3,               // Retry up to 3 times
+  wait: 1000,                // 1 second between retries
+  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+  logAllErrors: true         // Log all failed attempts
+});
+
+console.log(userData); // { id: 123, name: 'John' }</code></pre>
+                </div>
+
+                <div class="example-box">
+                    <h3>Batch Requests (API Gateway)</h3>
+                    <p>Execute multiple requests concurrently or sequentially</p>
+                    <pre><code class="language-typescript">import { stableApiGateway } from '@emmvish/stable-request';
+
+const requests = [
+  { id: 'users', requestOptions: { 
+    reqData: { path: '/users' }, resReq: true 
+  }},
+  { id: 'orders', requestOptions: { 
+    reqData: { path: '/orders' }, resReq: true 
+  }},
+  { id: 'products', requestOptions: { 
+    reqData: { path: '/products' }, resReq: true 
+  }}
+];
+
+const results = await stableApiGateway(requests, {
+  concurrentExecution: true,    // Execute in parallel
+  commonRequestData: { 
+    hostname: 'api.example.com',
+    headers: { 'X-API-Key': 'secret' }
+  },
+  commonAttempts: 2,             // Retry each request twice
+  commonWait: 500
+});
+
+results.forEach(result => {
+  console.log(`${result.id}:`, result.data);
+});</code></pre>
+                </div>
+
+                <div class="example-box">
+                    <h3>Multi-Phase Workflow</h3>
+                    <p>Orchestrate complex workflows with multiple phases</p>
+                    <pre><code class="language-typescript">import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
+
+const phases = [
+  {
+    id: 'authentication',
+    requests: [
+      { id: 'login', requestOptions: { 
+        reqData: { 
+          path: '/auth/login',
+          method: 'POST',
+          body: { username: 'user', password: 'pass' }
+        }, 
+        resReq: true 
+      }}
+    ]
+  },
+  {
+    id: 'fetch-data',
+    concurrentExecution: true,    // Execute in parallel
+    requests: [
+      { id: 'profile', requestOptions: { 
+        reqData: { path: '/profile' }, resReq: true 
+      }},
+      { id: 'orders', requestOptions: { 
+        reqData: { path: '/orders' }, resReq: true 
+      }},
+      { id: 'settings', requestOptions: { 
+        reqData: { path: '/settings' }, resReq: true 
+      }}
+    ]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'user-data-sync',
+  commonRequestData: { hostname: 'api.example.com' },
+  commonAttempts: 3,
+  stopOnFirstPhaseError: true,
+  logPhaseResults: true
+});
+
+console.log(`Success: ${result.success}`);</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="features-detailed">
+        <div class="container">
+            <h2 class="section-title">Core Features</h2>
+
+            <div class="feature-detail">
+                <div class="feature-detail-content">
+                    <h3>🔄 Intelligent Retry Strategies</h3>
+                    <p>Automatically retry failed requests with sophisticated backoff strategies:</p>
+                    <ul>
+                        <li><strong>Fixed Delay:</strong> Constant wait time between retries</li>
+                        <li><strong>Linear Backoff:</strong> Incrementally increasing delays (1s, 2s, 3s...)</li>
+                        <li><strong>Exponential Backoff:</strong> Exponentially growing delays (1s, 2s, 4s, 8s...)</li>
+                        <li><strong>Jitter Support:</strong> Randomized delays to prevent thundering herd</li>
+                    </ul>
+                    <pre><code class="language-typescript">await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  attempts: 5,
+  wait: 1000,
+  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+  jitter: 500  // Add randomness
+});</code></pre>
+                </div>
+            </div>
+
+            <div class="feature-detail">
+                <div class="feature-detail-content">
+                    <h3>🛡️ Circuit Breaker Pattern</h3>
+                    <p>Prevent cascade failures and system overload:</p>
+                    <ul>
+                        <li><strong>CLOSED:</strong> Normal operation, requests flow through</li>
+                        <li><strong>OPEN:</strong> Too many failures, requests blocked immediately</li>
+                        <li><strong>HALF_OPEN:</strong> Testing if service recovered</li>
+                    </ul>
+                    <pre><code class="language-typescript">await stableRequest({
+  reqData: { hostname: 'unreliable-api.com', path: '/data' },
+  attempts: 3,
+  circuitBreaker: {
+    failureThreshold: 5,      // Open after 5 failures
+    successThreshold: 2,      // Close after 2 successes
+    timeout: 60000            // Wait 60s before trying again
+  }
+});</code></pre>
+                </div>
+            </div>
+
+            <div class="feature-detail">
+                <div class="feature-detail-content">
+                    <h3>💾 Response Caching</h3>
+                    <p>Cache responses to reduce load and improve performance:</p>
+                    <ul>
+                        <li>Configurable TTL (time-to-live)</li>
+                        <li>Per-request or shared cache instances</li>
+                        <li>Automatic cache invalidation</li>
+                    </ul>
+                    <pre><code class="language-typescript">await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  cache: {
+    ttl: 300000  // Cache for 5 minutes
+  }
+});</code></pre>
+                </div>
+            </div>
+
+            <div class="feature-detail">
+                <div class="feature-detail-content">
+                    <h3>⚡ Rate Limiting & Concurrency Control</h3>
+                    <p>Control request rates and concurrent execution:</p>
+                    <ul>
+                        <li>Rate limiting: Respect API quotas (e.g., 100 requests per minute)</li>
+                        <li>Concurrency limiting: Control simultaneous requests</li>
+                        <li>Shared limiters across workflows</li>
+                    </ul>
+                    <pre><code class="language-typescript">const rateLimiter = new RateLimiter(100, 60000); // 100 req/min
+
+await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  rateLimiter
+});</code></pre>
+                </div>
+            </div>
+
+            <div class="feature-detail">
+                <div class="feature-detail-content">
+                    <h3>📊 Comprehensive Observability</h3>
+                    <p>Monitor and debug with powerful hooks:</p>
+                    <ul>
+                        <li><strong>handleErrors:</strong> Custom error handler for each failed attempt</li>
+                        <li><strong>handleSuccessfulAttemptData:</strong> Process each successful attempt</li>
+                        <li><strong>responseAnalyzer:</strong> Validate responses, trigger retries</li>
+                        <li><strong>finalErrorAnalyzer:</strong> Handle final errors after all retries</li>
+                        <li><strong>preExecution:</strong> Dynamic request modification before execution</li>
+                    </ul>
+                    <pre><code class="language-typescript">await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  handleErrors: async (error, context) => {
+    logger.error('Request failed', { error, context });
+  },
+  responseAnalyzer: async ({ data }) => {
+    return data.status === 'success';
+  }
+});</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="use-cases">
+        <div class="container">
+            <h2 class="section-title">Common Use Cases</h2>
+            
+            <div class="use-case-grid">
+                <div class="use-case-card">
+                    <h3>🔄 Data Synchronization</h3>
+                    <p>Multi-source data fetching, enrichment, and batch uploading with validation</p>
+                </div>
+                
+                <div class="use-case-card">
+                    <h3>🛒 E-commerce Workflows</h3>
+                    <p>Order processing coordinating user validation, inventory, payment, and notifications</p>
+                </div>
+                
+                <div class="use-case-card">
+                    <h3>🏥 Health Monitoring</h3>
+                    <p>Production API health checks with SLA compliance tracking and alerting</p>
+                </div>
+                
+                <div class="use-case-card">
+                    <h3>🖼️ Batch Processing</h3>
+                    <p>Image processing, video encoding, or data transformation at scale</p>
+                </div>
+                
+                <div class="use-case-card">
+                    <h3>🧪 A/B Testing</h3>
+                    <p>Feature flag testing with trial mode and probabilistic execution</p>
+                </div>
+                
+                <div class="use-case-card">
+                    <h3>🔗 Service Orchestration</h3>
+                    <p>Microservice coordination with proper dependencies and failure handling</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta">
+        <div class="container">
+            <h2>Ready to Build Resilient APIs?</h2>
+            <p>Get started with stable-request today and transform your HTTP workflows</p>
+            <div class="cta-buttons">
+                <a href="documentation.html" class="btn btn-primary">Read Documentation</a>
+                <a href="examples.html" class="btn btn-secondary">View Examples</a>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>stable-request</h4>
+                    <p>Production-grade HTTP Workflow Engine for Node.js</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Links</h4>
+                    <ul>
+                        <li><a href="documentation.html">Documentation</a></li>
+                        <li><a href="examples.html">Examples</a></li>
+                        <li><a href="https://github.com/manishvarma/stable-request">GitHub</a></li>
+                        <li><a href="https://www.npmjs.com/package/@emmvish/stable-request">npm</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="documentation.html#api-reference">API Reference</a></li>
+                        <li><a href="examples.html">Use Cases</a></li>
+                        <li><a href="https://github.com/manishvarma/stable-request/issues">Report Issues</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 Manish Varma. Released under the MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        hljs.highlightAll();
+        
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

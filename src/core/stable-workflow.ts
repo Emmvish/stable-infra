@@ -7,7 +7,7 @@ import {
     executeBranchWorkflow,
     executePhase,
     executeNonLinearWorkflow,
-    safelyExecuteUnknownFunction, 
+    executeWithPersistence,
     safelyStringify,
     CircuitBreaker,
     formatLogContext
@@ -216,7 +216,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
             }
 
             try {
-                await safelyExecuteUnknownFunction(
+                await executeWithPersistence<void>(
                     handlePhaseError, {
                         workflowId,
                         phaseResult,
@@ -224,7 +224,10 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                         maxSerializableChars,
                         params: workflowHookParams?.handlePhaseErrorParams,
                         sharedBuffer: options.sharedBuffer
-                    }
+                    },
+                    workflowHookParams?.statePersistence,
+                    { workflowId },
+                    options.sharedBuffer || {}
                 );
             } catch (hookError) {
                 console.error(

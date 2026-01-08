@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Examples (Stable Request)</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <span class="logo">⚡</span>
+                <span class="brand-name">stable-request</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="documentation.html">Documentation</a>
+                <a href="examples.html" class="active">Examples</a>
+                <a href="https://github.com/manishvarma/stable-request" target="_blank">GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="examples-hero">
+        <div class="container">
+            <h1>Production-Ready Examples</h1>
+            <p>Real-world use cases demonstrating the power of stable-request</p>
+        </div>
+    </div>
+
+    <div class="container examples-content">
+        <div class="example-showcase">
+            <div class="example-item">
+                <div class="example-header">
+                    <span class="example-number">01</span>
+                    <h2>Multi-Source Data Synchronization Pipeline</h2>
+                    <div class="example-tags">
+                        <span class="tag">Non-Linear Workflow</span>
+                        <span class="tag">Circuit Breaker</span>
+                        <span class="tag">Caching</span>
+                        <span class="tag">Rate Limiting</span>
+                    </div>
+                </div>
+                
+                <div class="example-description">
+                    <p>A comprehensive data synchronization workflow that fetches data from multiple API endpoints, validates and transforms it, then uploads to an internal system with full observability.</p>
+                    
+                    <h4>Key Features:</h4>
+                    <ul>
+                        <li>✅ Multi-phase workflow orchestration</li>
+                        <li>✅ Concurrent data fetching from multiple sources</li>
+                        <li>✅ Phase decision hooks with REPLAY action</li>
+                        <li>✅ Circuit breaker integration</li>
+                        <li>✅ Response caching with TTL</li>
+                        <li>✅ Rate limiting (50 requests per 10 seconds)</li>
+                        <li>✅ Exponential backoff retry strategy</li>
+                        <li>✅ Pre-execution hooks for data enrichment</li>
+                        <li>✅ Shared buffer for cross-phase state management</li>
+                    </ul>
+                    
+                    <h4>Use Case:</h4>
+                    <p>Enterprise data synchronization from external APIs with validation, transformation, and batch uploading.</p>
+                </div>
+                
+                <div class="example-code">
+                    <h4>Workflow Structure</h4>
+                    <pre><code class="language-typescript">const syncPhases: STABLE_WORKFLOW_PHASE[] = [
+  // Phase 1: Fetch data concurrently
+  {
+    id: 'fetch-source-data',
+    concurrentExecution: true,
+    requests: [
+      { id: 'fetch-users', requestOptions: {...} },
+      { id: 'fetch-posts', requestOptions: {...} },
+      { id: 'fetch-comments', requestOptions: {...} }
+    ]
+  },
+  
+  // Phase 2: Data enrichment
+  {
+    id: 'enrich-data',
+    requests: [{
+      id: 'enrich-posts-with-users',
+      requestOptions: {
+        preExecution: {
+          preExecutionHook: ({ commonBuffer }) => {
+            // Enrich posts with user and comment data
+            buffer.enrichedData = buffer.posts.map(post => ({
+              ...post,
+              author: findUser(post.userId),
+              commentCount: countComments(post.id)
+            }));
+          }
+        }
+      }
+    }]
+  },
+  
+  // Phase 3: Validation with conditional retry
+  {
+    id: 'validate-data',
+    allowReplay: true,
+    maxReplayCount: 2,
+    requests: [{ id: 'validate', requestOptions: {...} }],
+    phaseDecisionHook: async ({ phaseResult, retryCount }) => {
+      if (hasValidationErrors && retryCount < 2) {
+        return { action: PHASE_DECISION_ACTIONS.REPLAY };
+      }
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    }
+  },
+  
+  // Phase 4: Batch upload
+  {
+    id: 'upload-data',
+    concurrentExecution: true,
+    requests: enrichedData.map(item => ({
+      id: `upload-${item.id}`,
+      requestOptions: { 
+        reqData: { path: '/api/sync', method: 'POST', body: item }
+      }
+    }))
+  }
+];
+
+// Execute workflow with shared circuit breaker
+const result = await stableWorkflow(syncPhases, {
+  workflowId: 'data-sync-pipeline',
+  commonRequestData: { hostname: 'api.example.com' },
+  commonAttempts: 3,
+  commonWait: 1000,
+  commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+  enableNonLinearExecution: true,
+  circuitBreaker: sourceApiBreaker,
+  commonCache: { ttl: 300000 },
+  rateLimit: { maxRequests: 50, windowMs: 10000 },
+  sharedBuffer: syncState,
+  handlePhaseCompletion: async ({ phaseResult }) => {
+    console.log(`Phase ${phaseResult.phaseId} completed in ${phaseResult.executionTime}ms`);
+  }
+});</code></pre>
+                </div>
+            </div>
+
+            <div class="example-item">
+                <div class="example-header">
+                    <span class="example-number">02</span>
+                    <h2>Resilient Microservice Orchestration</h2>
+                    <div class="example-tags">
+                        <span class="tag">Branched Workflows</span>
+                        <span class="tag">Circuit Breakers</span>
+                        <span class="tag">Request Grouping</span>
+                        <span class="tag">Fallback Strategies</span>
+                    </div>
+                </div>
+                
+                <div class="example-description">
+                    <p>A sophisticated microservice orchestration pattern coordinating user validation, inventory management, payment processing, and notifications with proper failure handling.</p>
+                    
+                    <h4>Key Features:</h4>
+                    <ul>
+                        <li>✅ Branch workflow execution</li>
+                        <li>✅ Mixed concurrent and sequential branches</li>
+                        <li>✅ Multiple circuit breakers (one per service)</li>
+                        <li>✅ Request grouping with different retry policies</li>
+                        <li>✅ Branch decision hooks (REPLAY and TERMINATE actions)</li>
+                        <li>✅ Workflow termination on critical failures</li>
+                        <li>✅ Graceful handling of non-critical failures</li>
+                        <li>✅ Complex state management across branches</li>
+                    </ul>
+                    
+                    <h4>Use Case:</h4>
+                    <p>E-commerce order processing coordinating multiple microservices with isolated failure handling and proper SLA requirements.</p>
+                </div>
+                
+                <div class="example-code">
+                    <h4>Branch Workflow Structure</h4>
+                    <pre><code class="language-typescript">// Separate circuit breakers for each service
+const userServiceBreaker = new CircuitBreaker({
+  failureThresholdPercentage: 50,
+  minimumRequests: 5,
+  recoveryTimeoutMs: 60000
+});
+
+const inventoryServiceBreaker = new CircuitBreaker({...});
+const paymentServiceBreaker = new CircuitBreaker({...});
+
+const branches: STABLE_WORKFLOW_BRANCH[] = [
+  // Critical: User validation
+  {
+    branchId: 'user-service',
+    concurrentBranch: false,
+    phases: [
+      {
+        id: 'validate-user',
+        requests: [{ 
+          id: 'check-user',
+          groupId: 'critical',
+          requestOptions: {
+            reqData: { path: '/users/validate', method: 'POST' },
+            circuitBreaker: userServiceBreaker
+          }
+        }],
+        phaseDecisionHook: async ({ phaseResult }) => {
+          if (!phaseResult.success) {
+            return { 
+              action: PHASE_DECISION_ACTIONS.TERMINATE,
+              terminateWorkflow: true  // Stop entire workflow
+            };
+          }
+          return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+        }
+      }
+    ]
+  },
+  
+  // Critical: Inventory management
+  {
+    branchId: 'inventory-service',
+    concurrentBranch: false,
+    phases: [
+      { id: 'check-stock', requests: [...] },
+      { id: 'reserve-items', requests: [...] }
+    ]
+  },
+  
+  // Critical: Payment processing
+  {
+    branchId: 'payment-service',
+    concurrentBranch: false,
+    phases: [
+      { id: 'authorize-payment', requests: [...] },
+      { id: 'capture-payment', requests: [...] }
+    ]
+  },
+  
+  // Optional: Notification service
+  {
+    branchId: 'notification-service',
+    concurrentBranch: false,
+    phases: [
+      { id: 'send-notifications', requests: [...] }
+    ]
+  }
+];
+
+// Execute with branch-based workflow
+const result = await stableWorkflow([], {
+  workflowId: 'order-processing',
+  enableBranchExecution: true,
+  branches,
+  concurrentBranchExecution: true,  // Branches run in parallel
+  requestGroups: [
+    {
+      groupId: 'critical',
+      commonAttempts: 5,
+      commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+    },
+    {
+      groupId: 'optional',
+      commonAttempts: 1  // Don't retry optional services
+    }
+  ],
+  handleBranchCompletion: async ({ branchId, success }) => {
+    if (!success && branchId !== 'notification-service') {
+      logger.error(`Critical branch ${branchId} failed`);
+    }
+  }
+});</code></pre>
+                </div>
+            </div>
+
+            <div class="example-item">
+                <div class="example-header">
+                    <span class="example-number">03</span>
+                    <h2>Production API Health Monitoring</h2>
+                    <div class="example-tags">
+                        <span class="tag">Health Checks</span>
+                        <span class="tag">SLA Tracking</span>
+                        <span class="tag">Alerting</span>
+                        <span class="tag">Metrics</span>
+                    </div>
+                </div>
+                
+                <div class="example-description">
+                    <p>A comprehensive health monitoring system that tracks service availability, response times, and SLA compliance with real-time alerting.</p>
+                    
+                    <h4>Key Features:</h4>
+                    <ul>
+                        <li>✅ Individual service health checks with stableRequest</li>
+                        <li>✅ Circuit breaker per service</li>
+                        <li>✅ Exponential backoff retry strategy</li>
+                        <li>✅ Response caching with 5-second TTL</li>
+                        <li>✅ SLA threshold validation (200ms - 2000ms)</li>
+                        <li>✅ Consecutive failure tracking with alerting</li>
+                        <li>✅ Critical vs optional service differentiation</li>
+                        <li>✅ Real-time performance metrics</li>
+                    </ul>
+                    
+                    <h4>Use Case:</h4>
+                    <p>Production monitoring system tracking API health with automatic alerting on SLA breaches or consecutive failures.</p>
+                </div>
+                
+                <div class="example-code">
+                    <h4>Health Check Implementation</h4>
+                    <pre><code class="language-typescript">interface ServiceHealth {
+  serviceName: string;
+  endpoint: string;
+  isHealthy: boolean;
+  responseTime: number;
+  lastCheck: Date;
+  consecutiveFailures: number;
+  circuitBreakerState: string;
+  slaCompliant: boolean;
+}
+
+// Configure services to monitor
+const services = [
+  { name: 'user-api', path: '/health', critical: true, slaMs: 500 },
+  { name: 'order-api', path: '/health', critical: true, slaMs: 1000 },
+  { name: 'notification-api', path: '/health', critical: false, slaMs: 2000 }
+];
+
+// Create circuit breaker for each service
+const breakers = new Map();
+services.forEach(service => {
+  breakers.set(service.name, new CircuitBreaker({
+    failureThresholdPercentage: 50,
+    minimumRequests: 3,
+    recoveryTimeoutMs: 30000
+  }));
+});
+
+// Health check function
+async function checkServiceHealth(service): Promise<ServiceHealth> {
+  const breaker = breakers.get(service.name);
+  const startTime = Date.now();
+  
+  try {
+    const result = await stableRequest({
+      reqData: {
+        hostname: 'api.example.com',
+        path: service.path,
+        method: 'GET',
+        timeout: 5000
+      },
+      resReq: true,
+      attempts: 3,
+      wait: 1000,
+      retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+      circuitBreaker: breaker,
+      cache: { ttl: 5000 },
+      responseAnalyzer: async ({ status }) => {
+        return status === 200;
+      }
+    });
+    
+    const responseTime = Date.now() - startTime;
+    
+    return {
+      serviceName: service.name,
+      endpoint: service.path,
+      isHealthy: true,
+      responseTime,
+      lastCheck: new Date(),
+      consecutiveFailures: 0,
+      circuitBreakerState: breaker.getState().state,
+      slaCompliant: responseTime <= service.slaMs
+    };
+  } catch (error) {
+    return {
+      serviceName: service.name,
+      endpoint: service.path,
+      isHealthy: false,
+      responseTime: Date.now() - startTime,
+      lastCheck: new Date(),
+      consecutiveFailures: previousFailures + 1,
+      circuitBreakerState: breaker.getState().state,
+      slaCompliant: false
+    };
+  }
+}
+
+// Run health checks periodically
+setInterval(async () => {
+  const healthChecks = await Promise.all(
+    services.map(service => checkServiceHealth(service))
+  );
+  
+  healthChecks.forEach(health => {
+    if (!health.isHealthy && health.consecutiveFailures >= 3) {
+      alerting.critical(`Service ${health.serviceName} has failed 3 times`);
+    }
+    
+    if (!health.slaCompliant) {
+      alerting.warning(`Service ${health.serviceName} SLA breach: ${health.responseTime}ms`);
+    }
+    
+    metrics.gauge(`service.health.${health.serviceName}`, health.isHealthy ? 1 : 0);
+    metrics.gauge(`service.response_time.${health.serviceName}`, health.responseTime);
+  });
+}, 10000);</code></pre>
+                </div>
+            </div>
+
+            <div class="example-item">
+                <div class="example-header">
+                    <span class="example-number">04</span>
+                    <h2>Batch Image Processing Pipeline</h2>
+                    <div class="example-tags">
+                        <span class="tag">Batch Processing</span>
+                        <span class="tag">Concurrency Control</span>
+                        <span class="tag">Rate Limiting</span>
+                        <span class="tag">Progress Tracking</span>
+                    </div>
+                </div>
+                
+                <div class="example-description">
+                    <p>Process large batches of images through an external API with concurrency control, rate limiting, and progress tracking.</p>
+                    
+                    <h4>Key Features:</h4>
+                    <ul>
+                        <li>✅ Batch request processing with stableApiGateway</li>
+                        <li>✅ Concurrency limiting (max 10 simultaneous)</li>
+                        <li>✅ Rate limiting to respect API quotas</li>
+                        <li>✅ Progress tracking and reporting</li>
+                        <li>✅ Retry on transient failures</li>
+                        <li>✅ Error aggregation and reporting</li>
+                    </ul>
+                </div>
+                
+                <div class="example-code">
+                    <pre><code class="language-typescript">async function processBatchImages(imageUrls: string[]) {
+  console.log(`Processing ${imageUrls.length} images...`);
+  
+  // Create requests for each image
+  const requests = imageUrls.map((url, index) => ({
+    id: `image-${index}`,
+    requestOptions: {
+      reqData: {
+        hostname: 'image-api.example.com',
+        path: '/process',
+        method: 'POST',
+        body: { imageUrl: url, operations: ['resize', 'optimize'] },
+        timeout: 30000
+      },
+      resReq: true,
+      attempts: 3,
+      wait: 2000,
+      retryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+    }
+  }));
+  
+  // Process with concurrency and rate limiting
+  const results = await stableApiGateway(requests, {
+    concurrentExecution: true,
+    maxConcurrentRequests: 10,        // Max 10 simultaneous
+    rateLimit: {
+      maxRequests: 100,
+      windowMs: 60000                 // 100 requests per minute
+    },
+    commonHandleSuccessfulAttemptData: async ({ successfulAttemptData }, { requestId }) => {
+      const progress = ((results.length / imageUrls.length) * 100).toFixed(1);
+      console.log(`✅ Processed ${requestId}: ${progress}% complete`);
+    }
+  });
+  
+  // Report results
+  const successful = results.filter(r => r.success).length;
+  const failed = results.filter(r => !r.success).length;
+  
+  console.log(`\nBatch processing complete:`);
+  console.log(`  Total: ${imageUrls.length}`);
+  console.log(`  Successful: ${successful}`);
+  console.log(`  Failed: ${failed}`);
+  
+  return results;
+}</code></pre>
+                </div>
+            </div>
+
+            <div class="example-item">
+                <div class="example-header">
+                    <span class="example-number">05</span>
+                    <h2>Feature Flag Testing with Trial Mode</h2>
+                    <div class="example-tags">
+                        <span class="tag">A/B Testing</span>
+                        <span class="tag">Trial Mode</span>
+                        <span class="tag">Feature Flags</span>
+                        <span class="tag">Testing</span>
+                    </div>
+                </div>
+                
+                <div class="example-description">
+                    <p>Test feature flags and new implementations without making real API calls using trial mode with configurable success rates.</p>
+                    
+                    <h4>Key Features:</h4>
+                    <ul>
+                        <li>✅ Trial mode for testing without real requests</li>
+                        <li>✅ Configurable success/failure probabilities</li>
+                        <li>✅ A/B testing simulation</li>
+                        <li>✅ Mock data injection</li>
+                        <li>✅ Performance testing under various conditions</li>
+                    </ul>
+                </div>
+                
+                <div class="example-code">
+                    <pre><code class="language-typescript">// Test different feature configurations
+async function testFeatureFlag(featureName: string, config: any) {
+  console.log(`Testing feature: ${featureName}`);
+  
+  const results = await stableRequest({
+    reqData: {
+      hostname: 'api.example.com',
+      path: '/feature-test',
+      method: 'POST',
+      body: { feature: featureName, config }
+    },
+    resReq: true,
+    attempts: 5,
+    wait: 1000,
+    retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+    trialMode: {
+      trialModeOn: true,
+      successProbability: config.expectedSuccessRate,
+      trialModeData: {
+        feature: featureName,
+        enabled: true,
+        config,
+        timestamp: Date.now()
+      }
+    }
+  });
+  
+  return results;
+}
+
+// Run A/B tests
+const testScenarios = [
+  { name: 'feature-A', config: { timeout: 5000 }, expectedSuccessRate: 0.95 },
+  { name: 'feature-B', config: { timeout: 3000 }, expectedSuccessRate: 0.85 },
+  { name: 'feature-C', config: { timeout: 1000 }, expectedSuccessRate: 0.60 }
+];
+
+for (const scenario of testScenarios) {
+  const result = await testFeatureFlag(scenario.name, scenario.config);
+  console.log(`${scenario.name}: ${result ? 'SUCCESS' : 'FAILED'}`);
+}</code></pre>
+                </div>
+            </div>
+
+            <div class="example-item">
+                <div class="example-header">
+                    <span class="example-number">06</span>
+                    <h2>Distributed Workflow State Persistence</h2>
+                    <div class="example-tags">
+                        <span class="tag">State Persistence</span>
+                        <span class="tag">Workflow Recovery</span>
+                        <span class="tag">Distributed Systems</span>
+                        <span class="tag">Redis</span>
+                        <span class="tag">Checkpointing</span>
+                    </div>
+                </div>
+                
+                <div class="example-description">
+                    <p>A production-grade distributed data processing workflow with Redis-based state persistence, enabling workflow recovery, resumption, and distributed execution across multiple instances.</p>
+                    
+                    <h4>Key Features:</h4>
+                    <ul>
+                        <li>✅ State persistence to Redis with TTL</li>
+                        <li>✅ Workflow recovery and resumption after failures</li>
+                        <li>✅ Multi-stage data pipeline with checkpoints</li>
+                        <li>✅ Distributed lock mechanisms for safety</li>
+                        <li>✅ State versioning and audit trails</li>
+                        <li>✅ Real-time progress tracking across instances</li>
+                        <li>✅ Automatic cleanup of completed workflows</li>
+                        <li>✅ Phase completion tracking and skip logic</li>
+                        <li>✅ Hierarchical state keys for organization</li>
+                        <li>✅ Batch processing with concurrent migrations</li>
+                    </ul>
+                    
+                    <h4>Use Case:</h4>
+                    <p>Large-scale data migration pipeline that can be resumed from any checkpoint, run across multiple server instances, and provide real-time progress visibility. Perfect for long-running workflows that need resilience against failures.</p>
+                </div>
+                
+                <div class="example-code">
+                    <h4>Imports and Setup</h4>
+                    <pre><code class="language-typescript">import { 
+  stableWorkflow, 
+  PHASE_DECISION_ACTIONS,
+  REQUEST_METHODS,
+  VALID_REQUEST_PROTOCOLS,
+  type STABLE_WORKFLOW_PHASE,
+  type StatePersistenceOptions
+} from '../src/index.js';
+
+/**
+ * Redis-like storage for demonstration
+ * In production, use actual Redis client (ioredis or node-redis)
+ */
+class StateStorage {
+  private storage: Map<string, { value: string; expiresAt: number }> = new Map();
+
+  async setex(key: string, ttl: number, value: string): Promise<void> {
+    const expiresAt = Date.now() + (ttl * 1000);
+    this.storage.set(key, { value, expiresAt });
+    console.log(`    💾 Stored state: ${key} (TTL: ${ttl}s)`);
+  }
+
+  async get(key: string): Promise<string | null> {
+    const entry = this.storage.get(key);
+    if (!entry || Date.now() > entry.expiresAt) return null;
+    return entry.value;
+  }
+}
+
+const stateStore = new StateStorage();
+
+/**
+ * Redis persistence function with distributed locking
+ */
+async function persistToRedis({ executionContext, params, buffer }) {
+  const { workflowId, phaseId, branchId } = executionContext;
+  const { ttl = 86400, enableLocking = false, namespace = 'workflow' } = params || {};
+  
+  // Generate hierarchical key
+  const stateKey = `${namespace}:${workflowId}:${branchId || 'main'}:${phaseId || 'global'}`;
+  const lockKey = `lock:${stateKey}`;
+  
+  const isStoring = buffer && Object.keys(buffer).length > 0;
+  
+  if (enableLocking) {
+    // Acquire distributed lock
+    await stateStore.setex(lockKey, 5, `${Date.now()}-${Math.random()}`);
+  }
+  
+  try {
+    if (isStoring) {
+      // STORE MODE: Save state with metadata
+      const stateWithMeta = {
+        ...buffer,
+        _meta: {
+          workflowId,
+          phaseId,
+          timestamp: new Date().toISOString(),
+          version: (buffer._meta?.version || 0) + 1
+        }
+      };
+      
+      await stateStore.setex(stateKey, ttl, JSON.stringify(stateWithMeta));
+      
+      // Create audit log entry
+      const auditKey = `${namespace}:audit:${workflowId}:${Date.now()}`;
+      await stateStore.setex(auditKey, ttl * 2, JSON.stringify({
+        action: 'state_saved',
+        phaseId,
+        timestamp: new Date().toISOString(),
+        stateSnapshot: stateWithMeta
+      }));
+    } else {
+      // LOAD MODE: Retrieve state
+      const data = await stateStore.get(stateKey);
+      return data ? JSON.parse(data) : {};
+    }
+  } finally {
+    if (enableLocking) {
+      await stateStore.del(lockKey);
+    }
+  }
+  
+  return {};
+}</code></pre>
+
+                    <h4>Data Extraction with Mock Data</h4>
+                    <pre><code class="language-typescript">// Phase 1: Extract source data (using mock data for demonstration)
+{
+  id: 'extract-source-data',
+  concurrentExecution: false,
+  requests: [{
+    id: 'extract-users',
+    requestOptions: {
+      reqData: { 
+        hostname: 'jsonplaceholder.typicode.com', 
+        path: '/posts/1', 
+        method: REQUEST_METHODS.GET 
+      },
+      resReq: false, // Don't make actual request
+      preExecution: {
+        preExecutionHook: ({ commonBuffer }) => {
+          console.log('📥 Phase 1: Extracting source data...');
+          const buffer = commonBuffer as WorkflowState;
+          
+          // Generate 100 mock records
+          buffer.sourceRecords = Array.from({ length: 100 }, (_, i) => ({
+            id: i + 1,
+            name: `User ${i + 1}`,
+            email: `user${i + 1}@example.com`,
+            username: `user${i + 1}`,
+            company: { name: `Company ${i % 10}` },
+            address: { geo: { lat: '0.0', lng: '0.0' } }
+          }));
+          
+          buffer.totalRecords = buffer.sourceRecords.length;
+          buffer.progress = 20;
+          console.log(`✅ Extracted ${buffer.sourceRecords.length} records`);
+          return {};
+        }
+      }
+    }
+  }],
+  phaseDecisionHook: async ({ sharedBuffer }) => {
+    // Check if phase already completed (recovery scenario)
+    if (sharedBuffer.completedPhases.includes('extract-source-data')) {
+      console.log('Phase already completed, skipping...');
+      return { 
+        action: PHASE_DECISION_ACTIONS.SKIP, 
+        skipToPhaseId: 'transform-data' 
+      };
+    }
+    
+    if (sharedBuffer.sourceRecords.length > 0) {
+      sharedBuffer.completedPhases.push('extract-source-data');
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    }
+    
+    return { action: PHASE_DECISION_ACTIONS.TERMINATE };
+  },
+  statePersistence: {
+    persistenceFunction: persistToRedis,
+    persistenceParams: { ttl: 3600, enableLocking: true, namespace: 'migration' },
+    loadBeforeHooks: true,
+    storeAfterHooks: true
+  }
+},
+
+// Phase 2: Transform data
+{
+  id: 'transform-data',
+  requests: [{
+    id: 'transform-records',
+    requestOptions: {
+      reqData: { 
+        hostname: 'jsonplaceholder.typicode.com', 
+        path: '/posts/1', 
+        method: REQUEST_METHODS.GET 
+      },
+      resReq: false,
+      preExecution: {
+        preExecutionHook: ({ commonBuffer }) => {
+          const buffer = commonBuffer as WorkflowState;
+          
+          buffer.transformedRecords = buffer.sourceRecords.map(record => ({
+            id: record.id,
+            externalId: record.id,
+            name: record.name,
+            email: record.email?.toLowerCase(),
+            username: record.username,
+            company: record.company?.name,
+            metadata: {
+              importedAt: new Date().toISOString(),
+              source: 'jsonplaceholder',
+              workflowId: WORKFLOW_ID
+            }
+          }));
+          
+          buffer.progress = 30;
+          console.log(`✅ Transformed ${buffer.transformedRecords.length} records`);
+          return {};
+        }
+      }
+    }
+  }],
+  phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+    if (sharedBuffer.completedPhases.includes('transform-data')) {
+      return { action: PHASE_DECISION_ACTIONS.SKIP, skipToPhaseId: 'validate-data' };
+    }
+    
+    if (phaseResult.success && sharedBuffer.transformedRecords.length > 0) {
+      sharedBuffer.completedPhases.push('transform-data');
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    }
+    
+    // Retry logic using attemptCount from buffer
+    if (sharedBuffer.attemptCount < 2) {
+      sharedBuffer.attemptCount++;
+      return { action: PHASE_DECISION_ACTIONS.REPLAY };
+    }
+    
+    return { action: PHASE_DECISION_ACTIONS.TERMINATE };
+  },
+  allowReplay: true,
+  maxReplayCount: 2,
+  statePersistence: {
+    persistenceFunction: persistToRedis,
+    persistenceParams: { ttl: 3600, enableLocking: true, namespace: 'migration' },
+    loadBeforeHooks: true,
+    storeAfterHooks: true
+  }
+}</code></pre>
+
+                    <h4>Workflow Execution Configuration</h4>
+                    <pre><code class="language-typescript">// Execute workflow with global state persistence
+const result = await stableWorkflow(migrationPhases, {
+  workflowId: WORKFLOW_ID,
+  commonRequestData: { 
+    hostname: SOURCE_API,
+    protocol: VALID_REQUEST_PROTOCOLS.HTTPS
+  },
+  enableNonLinearExecution: true,
+  stopOnFirstPhaseError: false,
+  maxWorkflowIterations: 100,
+  sharedBuffer: workflowState,
+  commonStatePersistence: {
+    persistenceFunction: createCheckpoint,
+    persistenceParams: { ttl: 7200 },
+    loadBeforeHooks: true,
+    storeAfterHooks: true
+  },
+  handlePhaseCompletion: async ({ phaseResult, sharedBuffer }) => {
+    const buffer = sharedBuffer as WorkflowState;
+    console.log(`✅ Phase "${phaseResult.phaseId}" completed`);
+    console.log(`   Duration: ${phaseResult.executionTime}ms`);
+    console.log(`   Progress: ${buffer.progress}%`);
+  },
+  handlePhaseError: async ({ phaseResult, error, sharedBuffer }) => {
+    const buffer = sharedBuffer as WorkflowState;
+    console.error(`❌ Phase "${phaseResult.phaseId}" failed: ${error.message}`);
+    buffer.errors.push(`Phase ${phaseResult.phaseId}: ${error.message}`);
+  }
+});</code></pre>
+
+                    <h4>Workflow Recovery Pattern</h4>
+                    <pre><code class="language-typescript">/**
+ * Resume workflow from last checkpoint
+ */
+async function resumeWorkflow(workflowId: string) {
+  // Load checkpoint from Redis
+  const checkpointData = await redis.get(`checkpoint:${workflowId}`);
+  const checkpoint = checkpointData ? JSON.parse(checkpointData) : {
+    completedPhases: [],
+    processedRecords: 0
+  };
+  
+  console.log(`Resuming workflow from: ${checkpoint.lastPhase || 'start'}`);
+  console.log(`Previously completed: ${checkpoint.completedPhases.join(', ')}`);
+  
+  // Execute workflow - completed phases will be automatically skipped
+  const result = await stableWorkflow(migrationPhases, {
+    workflowId,
+    commonRequestData: { 
+      hostname: SOURCE_API,
+      protocol: VALID_REQUEST_PROTOCOLS.HTTPS
+    },
+    enableNonLinearExecution: true,
+    sharedBuffer: {
+      completedPhases: checkpoint.completedPhases,
+      processedRecords: checkpoint.processedRecords,
+      // ... restore other state
+    },
+    commonStatePersistence: {
+      persistenceFunction: persistToRedis,
+      persistenceParams: { ttl: 3600 },
+      loadBeforeHooks: true,
+      storeAfterHooks: true
+    }
+  });
+  
+  return result;
+}
+
+// Can be called multiple times - will resume from last checkpoint
+await resumeWorkflow('migration-12345');</code></pre>
+
+                    <h4>Key Benefits</h4>
+                    <ul>
+                        <li><strong>Resilience:</strong> Survive application restarts and failures</li>
+                        <li><strong>Distributed:</strong> Multiple instances can collaborate on same workflow</li>
+                        <li><strong>Visibility:</strong> Real-time progress tracking across systems</li>
+                        <li><strong>Debuggable:</strong> Complete audit trail of state changes</li>
+                        <li><strong>Efficient:</strong> Skip completed phases automatically</li>
+                        <li><strong>Safe:</strong> Distributed locks prevent race conditions</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <section class="next-steps">
+            <h2>Ready to Get Started?</h2>
+            <p>Explore the documentation to learn how to implement these patterns in your own applications.</p>
+            <div class="cta-buttons">
+                <a href="documentation.html" class="btn btn-primary">View Documentation</a>
+                <a href="https://github.com/manishvarma/stable-request/tree/main/examples" class="btn btn-secondary">View Full Examples on GitHub</a>
+            </div>
+        </section>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>stable-request</h4>
+                    <p>Production-grade HTTP Workflow Engine for Node.js</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Links</h4>
+                    <ul>
+                        <li><a href="documentation.html">Documentation</a></li>
+                        <li><a href="examples.html">Examples</a></li>
+                        <li><a href="https://github.com/manishvarma/stable-request">GitHub</a></li>
+                        <li><a href="https://www.npmjs.com/package/@emmvish/stable-request">npm</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="documentation.html#api-reference">API Reference</a></li>
+                        <li><a href="examples.html">Use Cases</a></li>
+                        <li><a href="https://github.com/manishvarma/stable-request/issues">Report Issues</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 Manish Varma. Released under the MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        hljs.highlightAll();
+        
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

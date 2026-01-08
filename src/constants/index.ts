@@ -20,6 +20,7 @@ export const extractCommonOptionsKeys: (keyof API_GATEWAY_OPTIONS)[] = [
     'commonMaxSerializableChars',
     'commonTrialMode',
     'commonCache',
+    'commonStatePersistence',
 ];
 
 export const PrepareApiRequestOptionsMapping: ApiRequestOptionsMapping[] = [    
@@ -42,4 +43,5 @@ export const PrepareApiRequestOptionsMapping: ApiRequestOptionsMapping[] = [
     { localKey: 'finalErrorAnalyzer', commonKey: 'commonFinalErrorAnalyzer', groupCommonKey: 'commonFinalErrorAnalyzer', targetKey: 'finalErrorAnalyzer' },
     { localKey: 'cache', commonKey: 'commonCache', groupCommonKey: 'commonCache', targetKey: 'cache' },
     { localKey: 'commonBuffer', commonKey: 'sharedBuffer', groupCommonKey: 'sharedBuffer', targetKey: 'commonBuffer' },
+    { localKey: 'statePersistence', commonKey: 'commonStatePersistence', groupCommonKey: 'commonStatePersistence', targetKey: 'statePersistence' },
 ];

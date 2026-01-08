@@ -17,12 +17,12 @@ import {
 import {
   CircuitBreaker,
   CircuitBreakerOpenError,
+  executeWithPersistence,
   formatLogContext,
   generateAxiosRequestConfig,
   getNewDelayTime,
   delay,
   reqFn,
-  safelyExecuteUnknownFunction,
   safelyStringify,
   validateTrialModeProbabilities
 } from '../utilities/index.js';
@@ -42,12 +42,15 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
   } = options;
   let preExecutionResult: Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>> | unknown;
   try {
-    preExecutionResult = await safelyExecuteUnknownFunction(
+    preExecutionResult = await executeWithPersistence<Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>> | unknown>(
       preExecution?.preExecutionHook as Function,
       {
         inputParams: preExecution?.preExecutionHookParams,
         commonBuffer
-      }
+      },
+      options.statePersistence,
+      executionContext || {},
+      commonBuffer
     );
     if(preExecution?.applyPreExecutionConfigOverride) {
       const finalOptions = {
@@ -94,7 +97,8 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     hookParams = {},
     cache,
     circuitBreaker,
-    jitter = 0
+    jitter = 0,
+    statePersistence
   } = options;
   let attempts = givenAttempts;
   const reqData: AxiosRequestConfig<RequestDataType> = generateAxiosRequestConfig<RequestDataType>(givenReqData);
@@ -160,7 +164,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
       let performNextAttempt: boolean = false;
       if (res.ok) {
         try {
-          performNextAttempt = !(await safelyExecuteUnknownFunction(
+          performNextAttempt = !(await executeWithPersistence<boolean>(
             responseAnalyzer,
             {
               reqData,
@@ -170,7 +174,10 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
               preExecutionResult,
               commonBuffer,
               executionContext
-            }
+            },
+            statePersistence,
+            executionContext || {},
+            commonBuffer
           ));
         } catch (e: any) {
           console.error(
@@ -220,7 +227,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
           statusCode: res.statusCode
         };
         try {
-          await safelyExecuteUnknownFunction(
+          await executeWithPersistence<void>(
             handleErrors,
             {
               reqData,
@@ -230,7 +237,10 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
               preExecutionResult,
               commonBuffer,
               executionContext
-            }
+            },
+            statePersistence,
+            executionContext || {},
+            commonBuffer
           );
         } catch (e: any) {
           console.error(
@@ -253,7 +263,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
             statusCode: res.statusCode
           };
           try {
-            await safelyExecuteUnknownFunction(
+            await executeWithPersistence<void>(
               handleSuccessfulAttemptData,
               {
                 reqData,
@@ -263,7 +273,10 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
                 preExecutionResult,
                 commonBuffer,
                 executionContext
-              }
+              },
+              statePersistence,
+              executionContext || {},
+              commonBuffer
             );
           } catch (e: any) {
             console.error(
@@ -325,7 +338,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     }
     let errorAnalysisResult = false;
     try {
-      errorAnalysisResult = await safelyExecuteUnknownFunction(
+      errorAnalysisResult = await executeWithPersistence<boolean>(
         finalErrorAnalyzer,
         {
           reqData,
@@ -335,7 +348,10 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
           preExecutionResult,
           commonBuffer,
           executionContext
-        }
+        },
+        statePersistence,
+        executionContext || {},
+        commonBuffer
       );
     } catch(errorAnalysisError: any) {
       console.error(

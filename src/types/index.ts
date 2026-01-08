@@ -41,6 +41,7 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
   ) => any | Promise<any>;
   commonPreExecution?: RequestPreExecutionOptions;
   commonCache?: CacheConfig;
+  commonStatePersistence?: StatePersistenceConfig;
   concurrentExecution?: boolean;
   requestGroups?: RequestGroup<RequestDataType, ResponseDataType>[];
   stopOnFirstError?: boolean;
@@ -184,10 +185,23 @@ export interface PreExecutionHookOptions {
 }
 
 export interface RequestPreExecutionOptions {
-  preExecutionHook: ({ inputParams, commonBuffer }: PreExecutionHookOptions) => any | Promise<any>;
+  preExecutionHook: (options: PreExecutionHookOptions) => any | Promise<any>;
   preExecutionHookParams?: any;
   applyPreExecutionConfigOverride?: boolean;
   continueOnPreExecutionHookFailure?: boolean;
+}
+
+export interface StatePersistenceOptions {
+  executionContext: ExecutionContext;
+  params?: any;
+  buffer: Record<string, any>;
+}
+
+export interface StatePersistenceConfig {
+  persistenceFunction: (options: StatePersistenceOptions) => Promise<Record<string, any>> | Record<string, any>;
+  persistenceParams?: any;
+  loadBeforeHooks?: boolean;
+  storeAfterHooks?: boolean;
 }
 
 export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
@@ -217,6 +231,7 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   cache?: CacheConfig;
   executionContext?: ExecutionContext;
   circuitBreaker?: CircuitBreakerConfig | CircuitBreaker;
+  statePersistence?: StatePersistenceConfig;
 }
 
 export interface SUCCESSFUL_ATTEMPT_DATA<ResponseDataType = any> {
@@ -255,6 +270,7 @@ export interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType =
   commonConfig?: Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, 
     'concurrentExecution' | 'stopOnFirstError' | 'requestGroups' | "maxConcurrentRequests" | "rateLimit" | "circuitBreaker">;
   branchId?: string;
+  statePersistence?: StatePersistenceConfig;
 }
 
 export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType = any> 
@@ -269,6 +285,7 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   enableMixedExecution?: boolean;
   enableNonLinearExecution?: boolean;
   maxWorkflowIterations?: number;
+  statePersistence?: StatePersistenceConfig;
   handlePhaseCompletion?: (
     options: HandlePhaseCompletionHookOptions<ResponseDataType>
   ) => any | Promise<any>;
@@ -336,6 +353,8 @@ export interface WorkflowHookParams {
   handlePhaseCompletionParams?: any;
   handlePhaseErrorParams?: any;
   handlePhaseDecisionParams?: any;
+  handleBranchDecisionParams?: any;
+  statePersistence?: StatePersistenceConfig;
 }
 
 export interface HandlePhaseCompletionHookOptions<ResponseDataType = any> {
@@ -399,7 +418,7 @@ export interface PhaseDecisionHookOptions<ResponseDataType = any> {
   executionHistory: PhaseExecutionRecord[];
   sharedBuffer?: Record<string, any>;
   params?: any;
-  concurrentPhaseResults?: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[]; // Available when phase is part of concurrent group
+  concurrentPhaseResults?: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
 }
 
 export interface PhaseExecutionRecord {
@@ -449,8 +468,9 @@ export interface STABLE_WORKFLOW_BRANCH<RequestDataType = any, ResponseDataType 
   branchDecisionHook?: (
     options: BranchDecisionHookOptions<ResponseDataType>
   ) => BranchExecutionDecision | Promise<BranchExecutionDecision>;
+  statePersistence?: StatePersistenceConfig;
   commonConfig?: Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, 
-    'concurrentExecution' | 'stopOnFirstError' | 'requestGroups' | 'maxConcurrentRequests' | 'rateLimit' | 'circuitBreaker'>; // Branch-level config overrides workflow config
+    'concurrentExecution' | 'stopOnFirstError' | 'requestGroups' | 'maxConcurrentRequests' | 'rateLimit' | 'circuitBreaker'>;
 }
 
 export interface BranchDecisionHookOptions<ResponseDataType = any> {

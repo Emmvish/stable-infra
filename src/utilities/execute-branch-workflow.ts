@@ -1,5 +1,5 @@
 import { executeNonLinearWorkflow } from './execute-non-linear-workflow.js';
-import { safelyExecuteUnknownFunction } from './safely-execute-unknown-function.js';
+import { executeWithPersistence } from './execute-with-persistence.js';
 import { formatLogContext } from './format-log-context.js';
 import { PHASE_DECISION_ACTIONS } from '../enums/index.js';
 import {
@@ -247,14 +247,17 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
 
         if (handleBranchCompletion) {
           try {
-            await safelyExecuteUnknownFunction(
+            await executeWithPersistence<void>(
               handleBranchCompletion,
               {
                 workflowId,
                 branchId: result.branchResult.branchId,
                 branchResults: result.branchResult.phaseResults,
                 success: result.branchResult.success
-              }
+              },
+              branch.statePersistence,
+              { workflowId, branchId: result.branchResult.branchId },
+              sharedBuffer || {}
             );
           } catch (hookError) {
             console.error(
@@ -266,7 +269,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
 
         if (branch.branchDecisionHook) {
           try {
-            const decision: BranchExecutionDecision = await safelyExecuteUnknownFunction(
+            const decision: BranchExecutionDecision = await executeWithPersistence<BranchExecutionDecision>(
               branch.branchDecisionHook,
               {
                 workflowId,
@@ -279,7 +282,10 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
                 sharedBuffer,
                 params: workflowHookParams?.handleBranchDecisionParams,
                 concurrentBranchResults: concurrentBranchResults
-              }
+              },
+              branch.statePersistence,
+              { workflowId, branchId: branch.id },
+              sharedBuffer || {}
             );
 
             result.branchResult.decision = decision;
@@ -293,10 +299,12 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
 
             if (handleBranchDecision) {
               try {
-                await safelyExecuteUnknownFunction(
+                await executeWithPersistence<void>(
                   handleBranchDecision,
                   decision,
-                  result.branchResult
+                  workflowHookParams?.statePersistence,
+                  { workflowId, branchId: branch.id },
+                  sharedBuffer || {}
                 );
               } catch (hookError) {
                 console.error(
@@ -407,13 +415,16 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
 
       if (handleBranchCompletion) {
         try {
-          await safelyExecuteUnknownFunction(
+          await executeWithPersistence<void>(
             handleBranchCompletion,
             {
               branchId: result.branchResult.branchId,
               branchResults: result.branchResult.phaseResults,
               success: result.branchResult.success
-            }
+            },
+            currentBranch.statePersistence,
+            { workflowId, branchId: currentBranchId },
+            sharedBuffer || {}
           );
         } catch (hookError) {
           console.error(
@@ -427,7 +438,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
 
       if (currentBranch.branchDecisionHook) {
         try {
-          decision = await safelyExecuteUnknownFunction(
+          decision = await executeWithPersistence<BranchExecutionDecision>(
             currentBranch.branchDecisionHook,
             {
               workflowId,
@@ -439,7 +450,10 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
               branchExecutionHistory,
               sharedBuffer,
               params: workflowHookParams?.handleBranchDecisionParams
-            }
+            },
+            currentBranch.statePersistence,
+            { workflowId, branchId: currentBranchId },
+            sharedBuffer || {}
           );
 
           result.branchResult.decision = decision;
@@ -460,10 +474,12 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
 
           if (handleBranchDecision) {
             try {
-              await safelyExecuteUnknownFunction(
+              await executeWithPersistence<void>(
                 handleBranchDecision,
                 decision,
-                result.branchResult
+                workflowHookParams?.statePersistence,
+                { workflowId, branchId: currentBranchId },
+                sharedBuffer || {}
               );
             } catch (hookError) {
               console.error(

@@ -1,5 +1,5 @@
 import { executePhase } from './execute-phase.js';
-import { safelyExecuteUnknownFunction } from './safely-execute-unknown-function.js';
+import { executeWithPersistence } from './execute-with-persistence.js';
 import { formatLogContext } from './format-log-context.js';
 import { PHASE_DECISION_ACTIONS } from '../enums/index.js';
 import {
@@ -161,7 +161,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
 
       if (lastConcurrentPhase.phase.phaseDecisionHook) {
         try {
-          decision = await safelyExecuteUnknownFunction(
+          decision = await executeWithPersistence<PhaseExecutionDecision>(
             lastConcurrentPhase.phase.phaseDecisionHook,
             {
               workflowId,
@@ -173,7 +173,10 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
               sharedBuffer,
               params: workflowHookParams?.handlePhaseDecisionParams,
               concurrentPhaseResults: concurrentResults
-            }
+            },
+            lastConcurrentPhase.phase.statePersistence,
+            { workflowId, branchId, phaseId: lastConcurrentPhase.id },
+            sharedBuffer || {}
           );
 
           if (!decision || typeof decision !== 'object') {
@@ -189,7 +192,13 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
 
           if (handlePhaseDecision) {
             try {
-              await safelyExecuteUnknownFunction(handlePhaseDecision, decision, lastResult);
+              await executeWithPersistence<void>(
+                handlePhaseDecision,
+                decision,
+                workflowHookParams?.statePersistence,
+                { workflowId, ...(branchId && { branchId }) },
+                sharedBuffer || {}
+              );
             } catch (hookError) {
               console.error(
                 `stable-request: [Workflow: ${workflowId}] Error in handlePhaseDecision hook:`,
@@ -350,7 +359,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
 
       if (phase.phaseDecisionHook) {
         try {
-          decision = await safelyExecuteUnknownFunction(
+          decision = await executeWithPersistence<PhaseExecutionDecision>(
             phase.phaseDecisionHook,
             {
               workflowId,
@@ -361,7 +370,10 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
               executionHistory,
               sharedBuffer,
               params: workflowHookParams?.handlePhaseDecisionParams
-            }
+            },
+            phase.statePersistence,
+            { workflowId, branchId, phaseId },
+            sharedBuffer || {}
           );
 
           if (!decision || typeof decision !== 'object') {
@@ -380,7 +392,13 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
 
           if (handlePhaseDecision) {
             try {
-              await safelyExecuteUnknownFunction(handlePhaseDecision, decision, phaseResult);
+              await executeWithPersistence<void>(
+                handlePhaseDecision,
+                decision,
+                workflowHookParams?.statePersistence,
+                { workflowId, ...(branchId && { branchId }), phaseId },
+                sharedBuffer || {}
+              );
             } catch (hookError) {
               console.error(
                 `stable-request: [Workflow: ${workflowId}] Error in handlePhaseDecision hook:`,
@@ -515,7 +533,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
       });
 
       try {
-        await safelyExecuteUnknownFunction(
+        await executeWithPersistence<void>(
           handlePhaseError,
           {
             workflowId,
@@ -525,7 +543,10 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
             maxSerializableChars,
             params: workflowHookParams?.handlePhaseErrorParams,
             sharedBuffer
-          }
+          },
+          workflowHookParams?.statePersistence,
+          { workflowId, ...(branchId && { branchId }), phaseId },
+          sharedBuffer || {}
         );
       } catch (hookError) {
         console.error(

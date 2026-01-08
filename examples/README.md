@@ -170,6 +170,97 @@ npx tsx examples/05-feature-flag-testing.ts
 
 ---
 
+### Example 6: Distributed Workflow State Persistence
+
+An enterprise-grade distributed data processing workflow demonstrating:
+- **Redis-based state persistence** for workflow recovery
+- **Multi-stage data pipeline** with checkpoints at each stage
+- **Distributed lock mechanisms** for multi-instance safety
+- **Phase completion tracking** to skip already-completed work
+- **Workflow recovery and resumption** after failures
+- **Real-time progress tracking** across distributed systems
+- **State versioning and audit trails** for compliance
+- **Hierarchical state keys** for organized storage
+- **Automatic TTL-based cleanup** of completed workflows
+- **Batch processing** with concurrent migrations
+
+```bash
+npx tsx examples/06-distributed-workflow-state-persistence.ts
+```
+
+**Key Features Demonstrated:**
+- ✅ State persistence to Redis with TTL
+- ✅ Workflow recovery and resumption after failures
+- ✅ Multi-stage pipeline (Extract → Transform → Validate → Migrate → Verify)
+- ✅ Distributed locking for concurrent safety
+- ✅ State versioning with timestamps and version numbers
+- ✅ Real-time progress tracking across instances
+- ✅ Automatic cleanup of completed workflows
+- ✅ Phase completion tracking and skip logic
+- ✅ Hierarchical state keys (namespace:workflow:branch:phase)
+- ✅ Batch processing with concurrent record migrations
+- ✅ Complete audit trail of state changes
+- ✅ Workflow recovery function for seamless resumption
+
+**Use Case:** Large-scale data migration pipeline that can survive application restarts, run across multiple server instances, and resume from any checkpoint. Perfect for long-running workflows requiring resilience against infrastructure failures, database migrations, ETL pipelines, and distributed batch processing.
+
+**Recovery Behavior Example:**
+```
+Initial Run (fails at Validate):
+✓ Extract Source Data    → Checkpoint saved
+✓ Transform Data         → Checkpoint saved
+✗ Validate Data          → FAILURE
+
+Resume Run:
+⏭ Extract Source Data    → SKIPPED (already completed)
+⏭ Transform Data         → SKIPPED (already completed)
+✓ Validate Data          → EXECUTED
+✓ Migrate Data           → EXECUTED
+✓ Verify Migration       → EXECUTED
+```
+
+**State Persistence Configuration:**
+```typescript
+// Phase-level persistence
+statePersistence: {
+  persistenceFunction: persistToRedis,
+  persistenceParams: { 
+    ttl: 3600,              // 1 hour expiration
+    enableLocking: true,     // Distributed lock
+    namespace: 'migration'   // Key prefix
+  },
+  loadBeforeHooks: true,     // Load state before phase hooks
+  storeAfterHooks: true      // Save state after phase hooks
+}
+
+// Global workflow persistence
+commonStatePersistence: {
+  persistenceFunction: createCheckpoint,
+  persistenceParams: { ttl: 7200 },
+  loadBeforeHooks: true,
+  storeAfterHooks: true
+}
+```
+
+**When to Use This Pattern:**
+- ✅ Workflows that take more than 5 minutes to complete
+- ✅ Processing large datasets (millions of records)
+- ✅ Running on infrastructure that may restart (Kubernetes, cloud instances)
+- ✅ Need visibility into workflow progress across systems
+- ✅ Multiple instances need to coordinate work
+- ✅ Failures are expensive and resumption is critical
+
+**Production Considerations:**
+- Use Redis Cluster for high availability
+- Set appropriate TTL based on workflow duration
+- Adjust lock timeouts based on phase execution time
+- Monitor state object sizes (Redis has limits)
+- Implement periodic cleanup of old workflow states
+- Add metrics for state persistence operations
+- Implement retry logic for Redis connection failures
+
+---
+
 ## Architecture Patterns Demonstrated
 
 ### 1. **Multi-Phase Pipeline Pattern** (Example 1)
@@ -219,6 +310,36 @@ Complete Outage (100% failure)  ──→  Validate Proper Failure
     Resilience Score  ←──────────────  Recommendations
 ```
 
+### 6. **Distributed Workflow State Persistence Pattern** (Example 6)
+```
+┌─────────────────────────────────────────────────────────┐
+│                  Workflow Coordinator                   │
+│         (Resume from checkpoint or start fresh)          │
+└────────────────────┬────────────────────────────────────┘
+                     │
+        ┌────────────┴────────────┐
+        │                         │
+┌───────▼──────┐          ┌──────▼───────┐
+│   Worker 1   │          │   Worker 2   │
+│  (Phase 1-2) │          │  (Phase 3-5) │
+└───────┬──────┘          └──────┬───────┘
+        │                        │
+        └────────────┬───────────┘
+                     │
+            ┌────────▼─────────┐
+            │   Redis Store    │
+            │  State + Locks   │
+            │  Audit Trails    │
+            └──────────────────┘
+
+Pipeline Flow:
+Extract → Transform → Validate → Migrate → Verify
+   ↓          ↓          ↓          ↓         ↓
+Checkpoint Checkpoint Checkpoint Checkpoint Final
+   ↓          ↓          ↓          ↓         ↓
+ Redis      Redis      Redis      Redis    Cleanup
+```
+
 ## Advanced Features Showcased
 
 ### Resilience & Reliability
@@ -228,6 +349,8 @@ Complete Outage (100% failure)  ──→  Validate Proper Failure
 - **Concurrency Control**: Limit parallel operations to prevent overload
 - **Trial Mode**: Simulate failures for resilience testing
 - **Health Monitoring**: Continuous service health assessment
+- **State Persistence**: Redis-based workflow recovery and resumption
+- **Distributed Locking**: Safe multi-instance workflow execution
 
 ### Workflow Orchestration
 - **Non-Linear Execution**: JUMP, SKIP, REPLAY, TERMINATE actions
@@ -236,6 +359,8 @@ Complete Outage (100% failure)  ──→  Validate Proper Failure
 - **Conditional Logic**: Dynamic workflow decisions based on results
 - **Batch Processing**: High-throughput concurrent operations
 - **Priority Queuing**: Different handling for different priority levels
+- **Checkpoint Management**: Automatic state snapshots at phase boundaries
+- **Phase Skip Logic**: Automatically skip completed phases during recovery
 
 ### Observability & Monitoring
 - **Execution History**: Track all phase executions and decisions
@@ -244,6 +369,9 @@ Complete Outage (100% failure)  ──→  Validate Proper Failure
 - **Circuit Breaker States**: Monitor service health in real-time
 - **SLA Compliance**: Track response times against thresholds
 - **Resilience Scoring**: Automated production readiness assessment
+- **State Versioning**: Track all state changes with timestamps
+- **Audit Trails**: Complete history of workflow state modifications
+- **Progress Tracking**: Real-time workflow progress visibility across instances
 
 ### Performance Optimization
 - **Response Caching**: TTL-based caching with cache-control support
@@ -265,6 +393,8 @@ These examples demonstrate patterns suitable for:
 - **Health Monitoring**: With SLA tracking and alerting
 - **Batch Processing**: With concurrent execution and resource management
 - **Resilience Testing**: With chaos engineering and failure simulation
+- **Distributed Workflows**: With state persistence and recovery
+- **Long-Running Operations**: With checkpoint-based resumption
 
 ## Core Functions Demonstrated
 
@@ -282,12 +412,14 @@ These examples demonstrate patterns suitable for:
 - Different retry strategies per group
 - Partial failure tolerance
 
-### stableWorkflow (Examples 1, 2)
+### stableWorkflow (Examples 1, 2, 6)
 - Multi-phase workflow orchestration
 - Branch workflows for parallel execution
 - Non-linear execution with phase decisions
 - Shared state management across phases
 - Complex conditional logic
+- State persistence for workflow recovery
+- Distributed execution with locking
 
 ## Customization
 
@@ -301,7 +433,7 @@ Each example can be customized by modifying:
 
 ## Learn More
 
-- [Main README](../README.md) - Library overview and quick start
+- [Main README](../readme.md) - Library overview and quick start
 - [API Reference](../docs/api-references.md) - Complete API documentation
 - [Test Suite](../tests/) - Additional usage examples
 

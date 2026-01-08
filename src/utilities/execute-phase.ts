@@ -1,5 +1,5 @@
 import { stableApiGateway } from '../core/index.js';
-import { safelyExecuteUnknownFunction } from './safely-execute-unknown-function';
+import { executeWithPersistence } from './execute-with-persistence.js';
 import { formatLogContext } from './format-log-context';
 import { STABLE_WORKFLOW_PHASE, STABLE_WORKFLOW_PHASE_RESULT } from '../types/index.js';
 
@@ -78,7 +78,7 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
 
     if (handlePhaseCompletion) {
         try {
-            await safelyExecuteUnknownFunction(
+            await executeWithPersistence<void>(
                 handlePhaseCompletion, {
                     workflowId,
                     ...(branchId && { branchId }),
@@ -86,7 +86,10 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
                     maxSerializableChars,
                     params: workflowHookParams?.handlePhaseCompletionParams,
                     sharedBuffer
-                }
+                },
+                phase.statePersistence,
+                { workflowId, branchId, phaseId },
+                sharedBuffer || {}
             );
         } catch (hookError) {
             console.error(

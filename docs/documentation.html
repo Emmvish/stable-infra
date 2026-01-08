@@ -1,0 +1,1459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation (Stable Request)</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <span class="logo">⚡</span>
+                <span class="brand-name">stable-request</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="documentation.html" class="active">Documentation</a>
+                <a href="examples.html">Examples</a>
+                <a href="https://github.com/manishvarma/stable-request" target="_blank">GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="docs-container">
+        <aside class="docs-sidebar">
+            <div class="sidebar-content">
+                <h3>Documentation</h3>
+                <ul class="docs-nav">
+                    <li><a href="#installation">Installation</a></li>
+                    <li><a href="#core-functions">Core Functions</a>
+                        <ul>
+                            <li><a href="#stable-request">stableRequest</a></li>
+                            <li><a href="#stable-api-gateway">stableApiGateway</a></li>
+                            <li><a href="#stable-workflow">stableWorkflow</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#retry-strategies">Retry Strategies</a></li>
+                    <li><a href="#circuit-breaker">Circuit Breaker</a></li>
+                    <li><a href="#caching">Response Caching</a></li>
+                    <li><a href="#rate-limiting">Rate Limiting</a></li>
+                    <li><a href="#workflow-patterns">Workflow Patterns</a>
+                        <ul>
+                            <li><a href="#sequential-concurrent">Sequential & Concurrent</a></li>
+                            <li><a href="#mixed-execution">Mixed Execution</a></li>
+                            <li><a href="#non-linear">Non-Linear Workflows</a></li>
+                            <li><a href="#branched">Branched Workflows</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#observability">Observability</a></li>
+                    <li><a href="#trial-mode">Trial Mode</a></li>
+                    <li><a href="#state-persistence">State Persistence</a></li>
+                    <li><a href="#best-practices">Best Practices</a></li>
+                </ul>
+            </div>
+        </aside>
+
+        <main class="docs-main">
+            <section id="installation" class="doc-section">
+                <h1>Documentation</h1>
+                <p class="lead">Complete guide to using stable-request for production-grade HTTP workflows</p>
+
+                <h2>Installation</h2>
+                <pre><code class="language-bash">npm install @emmvish/stable-request</code></pre>
+                
+                <p><strong>Requirements:</strong> Node.js 14+ (ES Modules)</p>
+                <p><strong>Dependencies:</strong> Built on Axios for HTTP requests</p>
+            </section>
+
+            <section id="core-functions" class="doc-section">
+                <h2>Core Functions</h2>
+
+                <div id="stable-request" class="subsection">
+                    <h3>stableRequest()</h3>
+                    <p>Execute a single HTTP request with built-in retry logic, circuit breaker, caching, and observability hooks.</p>
+                    
+                    <h4>Signature</h4>
+                    <pre><code class="language-typescript">function stableRequest&lt;RequestDataType = any, ResponseDataType = any&gt;(
+  options: STABLE_REQUEST&lt;RequestDataType, ResponseDataType&gt;
+): Promise&lt;ResponseDataType | false&gt;</code></pre>
+
+                    <h4>Basic Usage</h4>
+                    <pre><code class="language-typescript">import { stableRequest, RETRY_STRATEGIES } from '@emmvish/stable-request';
+
+const userData = await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    path: '/users/123',
+    method: 'GET',
+    headers: { 'Authorization': 'Bearer token' }
+  },
+  resReq: true,              // Return response data
+  attempts: 3,               // Retry up to 3 times
+  wait: 1000,                // 1 second between retries
+  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+  logAllErrors: true
+});</code></pre>
+
+                    <h4>Key Parameters</h4>
+                    <table class="params-table">
+                        <thead>
+                            <tr>
+                                <th>Parameter</th>
+                                <th>Type</th>
+                                <th>Default</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>reqData</code></td>
+                                <td>REQUEST_DATA</td>
+                                <td>Required</td>
+                                <td>Request configuration (hostname, path, method, headers, body)</td>
+                            </tr>
+                            <tr>
+                                <td><code>resReq</code></td>
+                                <td>boolean</td>
+                                <td>false</td>
+                                <td>If true, returns response data. If false, returns true/false</td>
+                            </tr>
+                            <tr>
+                                <td><code>attempts</code></td>
+                                <td>number</td>
+                                <td>1</td>
+                                <td>Maximum retry attempts (including initial request)</td>
+                            </tr>
+                            <tr>
+                                <td><code>wait</code></td>
+                                <td>number</td>
+                                <td>0</td>
+                                <td>Base wait time in milliseconds between retries</td>
+                            </tr>
+                            <tr>
+                                <td><code>retryStrategy</code></td>
+                                <td>RETRY_STRATEGY</td>
+                                <td>FIXED</td>
+                                <td>FIXED, LINEAR, or EXPONENTIAL backoff</td>
+                            </tr>
+                            <tr>
+                                <td><code>jitter</code></td>
+                                <td>number</td>
+                                <td>0</td>
+                                <td>Random delay variation to prevent thundering herd</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h4>Advanced Options</h4>
+                    <pre><code class="language-typescript">await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  resReq: true,
+  attempts: 5,
+  wait: 1000,
+  maxAllowedWait: 30000,     // Cap maximum retry delay
+  
+  // Custom response validation
+  responseAnalyzer: async ({ data, status }) => {
+    return status === 200 && data.status === 'success';
+  },
+  
+  // Error handling
+  handleErrors: async ({ errorLog, attempt }) => {
+    logger.error(`Attempt ${attempt} failed:`, errorLog);
+  },
+  
+  // Success tracking
+  handleSuccessfulAttemptData: async ({ data }) => {
+    logger.info('Request succeeded:', data);
+  },
+  
+  // Final error handler
+  finalErrorAnalyzer: async ({ error }) => {
+    if (error.status === 404) {
+      return true; // Suppress error, return false
+    }
+    return false; // Throw error
+  }
+});</code></pre>
+                </div>
+
+                <div id="stable-api-gateway" class="subsection">
+                    <h3>stableApiGateway()</h3>
+                    <p>Execute multiple HTTP requests either sequentially or concurrently with unified configuration.</p>
+                    
+                    <h4>Signature</h4>
+                    <pre><code class="language-typescript">function stableApiGateway&lt;RequestDataType = any, ResponseDataType = any&gt;(
+  requests: API_GATEWAY_REQUEST&lt;RequestDataType, ResponseDataType&gt;[],
+  options: API_GATEWAY_OPTIONS&lt;RequestDataType, ResponseDataType&gt;
+): Promise&lt;API_GATEWAY_RESPONSE&lt;ResponseDataType&gt;[]&gt;</code></pre>
+
+                    <h4>Concurrent Execution</h4>
+                    <pre><code class="language-typescript">import { stableApiGateway } from '@emmvish/stable-request';
+
+const requests = [
+  { id: 'users', requestOptions: { 
+    reqData: { path: '/users' }, resReq: true 
+  }},
+  { id: 'orders', requestOptions: { 
+    reqData: { path: '/orders' }, resReq: true 
+  }},
+  { id: 'products', requestOptions: { 
+    reqData: { path: '/products' }, resReq: true 
+  }}
+];
+
+const results = await stableApiGateway(requests, {
+  concurrentExecution: true,    // Execute in parallel
+  commonRequestData: { 
+    hostname: 'api.example.com',
+    headers: { 'X-API-Key': 'secret' }
+  },
+  commonAttempts: 2,
+  commonWait: 500,
+  stopOnFirstError: false        // Continue all even if some fail
+});
+
+results.forEach(result => {
+  console.log(`${result.id}:`, result.success ? result.data : result.error);
+});</code></pre>
+
+                    <h4>Sequential Execution</h4>
+                    <pre><code class="language-typescript">const results = await stableApiGateway(requests, {
+  concurrentExecution: false,    // Execute one at a time
+  stopOnFirstError: true,        // Stop after first failure
+  commonRequestData: { hostname: 'api.example.com' },
+  commonAttempts: 3
+});</code></pre>
+
+                    <h4>Request Grouping</h4>
+                    <p>Apply different configurations to groups of requests:</p>
+                    <pre><code class="language-typescript">const requests = [
+  { id: 'critical-1', groupId: 'critical', requestOptions: {...} },
+  { id: 'critical-2', groupId: 'critical', requestOptions: {...} },
+  { id: 'optional-1', groupId: 'optional', requestOptions: {...} },
+];
+
+const results = await stableApiGateway(requests, {
+  concurrentExecution: true,
+  commonAttempts: 1,
+  requestGroups: [
+    {
+      groupId: 'critical',
+      commonAttempts: 5,          // Critical requests retry more
+      commonWait: 1000,
+      commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+    },
+    {
+      groupId: 'optional',
+      commonAttempts: 2,          // Optional requests retry less
+      commonWait: 500
+    }
+  ]
+});</code></pre>
+                </div>
+
+                <div id="stable-workflow" class="subsection">
+                    <h3>stableWorkflow()</h3>
+                    <p>Orchestrate complex multi-phase API workflows with support for sequential, concurrent, mixed, non-linear, and branching execution patterns.</p>
+                    
+                    <h4>Signature</h4>
+                    <pre><code class="language-typescript">function stableWorkflow&lt;RequestDataType = any, ResponseDataType = any&gt;(
+  phases: STABLE_WORKFLOW_PHASE&lt;RequestDataType, ResponseDataType&gt;[],
+  options: STABLE_WORKFLOW_OPTIONS&lt;RequestDataType, ResponseDataType&gt;
+): Promise&lt;STABLE_WORKFLOW_RESULT&lt;ResponseDataType&gt;&gt;</code></pre>
+
+                    <h4>Basic Multi-Phase Workflow</h4>
+                    <pre><code class="language-typescript">import { stableWorkflow } from '@emmvish/stable-request';
+
+const phases = [
+  {
+    id: 'authentication',
+    requests: [
+      { id: 'login', requestOptions: { 
+        reqData: { path: '/auth/login', method: 'POST' },
+        resReq: true 
+      }}
+    ]
+  },
+  {
+    id: 'fetch-data',
+    concurrentExecution: true,    // Requests in this phase run in parallel
+    requests: [
+      { id: 'profile', requestOptions: { reqData: { path: '/profile' }, resReq: true }},
+      { id: 'orders', requestOptions: { reqData: { path: '/orders' }, resReq: true }},
+      { id: 'settings', requestOptions: { reqData: { path: '/settings' }, resReq: true }}
+    ]
+  },
+  {
+    id: 'process-data',
+    requests: [
+      { id: 'analytics', requestOptions: { 
+        reqData: { path: '/analytics', method: 'POST' },
+        resReq: false 
+      }}
+    ]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'user-data-sync',
+  commonRequestData: { hostname: 'api.example.com' },
+  commonAttempts: 3,
+  stopOnFirstPhaseError: true,
+  logPhaseResults: true
+});
+
+console.log(`Workflow completed: ${result.success}`);
+console.log(`Total requests: ${result.totalRequests}`);
+console.log(`Successful: ${result.successfulRequests}`);
+console.log(`Failed: ${result.failedRequests}`);
+console.log(`Execution time: ${result.executionTime}ms`);</code></pre>
+                </div>
+            </section>
+
+            <section id="retry-strategies" class="doc-section">
+                <h2>Retry Strategies</h2>
+                <p>Automatically retry failed requests with sophisticated backoff strategies.</p>
+
+                <h3>Fixed Delay</h3>
+                <p>Constant wait time between each retry attempt.</p>
+                <pre><code class="language-typescript">await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  attempts: 5,
+  wait: 1000,                     // 1s, 1s, 1s, 1s, 1s
+  retryStrategy: RETRY_STRATEGIES.FIXED
+});</code></pre>
+
+                <h3>Linear Backoff</h3>
+                <p>Incrementally increasing delays.</p>
+                <pre><code class="language-typescript">await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  attempts: 5,
+  wait: 1000,                     // 1s, 2s, 3s, 4s, 5s
+  retryStrategy: RETRY_STRATEGIES.LINEAR
+});</code></pre>
+
+                <h3>Exponential Backoff</h3>
+                <p>Exponentially growing delays (recommended for most use cases).</p>
+                <pre><code class="language-typescript">await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  attempts: 5,
+  wait: 1000,                     // 1s, 2s, 4s, 8s, 16s
+  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+  maxAllowedWait: 30000           // Cap at 30 seconds
+});</code></pre>
+
+                <h3>Jitter</h3>
+                <p>Add randomness to prevent thundering herd problems.</p>
+                <pre><code class="language-typescript">await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  attempts: 5,
+  wait: 1000,
+  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+  jitter: 500                     // ±500ms random variation
+});</code></pre>
+
+                <h3>Custom Response Validation</h3>
+                <p>Retry based on response content, not just HTTP status.</p>
+                <pre><code class="language-typescript">await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/job/status' },
+  resReq: true,
+  attempts: 10,
+  wait: 2000,
+  responseAnalyzer: async ({ data }) => {
+    // Retry until job is complete
+    return data.status === 'completed';
+  }
+});</code></pre>
+            </section>
+
+            <section id="circuit-breaker" class="doc-section">
+                <h2>Circuit Breaker Pattern</h2>
+                <p>Prevent cascade failures and system overload with built-in circuit breakers.</p>
+
+                <h3>Circuit Breaker States</h3>
+                <ul>
+                    <li><strong>CLOSED:</strong> Normal operation, requests flow through</li>
+                    <li><strong>OPEN:</strong> Too many failures detected, requests blocked immediately</li>
+                    <li><strong>HALF_OPEN:</strong> Testing if service recovered, limited requests allowed</li>
+                </ul>
+
+                <h3>Basic Usage</h3>
+                <pre><code class="language-typescript">import { stableRequest } from '@emmvish/stable-request';
+
+await stableRequest({
+  reqData: { hostname: 'unreliable-api.example.com', path: '/data' },
+  attempts: 3,
+  circuitBreaker: {
+    failureThreshold: 5,          // Open after 5 failures
+    successThreshold: 2,          // Close after 2 successes in half-open
+    timeout: 60000,               // Wait 60s before trying again (half-open)
+    trackIndividualAttempts: false // Track at request level (not attempt level)
+  }
+});</code></pre>
+
+                <h3>Shared Circuit Breaker</h3>
+                <p>Use the same circuit breaker instance across multiple requests or workflows:</p>
+                <pre><code class="language-typescript">import { CircuitBreaker } from '@emmvish/stable-request';
+
+const sharedBreaker = new CircuitBreaker({
+  failureThresholdPercentage: 50,
+  minimumRequests: 5,
+  recoveryTimeoutMs: 60000,
+  successThresholdPercentage: 70,
+  halfOpenMaxRequests: 3
+});
+
+// Use in multiple requests
+await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/users' },
+  circuitBreaker: sharedBreaker
+});
+
+await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/orders' },
+  circuitBreaker: sharedBreaker
+});
+
+// Check circuit breaker state
+const state = sharedBreaker.getState();
+console.log(`State: ${state.state}`);
+console.log(`Failure rate: ${state.failureRate}%`);</code></pre>
+
+                <h3>Workflow-Level Circuit Breaker</h3>
+                <pre><code class="language-typescript">await stableWorkflow(phases, {
+  commonRequestData: { hostname: 'api.example.com' },
+  circuitBreaker: sharedBreaker,  // Shared across all phases
+  commonAttempts: 3
+});</code></pre>
+            </section>
+
+            <section id="caching" class="doc-section">
+                <h2>Response Caching</h2>
+                <p>Cache responses to reduce load and improve performance.</p>
+
+                <h3>Basic Caching</h3>
+                <pre><code class="language-typescript">await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  resReq: true,
+  cache: {
+    ttl: 300000                   // Cache for 5 minutes
+  }
+});</code></pre>
+
+                <h3>Shared Cache Instance</h3>
+                <pre><code class="language-typescript">import { CacheManager } from '@emmvish/stable-request';
+
+const cache = new CacheManager({ ttl: 300000 });
+
+// Use across multiple requests
+await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/users' },
+  cache: { cacheInstance: cache }
+});
+
+await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/users' },
+  cache: { cacheInstance: cache }  // Reuses cached data
+});</code></pre>
+
+                <h3>Workflow-Level Caching</h3>
+                <pre><code class="language-typescript">await stableWorkflow(phases, {
+  commonCache: {
+    ttl: 300000
+  }
+});</code></pre>
+            </section>
+
+            <section id="rate-limiting" class="doc-section">
+                <h2>Rate Limiting & Concurrency Control</h2>
+
+                <h3>Rate Limiting</h3>
+                <p>Control request rates to respect API quotas.</p>
+                <pre><code class="language-typescript">import { RateLimiter } from '@emmvish/stable-request';
+
+const limiter = new RateLimiter(100, 60000); // 100 requests per minute
+
+await stableApiGateway(requests, {
+  rateLimit: {
+    maxRequests: 100,
+    windowMs: 60000
+  }
+});</code></pre>
+
+                <h3>Concurrency Limiting</h3>
+                <p>Control the maximum number of simultaneous requests.</p>
+                <pre><code class="language-typescript">await stableApiGateway(requests, {
+  concurrentExecution: true,
+  maxConcurrentRequests: 5        // Max 5 simultaneous requests
+});</code></pre>
+
+                <h3>Combined Rate & Concurrency Limiting</h3>
+                <pre><code class="language-typescript">await stableApiGateway(requests, {
+  concurrentExecution: true,
+  maxConcurrentRequests: 10,
+  rateLimit: {
+    maxRequests: 100,
+    windowMs: 60000
+  }
+});</code></pre>
+            </section>
+
+            <section id="workflow-patterns" class="doc-section">
+                <h2>Workflow Execution Patterns</h2>
+
+                <div id="sequential-concurrent" class="subsection">
+                    <h3>Sequential & Concurrent Phases</h3>
+                    
+                    <h4>Sequential Phases (Default)</h4>
+                    <p>Phases execute one after another.</p>
+                    <pre><code class="language-typescript">const result = await stableWorkflow(phases, {
+  concurrentPhaseExecution: false  // Default
+});</code></pre>
+
+                    <h4>Concurrent Phases</h4>
+                    <p>All phases execute simultaneously.</p>
+                    <pre><code class="language-typescript">const result = await stableWorkflow(phases, {
+  concurrentPhaseExecution: true
+});</code></pre>
+
+                    <h4>Concurrent Requests within Phase</h4>
+                    <pre><code class="language-typescript">const phases = [
+  {
+    id: 'fetch-data',
+    concurrentExecution: true,    // Requests in parallel
+    requests: [...]
+  }
+];</code></pre>
+                </div>
+
+                <div id="mixed-execution" class="subsection">
+                    <h3>Mixed Execution Mode</h3>
+                    <p>Mark specific phases for concurrent execution while others run sequentially.</p>
+                    <pre><code class="language-typescript">const phases = [
+  {
+    id: 'auth',
+    requests: [...]               // Runs first (sequential)
+  },
+  {
+    id: 'fetch-users',
+    markConcurrentPhase: true,    // Concurrent group starts
+    requests: [...]
+  },
+  {
+    id: 'fetch-products',
+    markConcurrentPhase: true,    // Part of concurrent group
+    requests: [...]
+  },
+  {
+    id: 'process',
+    requests: [...]               // Runs after concurrent group
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  enableMixedExecution: true
+});</code></pre>
+                </div>
+
+                <div id="non-linear" class="subsection">
+                    <h3>Non-Linear Workflows</h3>
+                    <p>Implement conditional logic with phase decision hooks.</p>
+                    
+                    <h4>Available Actions</h4>
+                    <ul>
+                        <li><code>CONTINUE</code>: Proceed to next phase normally</li>
+                        <li><code>SKIP</code>: Skip to a specific phase</li>
+                        <li><code>JUMP</code>: Jump backwards to re-execute a phase</li>
+                        <li><code>REPLAY</code>: Re-execute current phase</li>
+                        <li><code>TERMINATE</code>: End workflow immediately</li>
+                    </ul>
+
+                    <pre><code class="language-typescript">import { PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
+
+const phases = [
+  {
+    id: 'validate',
+    requests: [...],
+    phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+      if (!phaseResult.success) {
+        return { action: PHASE_DECISION_ACTIONS.TERMINATE };
+      }
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    }
+  },
+  {
+    id: 'process',
+    requests: [...],
+    phaseDecisionHook: async ({ phaseResult, sharedBuffer, retryCount }) => {
+      if (phaseResult.failedRequests > 0 && retryCount < 3) {
+        return { action: PHASE_DECISION_ACTIONS.REPLAY }; // Retry phase
+      }
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    }
+  },
+  {
+    id: 'finalize',
+    requests: [...]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  enableNonLinearExecution: true,
+  maxWorkflowIterations: 1000     // Prevent infinite loops
+});</code></pre>
+                </div>
+
+                <div id="branched" class="subsection">
+                    <h3>Branched Workflows</h3>
+                    <p>Execute independent branches of work, each with its own phases.</p>
+                    
+                    <pre><code class="language-typescript">const branches = [
+  {
+    branchId: 'user-service',
+    concurrentBranch: false,      // Phases run sequentially in this branch
+    phases: [
+      { id: 'validate-user', requests: [...] },
+      { id: 'update-profile', requests: [...] }
+    ]
+  },
+  {
+    branchId: 'inventory-service',
+    concurrentBranch: false,
+    phases: [
+      { id: 'check-stock', requests: [...] },
+      { id: 'reserve-items', requests: [...] }
+    ]
+  },
+  {
+    branchId: 'payment-service',
+    concurrentBranch: false,
+    phases: [
+      { id: 'authorize-payment', requests: [...] },
+      { id: 'capture-payment', requests: [...] }
+    ]
+  }
+];
+
+const result = await stableWorkflow([], {
+  enableBranchExecution: true,
+  branches,
+  concurrentBranchExecution: true,  // Branches run in parallel
+  handleBranchCompletion: async ({ branchId, success, branchResults }) => {
+    console.log(`Branch ${branchId}: ${success ? 'SUCCESS' : 'FAILED'}`);
+  }
+});</code></pre>
+
+                    <h4>Branch Decision Hooks</h4>
+                    <pre><code class="language-typescript">const branches = [
+  {
+    branchId: 'critical-service',
+    phases: [{
+      id: 'critical-operation',
+      requests: [...],
+      phaseDecisionHook: async ({ phaseResult }) => {
+        if (!phaseResult.success) {
+          return { 
+            action: PHASE_DECISION_ACTIONS.TERMINATE,
+            terminateWorkflow: true  // Stop entire workflow
+          };
+        }
+        return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+      }
+    }]
+  }
+];
+
+const result = await stableWorkflow([], {
+  enableBranchExecution: true,
+  branches,
+  handleBranchDecision: async ({ branchId, decision }) => {
+    logger.warn(`Branch ${branchId} decision:`, decision);
+  }
+});</code></pre>
+                </div>
+            </section>
+
+            <section id="observability" class="doc-section">
+                <h2>Observability & Hooks</h2>
+                <p>Comprehensive hooks for monitoring, logging, and debugging.</p>
+
+                <h3>Request-Level Hooks</h3>
+                <pre><code class="language-typescript">await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  
+  // Called on each failed attempt
+  handleErrors: async ({ error, errorLog, attempt, totalAttempts }) => {
+    logger.error(`Attempt ${attempt}/${totalAttempts} failed:`, errorLog);
+  },
+  
+  // Called on each successful attempt
+  handleSuccessfulAttemptData: async ({ data, status, attempt }) => {
+    logger.info(`Attempt ${attempt} succeeded with status ${status}`);
+  },
+  
+  // Validate responses (return false to retry)
+  responseAnalyzer: async ({ data, status, headers }) => {
+    return status === 200 && data.status === 'success';
+  },
+  
+  // Handle final error after all retries exhausted
+  finalErrorAnalyzer: async ({ error, allErrors }) => {
+    logger.error('All attempts failed:', allErrors);
+    return false; // Throw error (true = suppress)
+  }
+});</code></pre>
+
+                <h3>Workflow-Level Hooks</h3>
+                <pre><code class="language-typescript">await stableWorkflow(phases, {
+  // Called after each phase completes
+  handlePhaseCompletion: async ({ 
+    phaseId, 
+    phaseResult, 
+    totalPhasesCompleted,
+    sharedBuffer 
+  }) => {
+    logger.info(`Phase ${phaseId} completed:`, {
+      success: phaseResult.success,
+      totalRequests: phaseResult.totalRequests,
+      executionTime: phaseResult.executionTime
+    });
+  },
+  
+  // Called when phase encounters error
+  handlePhaseError: async ({ phaseId, error, phaseResult }) => {
+    logger.error(`Phase ${phaseId} failed:`, error);
+  },
+  
+  // Called for non-linear decisions
+  handlePhaseDecision: async ({ phaseId, decision, nextPhaseId }) => {
+    logger.info(`Phase ${phaseId} decision:`, decision);
+  },
+  
+  // Called when branch completes
+  handleBranchCompletion: async ({ branchId, success, branchResults }) => {
+    logger.info(`Branch ${branchId}:`, { success, branchResults });
+  }
+});</code></pre>
+
+                <h3>Pre-Execution Hooks</h3>
+                <p>Dynamically modify requests before execution:</p>
+                <pre><code class="language-typescript">await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  preExecution: {
+    handler: async ({ reqData, sharedBuffer, attempt }) => {
+      // Add dynamic headers
+      reqData.headers = {
+        ...reqData.headers,
+        'X-Request-ID': generateUUID(),
+        'X-Attempt': attempt.toString()
+      };
+      
+      // Modify based on shared state
+      if (sharedBuffer.authToken) {
+        reqData.headers['Authorization'] = `Bearer ${sharedBuffer.authToken}`;
+      }
+      
+      return reqData;
+    }
+  },
+  sharedBuffer: {}
+});</code></pre>
+            </section>
+
+            <section id="trial-mode" class="doc-section">
+                <h2>Trial Mode</h2>
+                <p>Test without making real API calls using probabilistic success/failure simulation.</p>
+
+                <h3>Basic Trial Mode</h3>
+                <pre><code class="language-typescript">await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  resReq: true,
+  attempts: 3,
+  trialMode: {
+    trialModeOn: true,
+    successProbability: 0.7,      // 70% chance of success
+    trialModeData: { mock: 'data' }
+  }
+});</code></pre>
+
+                <h3>A/B Testing with Trial Mode</h3>
+                <pre><code class="language-typescript">// Test feature flags with different probabilities
+const runTest = async (featureName, successRate) => {
+  const result = await stableRequest({
+    reqData: { hostname: 'api.example.com', path: '/feature-test' },
+    resReq: true,
+    attempts: 5,
+    trialMode: {
+      trialModeOn: true,
+      successProbability: successRate,
+      trialModeData: { feature: featureName, enabled: true }
+    }
+  });
+  
+  return result;
+};
+
+// Test different configurations
+await runTest('feature-A', 0.9);  // 90% success rate
+await runTest('feature-B', 0.5);  // 50% success rate</code></pre>
+            </section>
+
+            <section id="state-persistence" class="doc-section">
+                <h2>State Persistence</h2>
+                <p>Persist workflow state to external storage (databases, Redis, file systems) for resilience, recovery, and distributed execution.</p>
+
+                <h3>Use Cases</h3>
+                <ul>
+                    <li><strong>Workflow Recovery:</strong> Resume workflows after application restarts or failures</li>
+                    <li><strong>Distributed Systems:</strong> Share state across multiple service instances</li>
+                    <li><strong>Audit Trails:</strong> Track workflow execution history and state changes</li>
+                    <li><strong>Long-Running Workflows:</strong> Persist progress for workflows that span hours or days</li>
+                    <li><strong>Debug & Analysis:</strong> Capture state snapshots for post-mortem analysis</li>
+                </ul>
+
+                <h3>Configuration</h3>
+                <p>State persistence is configured using the <code>StatePersistenceConfig</code> interface:</p>
+                <pre><code class="language-typescript">interface StatePersistenceConfig {
+  persistenceFunction: (options: StatePersistenceOptions) => Promise<Record<string, any>> | Record<string, any>;
+  persistenceParams?: any;  // Custom parameters passed to your persistence function
+  loadBeforeHooks?: boolean;  // Load state before executing hooks (default: false)
+  storeAfterHooks?: boolean;  // Store state after hook execution (default: false)
+}
+
+interface StatePersistenceOptions {
+  executionContext: ExecutionContext;  // Context about current execution
+  params?: any;                        // Your custom persistenceParams
+  buffer: Record<string, any>;         // The state buffer to store/load
+}
+
+interface ExecutionContext {
+  workflowId: string;   // Unique workflow identifier
+  phaseId?: string;     // Current phase ID (if in a phase)
+  branchId?: string;    // Current branch ID (if in a branch)
+  requestId?: string;   // Current request ID (if applicable)
+}</code></pre>
+
+                <h3>How It Works</h3>
+                <p>The persistence function is called in two modes:</p>
+                <ul>
+                    <li><strong>LOAD Mode:</strong> When <code>buffer</code> is empty/null, return the stored state</li>
+                    <li><strong>STORE Mode:</strong> When <code>buffer</code> contains data, save it to your storage</li>
+                </ul>
+                <pre><code class="language-typescript">// Your persistence function
+const myPersistenceFunction = async ({ executionContext, params, buffer }) => {
+  if (buffer && Object.keys(buffer).length > 0) {
+    // STORE MODE: Save the buffer to storage
+    await myStorage.save(executionContext.workflowId, buffer);
+    return {};
+  } else {
+    // LOAD MODE: Return stored state
+    const stored = await myStorage.load(executionContext.workflowId);
+    return stored || {};  // Return empty object if nothing stored
+  }
+};</code></pre>
+
+                <h3>Basic Usage with Database</h3>
+                <pre><code class="language-typescript">import { stableWorkflow } from '@emmvish/stable-request';
+
+// Database persistence function
+const persistToDatabase = async ({ executionContext, params, buffer }) => {
+  const { workflowId, phaseId } = executionContext;
+  const { db } = params;
+  
+  if (buffer) {
+    // Store state
+    await db.collection('workflow_state').updateOne(
+      { workflowId, phaseId },
+      { $set: { state: buffer, updatedAt: new Date() } },
+      { upsert: true }
+    );
+  } else {
+    // Load state
+    const doc = await db.collection('workflow_state').findOne({ workflowId, phaseId });
+    return doc?.state || {};
+  }
+};
+
+const phases = [
+  {
+    id: 'data-fetch',
+    requests: [...],
+    statePersistence: {
+      persistenceFunction: persistToDatabase,
+      persistenceParams: { db: mongoClient.db('workflows') },
+      loadBeforeHooks: true,
+      storeAfterHooks: true
+    }
+  }
+];
+
+await stableWorkflow(phases, {
+  workflowId: 'data-pipeline-123',
+  sharedBuffer: {}  // Will be populated from persistence
+});</code></pre>
+
+                <h3>Redis Persistence with Distributed Locking</h3>
+                <p>For distributed workflows across multiple instances, use distributed locking to prevent race conditions:</p>
+                <pre><code class="language-typescript">import Redis from 'ioredis';
+
+const redis = new Redis();
+
+const persistToRedis = async ({ executionContext, params, buffer }) => {
+  const { workflowId, phaseId, branchId } = executionContext;
+  const { ttl = 86400, enableLocking = false, namespace = 'workflow' } = params;
+  
+  // Generate hierarchical key
+  const stateKey = `${namespace}:${workflowId}:${branchId || 'main'}:${phaseId || 'global'}`;
+  const lockKey = `lock:${stateKey}`;
+  
+  // Check if we're storing or loading
+  const isStoring = buffer && Object.keys(buffer).length > 0;
+  
+  if (enableLocking) {
+    // Acquire distributed lock (5 second timeout)
+    await redis.setex(lockKey, 5, `${Date.now()}-${Math.random()}`);
+  }
+  
+  try {
+    if (isStoring) {
+      // STORE MODE: Save state with metadata
+      const stateWithMeta = {
+        ...buffer,
+        _meta: {
+          workflowId,
+          phaseId,
+          branchId,
+          timestamp: new Date().toISOString(),
+          version: (buffer._meta?.version || 0) + 1
+        }
+      };
+      
+      await redis.setex(stateKey, ttl, JSON.stringify(stateWithMeta));
+      
+      // Create audit log entry
+      const auditKey = `${namespace}:audit:${workflowId}:${Date.now()}`;
+      await redis.setex(auditKey, ttl * 2, JSON.stringify({
+        action: 'state_saved',
+        phaseId,
+        timestamp: new Date().toISOString(),
+        stateSnapshot: stateWithMeta
+      }));
+      
+    } else {
+      // LOAD MODE: Retrieve state
+      const data = await redis.get(stateKey);
+      if (data) {
+        const parsed = JSON.parse(data);
+        console.log(`Loaded state version: ${parsed._meta?.version || 0}`);
+        return parsed;
+      }
+      return {};
+    }
+  } finally {
+    if (enableLocking) {
+      await redis.del(lockKey);  // Release lock
+    }
+  }
+  
+  return {};
+};
+
+// Usage with locking enabled
+await stableWorkflow(phases, {
+  workflowId: 'distributed-job-456',
+  commonStatePersistence: {
+    persistenceFunction: persistToRedis,
+    persistenceParams: { 
+      ttl: 3600,
+      enableLocking: true,  // Enable distributed locking
+      namespace: 'migration'
+    },
+    loadBeforeHooks: true,
+    storeAfterHooks: true
+  }
+});</code></pre>
+
+                <h3>File System Persistence</h3>
+                <pre><code class="language-typescript">import fs from 'fs/promises';
+import path from 'path';
+
+const persistToFile = async ({ executionContext, params, buffer }) => {
+  const { workflowId, phaseId } = executionContext;
+  const { directory = './workflow-state' } = params;
+  
+  await fs.mkdir(directory, { recursive: true });
+  const filePath = path.join(directory, `${workflowId}-${phaseId}.json`);
+  
+  if (buffer) {
+    // Store state
+    await fs.writeFile(filePath, JSON.stringify(buffer, null, 2));
+    console.log(`State saved to: ${filePath}`);
+  } else {
+    // Load state
+    try {
+      const data = await fs.readFile(filePath, 'utf-8');
+      return JSON.parse(data);
+    } catch (error) {
+      return {}; // File doesn't exist yet
+    }
+  }
+};
+
+const phases = [
+  {
+    id: 'long-running-task',
+    requests: [...],
+    statePersistence: {
+      persistenceFunction: persistToFile,
+      persistenceParams: { directory: './state-snapshots' },
+      loadBeforeHooks: true,
+      storeAfterHooks: true
+    }
+  }
+];</code></pre>
+
+                <h3>Checkpoint-Based Global Persistence</h3>
+                <p>Track workflow progress with global checkpoints that persist completed phases:</p>
+                <pre><code class="language-typescript">async function createCheckpoint({ executionContext, params, buffer }) {
+  const { workflowId, phaseId } = executionContext;
+  const { ttl = 86400 } = params || {};
+  
+  const checkpointKey = `checkpoint:${workflowId}`;
+  
+  if (buffer && Object.keys(buffer).length > 0) {
+    // STORE: Save checkpoint with completed phases
+    const existingData = await redis.get(checkpointKey);
+    const existing = existingData ? JSON.parse(existingData) : {};
+    
+    const checkpointData = {
+      ...existing,
+      completedPhases: [...new Set([...(existing.completedPhases || []), ...(buffer.completedPhases || [])])],
+      lastPhase: phaseId || existing.lastPhase,
+      lastUpdated: new Date().toISOString(),
+      progress: buffer.progress || existing.progress || 0,
+      processedRecords: buffer.recordsProcessed || existing.processedRecords || 0
+    };
+    
+    await redis.setex(checkpointKey, ttl, JSON.stringify(checkpointData));
+    console.log(`✅ Checkpoint saved: ${phaseId} (Progress: ${checkpointData.progress}%)`);
+  } else {
+    // LOAD: Return checkpoint data
+    const data = await redis.get(checkpointKey);
+    return data ? JSON.parse(data) : { completedPhases: [], processedRecords: 0 };
+  }
+  
+  return {};
+}
+
+// Use global checkpoint for all phases
+await stableWorkflow(phases, {
+  workflowId: 'migration-12345',
+  enableNonLinearExecution: true,
+  sharedBuffer: {
+    completedPhases: [],
+    progress: 0
+  },
+  commonStatePersistence: {
+    persistenceFunction: createCheckpoint,
+    persistenceParams: { ttl: 7200 },  // 2 hours
+    loadBeforeHooks: true,
+    storeAfterHooks: true
+  }
+});</code></pre>
+                <p>Resume workflows from checkpoints with automatic phase skipping:</p>
+                <pre><code class="language-typescript">// Resume a workflow from last saved state
+async function resumeWorkflow(workflowId: string) {
+  const phases = [
+    {
+      id: 'phase-1',
+      requests: [...],
+      phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+        // Check if this phase already completed (recovery scenario)
+        if (sharedBuffer.completedPhases?.includes('phase-1')) {
+          console.log('✅ Phase-1 already completed, skipping...');
+          return { 
+            action: PHASE_DECISION_ACTIONS.SKIP, 
+            skipToPhaseId: 'phase-2' 
+          };
+        }
+        
+        // Verify success before marking complete
+        if (phaseResult.success) {
+          sharedBuffer.completedPhases = [...(sharedBuffer.completedPhases || []), 'phase-1'];
+          console.log('📊 Phase-1 completed, saving checkpoint...');
+          return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+        }
+        
+        return { action: PHASE_DECISION_ACTIONS.TERMINATE };
+      },
+      statePersistence: {
+        persistenceFunction: persistToDatabase,
+        persistenceParams: { db },
+        loadBeforeHooks: true,
+        storeAfterHooks: true
+      }
+    },
+    {
+      id: 'phase-2',
+      requests: [...],
+      phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+        if (sharedBuffer.completedPhases?.includes('phase-2')) {
+          console.log('✅ Phase-2 already completed, skipping...');
+          return { 
+            action: PHASE_DECISION_ACTIONS.SKIP, 
+            skipToPhaseId: 'phase-3' 
+          };
+        }
+        
+        if (phaseResult.success) {
+          sharedBuffer.completedPhases = [...(sharedBuffer.completedPhases || []), 'phase-2'];
+          return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+        }
+        
+        return { action: PHASE_DECISION_ACTIONS.TERMINATE };
+      },
+      statePersistence: {
+        persistenceFunction: persistToDatabase,
+        persistenceParams: { db },
+        loadBeforeHooks: true,
+        storeAfterHooks: true
+      }
+    }
+  ];
+  
+  const result = await stableWorkflow(phases, {
+    workflowId,
+    enableNonLinearExecution: true,
+    sharedBuffer: { completedPhases: [] }
+  });
+  
+  return result;
+}
+
+// Can be called multiple times, will resume from last checkpoint
+await resumeWorkflow('data-migration-789');</code></pre>
+
+                <h3>Best Practices</h3>
+                <div class="best-practice">
+                    <h4>1. Use Appropriate Storage Based on Requirements</h4>
+                    <ul>
+                        <li><strong>Redis:</strong> Fast, distributed, with TTL support - ideal for short-lived workflows</li>
+                        <li><strong>Database:</strong> Durable, queryable - best for audit trails and long-term storage</li>
+                        <li><strong>File System:</strong> Simple, no dependencies - good for development and single-instance apps</li>
+                    </ul>
+                </div>
+
+                <div class="best-practice">
+                    <h4>2. Handle Serialization Carefully</h4>
+                    <pre><code class="language-typescript">// Store only serializable data
+const persistSafely = async ({ buffer }) => {
+  const serializableBuffer = {
+    ...buffer,
+    // Remove non-serializable properties
+    timestamp: buffer.timestamp?.toISOString?.() || buffer.timestamp
+  };
+  await storage.save(serializableBuffer);
+};</code></pre>
+                </div>
+
+                <div class="best-practice">
+                    <h4>3. Implement Error Handling</h4>
+                    <pre><code class="language-typescript">const persistWithFallback = async ({ buffer, params }) => {
+  try {
+    await primaryStorage.save(buffer);
+  } catch (error) {
+    console.error('Primary storage failed, using fallback');
+    await fallbackStorage.save(buffer);
+  }
+};</code></pre>
+                </div>
+
+                <div class="best-practice">
+                    <h4>4. Use TTL for Temporary State</h4>
+                    <p>Set appropriate TTL values to prevent storage bloat:</p>
+                    <pre><code class="language-typescript">statePersistence: {
+  persistenceFunction: persistToRedis,
+  persistenceParams: {
+    ttl: 86400  // 24 hours for short-lived workflows
+  }
+}</code></pre>
+                </div>
+
+                <div class="best-practice">
+                    <h4>5. Include Execution Context in State Keys</h4>
+                    <p>Use workflow ID, phase ID, and branch ID to create unique keys:</p>
+                    <pre><code class="language-typescript">const generateKey = ({ workflowId, phaseId, branchId }) => {
+  return `wf:${workflowId}:br:${branchId || 'main'}:ph:${phaseId || 'global'}`;
+};</code></pre>
+                </div>
+
+                <div class="best-practice">
+                    <h4>6. Choose Phase-Level vs Global Persistence</h4>
+                    <p><strong>Phase-Level:</strong> Configure <code>statePersistence</code> on individual phases for granular control:</p>
+                    <pre><code class="language-typescript">{
+  id: 'extract-data',
+  requests: [...],
+  statePersistence: {
+    persistenceFunction: persistToRedis,
+    persistenceParams: { ttl: 3600 }
+  }
+}</code></pre>
+                    <p><strong>Global Persistence:</strong> Use <code>commonStatePersistence</code> for all phases:</p>
+                    <pre><code class="language-typescript">await stableWorkflow(phases, {
+  commonStatePersistence: {
+    persistenceFunction: createCheckpoint,
+    persistenceParams: { ttl: 7200 }
+  }
+});</code></pre>
+                </div>
+                <h4>Checkpoint Pattern</h4>
+                <pre><code class="language-typescript">// Save checkpoint after each major step
+phases.forEach(phase => {
+  phase.statePersistence = {
+    persistenceFunction: createCheckpoint,
+    loadBeforeHooks: true,
+    storeAfterHooks: true
+  };
+});</code></pre>
+
+                <h4>Distributed Lock Pattern</h4>
+                <pre><code class="language-typescript">const persistWithLock = async ({ executionContext, buffer }) => {
+  const lock = await redis.lock(`lock:${executionContext.workflowId}`, 5000);
+  try {
+    // Read-modify-write with lock
+    const current = await loadState(executionContext);
+    const merged = { ...current, ...buffer };
+    await saveState(executionContext, merged);
+  } finally {
+    await lock.unlock();
+  }
+};</code></pre>
+
+                <h4>Versioned State Pattern</h4>
+                <pre><code class="language-typescript">const persistVersioned = async ({ executionContext, buffer }) => {
+  const version = Date.now();
+  await storage.save({
+    ...executionContext,
+    version,
+    state: buffer,
+    previousVersion: await storage.getLatestVersion(executionContext.workflowId)
+  });
+};</code></pre>
+            </section>
+
+            <section id="best-practices" class="doc-section">
+                <h2>Best Practices</h2>
+
+                <div class="best-practice">
+                    <h3>1. Use Exponential Backoff for Most Cases</h3>
+                    <p>Exponential backoff with jitter is recommended for most retry scenarios to avoid overwhelming services and prevent thundering herd problems.</p>
+                    <pre><code class="language-typescript">await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  attempts: 5,
+  wait: 1000,
+  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+  jitter: 500,
+  maxAllowedWait: 30000
+});</code></pre>
+                </div>
+
+                <div class="best-practice">
+                    <h3>2. Implement Circuit Breakers for External Services</h3>
+                    <p>Always use circuit breakers when calling external APIs to prevent cascade failures.</p>
+                    <pre><code class="language-typescript">const externalServiceBreaker = new CircuitBreaker({
+  failureThresholdPercentage: 50,
+  minimumRequests: 5,
+  recoveryTimeoutMs: 60000
+});
+
+// Share across all requests to that service
+await stableRequest({
+  reqData: { hostname: 'external-api.com', path: '/data' },
+  circuitBreaker: externalServiceBreaker
+});</code></pre>
+                </div>
+
+                <div class="best-practice">
+                    <h3>3. Use Request Grouping for Different SLAs</h3>
+                    <p>Separate critical and non-critical requests with different retry policies.</p>
+                    <pre><code class="language-typescript">await stableApiGateway(requests, {
+  requestGroups: [
+    {
+      groupId: 'critical',
+      commonAttempts: 5,
+      commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+    },
+    {
+      groupId: 'optional',
+      commonAttempts: 1  // Don't retry optional requests
+    }
+  ]
+});</code></pre>
+                </div>
+
+                <div class="best-practice">
+                    <h3>4. Enable Caching for Read Operations</h3>
+                    <p>Cache GET requests to reduce load and improve performance.</p>
+                    <pre><code class="language-typescript">const cache = new CacheManager({ ttl: 300000 });
+
+await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/users', method: 'GET' },
+  cache: { cacheInstance: cache }
+});</code></pre>
+                </div>
+
+                <div class="best-practice">
+                    <h3>5. Implement Comprehensive Observability</h3>
+                    <p>Use hooks to track all request attempts and failures for debugging and monitoring.</p>
+                    <pre><code class="language-typescript">await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  handleErrors: async ({ errorLog }) => {
+    metrics.increment('api.errors', { endpoint: '/data' });
+    logger.error('API error:', errorLog);
+  },
+  handleSuccessfulAttemptData: async ({ data, attempt }) => {
+    metrics.increment('api.success', { endpoint: '/data', attempt });
+  }
+});</code></pre>
+                </div>
+
+                <div class="best-practice">
+                    <h3>6. Use Shared Buffers for State Management</h3>
+                    <p>Share data across phases using sharedBuffer instead of global variables.</p>
+                    <pre><code class="language-typescript">const phases = [
+  {
+    id: 'login',
+    requests: [{
+      id: 'auth',
+      requestOptions: {
+        reqData: { path: '/auth/login' },
+        resReq: true,
+        handleSuccessfulAttemptData: async ({ data }, { sharedBuffer }) => {
+          sharedBuffer.authToken = data.token;
+        }
+      }
+    }]
+  },
+  {
+    id: 'fetch-data',
+    requests: [{
+      id: 'profile',
+      requestOptions: {
+        reqData: { path: '/profile' },
+        preExecution: {
+          handler: async ({ reqData, sharedBuffer }) => {
+            reqData.headers['Authorization'] = `Bearer ${sharedBuffer.authToken}`;
+            return reqData;
+          }
+        }
+      }
+    }]
+  }
+];
+
+await stableWorkflow(phases, {
+  sharedBuffer: {}
+});</code></pre>
+                </div>
+
+                <div class="best-practice">
+                    <h3>7. Set Appropriate Timeouts</h3>
+                    <p>Always set timeout values to prevent hanging requests.</p>
+                    <pre><code class="language-typescript">await stableRequest({
+  reqData: { 
+    hostname: 'api.example.com', 
+    path: '/data',
+    timeout: 5000  // 5 second timeout
+  },
+  attempts: 3
+});</code></pre>
+                </div>
+
+                <div class="best-practice">
+                    <h3>8. Use Rate Limiting for High-Volume Operations</h3>
+                    <p>Respect API rate limits to avoid being throttled or banned.</p>
+                    <pre><code class="language-typescript">await stableApiGateway(largeRequestArray, {
+  concurrentExecution: true,
+  maxConcurrentRequests: 10,
+  rateLimit: {
+    maxRequests: 100,
+    windowMs: 60000  // 100 requests per minute
+  }
+});</code></pre>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>stable-request</h4>
+                    <p>Production-grade HTTP Workflow Engine for Node.js</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Links</h4>
+                    <ul>
+                        <li><a href="documentation.html">Documentation</a></li>
+                        <li><a href="examples.html">Examples</a></li>
+                        <li><a href="https://github.com/manishvarma/stable-request">GitHub</a></li>
+                        <li><a href="https://www.npmjs.com/package/@emmvish/stable-request">npm</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="#api-reference">API Reference</a></li>
+                        <li><a href="examples.html">Use Cases</a></li>
+                        <li><a href="https://github.com/manishvarma/stable-request/issues">Report Issues</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 Manish Varma. Released under the MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        hljs.highlightAll();
+        
+        // Smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Highlight active section in sidebar
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.getAttribute('id');
+                    document.querySelectorAll('.docs-nav a').forEach(link => {
+                        link.classList.remove('active');
+                        if (link.getAttribute('href') === `#${id}`) {
+                            link.classList.add('active');
+                        }
+                    });
+                }
+            });
+        }, { rootMargin: '-20% 0px -80% 0px' });
+
+        document.querySelectorAll('.doc-section').forEach(section => {
+            observer.observe(section);
+        });
+    </script>
+</body>
+</html>
