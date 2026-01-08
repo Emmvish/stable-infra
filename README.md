@@ -1087,8 +1087,8 @@ await stableWorkflow(phases, {
   },
   
   // Monitor branch decisions
-  handleBranchDecision: async ({ workflowId, decision, branchResult }) => {
-    console.log(`Branch decision: ${decision.action}`);
+  handleBranchDecision: async ({ workflowId, branchId, branchResults, success }) => {
+    console.log(`Branch ID: ${branchId}`);
   },
   
   // Pass parameters to workflow hooks

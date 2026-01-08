@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Documentation (Stable Request)</title>
+    <title>Documentation - Stable Request</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -12,15 +13,15 @@
 <body>
     <nav class="navbar">
         <div class="container">
-            <div class="nav-brand">
+            <a href="index.html" class="nav-brand">
                 <span class="logo">⚡</span>
-                <span class="brand-name">stable-request</span>
-            </div>
+                <span class="brand-name">Stable Request</span>
+            </a>
             <div class="nav-links">
                 <a href="index.html">Home</a>
                 <a href="documentation.html" class="active">Documentation</a>
                 <a href="examples.html">Examples</a>
-                <a href="https://github.com/manishvarma/stable-request" target="_blank">GitHub</a>
+                <a href="https://github.com/Emmvish/stable-request" target="_blank">GitHub</a>
             </div>
         </div>
     </nav>
@@ -67,14 +68,12 @@
                 <pre><code class="language-bash">npm install @emmvish/stable-request</code></pre>
                 
                 <p><strong>Requirements:</strong> Node.js 14+ (ES Modules)</p>
-                <p><strong>Dependencies:</strong> Built on Axios for HTTP requests</p>
             </section>
 
             <section id="core-functions" class="doc-section">
                 <h2>Core Functions</h2>
 
-                <div id="stable-request" class="subsection">
-                    <h3>stableRequest()</h3>
+                <h3 id="stable-request">stableRequest()</h3>
                     <p>Execute a single HTTP request with built-in retry logic, circuit breaker, caching, and observability hooks.</p>
                     
                     <h4>Signature</h4>
@@ -99,91 +98,186 @@ const userData = await stableRequest({
   logAllErrors: true
 });</code></pre>
 
-                    <h4>Key Parameters</h4>
+                    <h4>STABLE_REQUEST Interface</h4>
+                    <p>Complete parameter reference for the <code>stableRequest</code> function options:</p>
+                    <div class="table-wrapper">
                     <table class="params-table">
                         <thead>
                             <tr>
                                 <th>Parameter</th>
                                 <th>Type</th>
                                 <th>Default</th>
+                                <th>Required</th>
                                 <th>Description</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
                                 <td><code>reqData</code></td>
-                                <td>REQUEST_DATA</td>
-                                <td>Required</td>
-                                <td>Request configuration (hostname, path, method, headers, body)</td>
+                                <td><code>REQUEST_DATA&lt;RequestDataType&gt;</code></td>
+                                <td>-</td>
+                                <td>Yes</td>
+                                <td>Request configuration including hostname, path, method, headers, body, query, timeout, protocol, port, signal</td>
+                            </tr>
+                            <tr>
+                                <td><code>responseAnalyzer</code></td>
+                                <td><code>(options: ResponseAnalysisHookOptions&lt;RequestDataType, ResponseDataType&gt;) =&gt; boolean | Promise&lt;boolean&gt;</code></td>
+                                <td><code>() => true</code></td>
+                                <td>No</td>
+                                <td>Custom function to validate response content. Return <code>false</code> to trigger retry, <code>true</code> if response is acceptable</td>
                             </tr>
                             <tr>
                                 <td><code>resReq</code></td>
-                                <td>boolean</td>
-                                <td>false</td>
-                                <td>If true, returns response data. If false, returns true/false</td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>If <code>true</code>, returns response data. If <code>false</code>, returns <code>true</code> on success or <code>false</code> on failure</td>
                             </tr>
                             <tr>
                                 <td><code>attempts</code></td>
-                                <td>number</td>
-                                <td>1</td>
-                                <td>Maximum retry attempts (including initial request)</td>
+                                <td><code>number</code></td>
+                                <td><code>1</code></td>
+                                <td>No</td>
+                                <td>Maximum number of attempts (including initial request). Must be ≥ 1</td>
+                            </tr>
+                            <tr>
+                                <td><code>performAllAttempts</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>If <code>true</code>, performs all attempts even if one succeeds (useful for testing)</td>
                             </tr>
                             <tr>
                                 <td><code>wait</code></td>
-                                <td>number</td>
-                                <td>0</td>
-                                <td>Base wait time in milliseconds between retries</td>
+                                <td><code>number</code></td>
+                                <td><code>0</code></td>
+                                <td>No</td>
+                                <td>Base wait time in milliseconds between retry attempts</td>
+                            </tr>
+                            <tr>
+                                <td><code>maxAllowedWait</code></td>
+                                <td><code>number</code></td>
+                                <td><code>60000</code></td>
+                                <td>No</td>
+                                <td>Maximum allowed wait time between retries (caps the backoff calculation)</td>
                             </tr>
                             <tr>
                                 <td><code>retryStrategy</code></td>
-                                <td>RETRY_STRATEGY</td>
-                                <td>FIXED</td>
-                                <td>FIXED, LINEAR, or EXPONENTIAL backoff</td>
+                                <td><code>RETRY_STRATEGY_TYPES</code></td>
+                                <td><code>FIXED</code></td>
+                                <td>No</td>
+                                <td>Retry backoff strategy: <code>FIXED</code>, <code>LINEAR</code>, or <code>EXPONENTIAL</code></td>
                             </tr>
                             <tr>
                                 <td><code>jitter</code></td>
-                                <td>number</td>
-                                <td>0</td>
-                                <td>Random delay variation to prevent thundering herd</td>
+                                <td><code>number</code></td>
+                                <td><code>0</code></td>
+                                <td>No</td>
+                                <td>Random delay variation in milliseconds. If non-zero, applies randomized jitter to retry delays to prevent thundering herd</td>
+                            </tr>
+                            <tr>
+                                <td><code>logAllErrors</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>If <code>true</code>, logs all error attempts to console</td>
+                            </tr>
+                            <tr>
+                                <td><code>handleErrors</code></td>
+                                <td><code>(options: HandleErrorHookOptions&lt;RequestDataType&gt;) =&gt; any | Promise&lt;any&gt;</code></td>
+                                <td><code>() => console.log</code></td>
+                                <td>No</td>
+                                <td>Custom error handler called for each failed attempt</td>
+                            </tr>
+                            <tr>
+                                <td><code>logAllSuccessfulAttempts</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>If <code>true</code>, logs all successful attempts to console</td>
+                            </tr>
+                            <tr>
+                                <td><code>handleSuccessfulAttemptData</code></td>
+                                <td><code>(options: HandleSuccessfulAttemptDataHookOptions&lt;RequestDataType, ResponseDataType&gt;) =&gt; any | Promise&lt;any&gt;</code></td>
+                                <td><code>() => console.log</code></td>
+                                <td>No</td>
+                                <td>Custom handler called for each successful attempt</td>
+                            </tr>
+                            <tr>
+                                <td><code>maxSerializableChars</code></td>
+                                <td><code>number</code></td>
+                                <td><code>1000</code></td>
+                                <td>No</td>
+                                <td>Maximum characters to include when serializing objects in logs</td>
+                            </tr>
+                            <tr>
+                                <td><code>finalErrorAnalyzer</code></td>
+                                <td><code>(options: FinalErrorAnalysisHookOptions&lt;RequestDataType&gt;) =&gt; boolean | Promise&lt;boolean&gt;</code></td>
+                                <td><code>() => false</code></td>
+                                <td>No</td>
+                                <td>Analyzes the final error after all retries exhausted. Return <code>true</code> to suppress error (return <code>false</code>), <code>false</code> to throw</td>
+                            </tr>
+                            <tr>
+                                <td><code>trialMode</code></td>
+                                <td><code>TRIAL_MODE_OPTIONS</code></td>
+                                <td><code>{ enabled: false }</code></td>
+                                <td>No</td>
+                                <td>Enables trial mode for testing without making real API calls. Configure failure probabilities and latency ranges</td>
+                            </tr>
+                            <tr>
+                                <td><code>hookParams</code></td>
+                                <td><code>HookParams</code></td>
+                                <td><code>{}</code></td>
+                                <td>No</td>
+                                <td>Custom parameters to pass to hook functions (responseAnalyzerParams, handleErrorsParams, handleSuccessfulAttemptDataParams, finalErrorAnalyzerParams)</td>
+                            </tr>
+                            <tr>
+                                <td><code>preExecution</code></td>
+                                <td><code>RequestPreExecutionOptions</code></td>
+                                <td><code>{}</code></td>
+                                <td>No</td>
+                                <td>Pre-execution hook configuration for dynamic request modification before execution</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonBuffer</code></td>
+                                <td><code>Record&lt;string, any&gt;</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Shared buffer for storing/accessing data across requests, hooks, and workflow phases</td>
+                            </tr>
+                            <tr>
+                                <td><code>cache</code></td>
+                                <td><code>CacheConfig</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Response caching configuration with TTL, cache control, status codes, and custom key generation</td>
+                            </tr>
+                            <tr>
+                                <td><code>executionContext</code></td>
+                                <td><code>ExecutionContext</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Execution context for logging and traceability (workflowId, phaseId, branchId, requestId)</td>
+                            </tr>
+                            <tr>
+                                <td><code>circuitBreaker</code></td>
+                                <td><code>CircuitBreakerConfig | CircuitBreaker</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Circuit breaker configuration or instance to prevent cascade failures and system overload</td>
+                            </tr>
+                            <tr>
+                                <td><code>statePersistence</code></td>
+                                <td><code>StatePersistenceConfig</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>State persistence configuration for saving/loading workflow state to external storage (Redis, MongoDB, File System)</td>
                             </tr>
                         </tbody>
                     </table>
+                    </div>
 
-                    <h4>Advanced Options</h4>
-                    <pre><code class="language-typescript">await stableRequest({
-  reqData: { hostname: 'api.example.com', path: '/data' },
-  resReq: true,
-  attempts: 5,
-  wait: 1000,
-  maxAllowedWait: 30000,     // Cap maximum retry delay
-  
-  // Custom response validation
-  responseAnalyzer: async ({ data, status }) => {
-    return status === 200 && data.status === 'success';
-  },
-  
-  // Error handling
-  handleErrors: async ({ errorLog, attempt }) => {
-    logger.error(`Attempt ${attempt} failed:`, errorLog);
-  },
-  
-  // Success tracking
-  handleSuccessfulAttemptData: async ({ data }) => {
-    logger.info('Request succeeded:', data);
-  },
-  
-  // Final error handler
-  finalErrorAnalyzer: async ({ error }) => {
-    if (error.status === 404) {
-      return true; // Suppress error, return false
-    }
-    return false; // Throw error
-  }
-});</code></pre>
-                </div>
-
-                <div id="stable-api-gateway" class="subsection">
-                    <h3>stableApiGateway()</h3>
+                <h3 id="stable-api-gateway">stableApiGateway()</h3>
                     <p>Execute multiple HTTP requests either sequentially or concurrently with unified configuration.</p>
                     
                     <h4>Signature</h4>
@@ -255,10 +349,222 @@ const results = await stableApiGateway(requests, {
     }
   ]
 });</code></pre>
-                </div>
 
-                <div id="stable-workflow" class="subsection">
-                    <h3>stableWorkflow()</h3>
+                    <h4>API_GATEWAY_OPTIONS Interface</h4>
+                    <p>Complete parameter reference for the <code>stableApiGateway</code> function options:</p>
+                    <div class="table-wrapper">
+                    <table class="params-table">
+                        <thead>
+                            <tr>
+                                <th>Parameter</th>
+                                <th>Type</th>
+                                <th>Default</th>
+                                <th>Required</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>commonRequestData</code></td>
+                                <td><code>Partial&lt;REQUEST_DATA&lt;RequestDataType&gt;&gt;</code></td>
+                                <td><code>{}</code></td>
+                                <td>No</td>
+                                <td>Common request configuration applied to all requests (hostname, headers, protocol, etc.)</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonAttempts</code></td>
+                                <td><code>number</code></td>
+                                <td><code>1</code></td>
+                                <td>No</td>
+                                <td>Default number of retry attempts for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonHookParams</code></td>
+                                <td><code>HookParams</code></td>
+                                <td><code>{}</code></td>
+                                <td>No</td>
+                                <td>Default hook parameters for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonPerformAllAttempts</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>Default performAllAttempts setting for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonWait</code></td>
+                                <td><code>number</code></td>
+                                <td><code>0</code></td>
+                                <td>No</td>
+                                <td>Default wait time between retries for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonMaxAllowedWait</code></td>
+                                <td><code>number</code></td>
+                                <td><code>60000</code></td>
+                                <td>No</td>
+                                <td>Default maximum wait time for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonRetryStrategy</code></td>
+                                <td><code>RETRY_STRATEGY_TYPES</code></td>
+                                <td><code>FIXED</code></td>
+                                <td>No</td>
+                                <td>Default retry strategy for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonJitter</code></td>
+                                <td><code>number</code></td>
+                                <td><code>0</code></td>
+                                <td>No</td>
+                                <td>Default jitter setting for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonLogAllErrors</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>Default error logging setting for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonLogAllSuccessfulAttempts</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>Default success logging setting for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonMaxSerializableChars</code></td>
+                                <td><code>number</code></td>
+                                <td><code>1000</code></td>
+                                <td>No</td>
+                                <td>Default max chars for serialization in logs</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonTrialMode</code></td>
+                                <td><code>TRIAL_MODE_OPTIONS</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Default trial mode configuration for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonResponseAnalyzer</code></td>
+                                <td><code>(options: ResponseAnalysisHookOptions&lt;RequestDataType, ResponseDataType&gt;) =&gt; boolean | Promise&lt;boolean&gt;</code></td>
+                                <td><code>() => true</code></td>
+                                <td>No</td>
+                                <td>Default response analyzer for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonResReq</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>Default resReq value for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonFinalErrorAnalyzer</code></td>
+                                <td><code>(options: FinalErrorAnalysisHookOptions&lt;RequestDataType&gt;) =&gt; boolean | Promise&lt;boolean&gt;</code></td>
+                                <td><code>() => false</code></td>
+                                <td>No</td>
+                                <td>Default final error analyzer for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonHandleErrors</code></td>
+                                <td><code>(options: HandleErrorHookOptions&lt;RequestDataType&gt;) =&gt; any | Promise&lt;any&gt;</code></td>
+                                <td><code>() => console.log</code></td>
+                                <td>No</td>
+                                <td>Default error handler for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonHandleSuccessfulAttemptData</code></td>
+                                <td><code>(options: HandleSuccessfulAttemptDataHookOptions&lt;RequestDataType, ResponseDataType&gt;) =&gt; any | Promise&lt;any&gt;</code></td>
+                                <td><code>() => console.log</code></td>
+                                <td>No</td>
+                                <td>Default success handler for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonPreExecution</code></td>
+                                <td><code>RequestPreExecutionOptions</code></td>
+                                <td><code>() => {}</code></td>
+                                <td>No</td>
+                                <td>Default pre-execution hook configuration for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonCache</code></td>
+                                <td><code>CacheConfig</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Default cache configuration for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonStatePersistence</code></td>
+                                <td><code>StatePersistenceConfig</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Default state persistence configuration for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>concurrentExecution</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>true</code></td>
+                                <td>No</td>
+                                <td>If <code>true</code>, executes all requests concurrently. If <code>false</code>, executes sequentially</td>
+                            </tr>
+                            <tr>
+                                <td><code>requestGroups</code></td>
+                                <td><code>RequestGroup&lt;RequestDataType, ResponseDataType&gt;[]</code></td>
+                                <td><code>[]</code></td>
+                                <td>No</td>
+                                <td>Array of request group configurations for applying settings to specific groups</td>
+                            </tr>
+                            <tr>
+                                <td><code>stopOnFirstError</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>If <code>true</code>, stops executing remaining requests after first error (sequential mode) or stops launching new requests (concurrent mode)</td>
+                            </tr>
+                            <tr>
+                                <td><code>sharedBuffer</code></td>
+                                <td><code>Record&lt;string, any&gt;</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Shared buffer accessible by all requests for data exchange</td>
+                            </tr>
+                            <tr>
+                                <td><code>maxConcurrentRequests</code></td>
+                                <td><code>number</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Maximum number of concurrent requests (concurrent mode only)</td>
+                            </tr>
+                            <tr>
+                                <td><code>rateLimit</code></td>
+                                <td><code>RateLimitConfig</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Rate limiting configuration (maxRequests, windowMs)</td>
+                            </tr>
+                            <tr>
+                                <td><code>circuitBreaker</code></td>
+                                <td><code>CircuitBreakerConfig</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Circuit breaker configuration shared across all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>executionContext</code></td>
+                                <td><code>Partial&lt;ExecutionContext&gt;</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Execution context for logging and traceability</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    </div>
+
+                <h3 id="stable-workflow">stableWorkflow()</h3>
                     <p>Orchestrate complex multi-phase API workflows with support for sequential, concurrent, mixed, non-linear, and branching execution patterns.</p>
                     
                     <h4>Signature</h4>
@@ -274,10 +580,13 @@ const phases = [
   {
     id: 'authentication',
     requests: [
-      { id: 'login', requestOptions: { 
-        reqData: { path: '/auth/login', method: 'POST' },
-        resReq: true 
-      }}
+      { 
+        id: 'login', 
+        requestOptions: { 
+          reqData: { path: '/auth/login', method: 'POST' },
+          resReq: true 
+        }
+      }
     ]
   },
   {
@@ -313,7 +622,325 @@ console.log(`Total requests: ${result.totalRequests}`);
 console.log(`Successful: ${result.successfulRequests}`);
 console.log(`Failed: ${result.failedRequests}`);
 console.log(`Execution time: ${result.executionTime}ms`);</code></pre>
-                </div>
+
+                    <h4>STABLE_WORKFLOW_OPTIONS Interface</h4>
+                    <p>Complete parameter reference for the <code>stableWorkflow</code> function options. Extends all <code>API_GATEWAY_OPTIONS</code> plus workflow-specific parameters:</p>
+                    <div class="table-wrapper">
+                    <table class="params-table">
+                        <thead>
+                            <tr>
+                                <th>Parameter</th>
+                                <th>Type</th>
+                                <th>Default</th>
+                                <th>Required</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>workflowId</code></td>
+                                <td><code>string</code></td>
+                                <td><code>'workflow-{timestamp}'</code></td>
+                                <td>No</td>
+                                <td>Unique identifier for this workflow execution</td>
+                            </tr>
+                            <tr>
+                                <td><code>stopOnFirstPhaseError</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>If <code>true</code>, stops workflow execution after first phase error</td>
+                            </tr>
+                            <tr>
+                                <td><code>logPhaseResults</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>If <code>true</code>, logs each phase result to console</td>
+                            </tr>
+                            <tr>
+                                <td><code>concurrentPhaseExecution</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>If <code>true</code>, all phases execute concurrently. If <code>false</code>, phases execute sequentially</td>
+                            </tr>
+                            <tr>
+                                <td><code>enableBranchExecution</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>Enables branch-based workflow execution with independent branches</td>
+                            </tr>
+                            <tr>
+                                <td><code>branches</code></td>
+                                <td><code>STABLE_WORKFLOW_BRANCH&lt;RequestDataType, ResponseDataType&gt;[]</code></td>
+                                <td><code>[]</code></td>
+                                <td>No</td>
+                                <td>Array of workflow branches (when enableBranchExecution is true)</td>
+                            </tr>
+                            <tr>
+                                <td><code>enableMixedExecution</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>Enables mixed execution mode where phases can be marked for concurrent execution using markConcurrentPhase</td>
+                            </tr>
+                            <tr>
+                                <td><code>enableNonLinearExecution</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>Enables non-linear execution with phase decision hooks (JUMP, SKIP, REPLAY, TERMINATE)</td>
+                            </tr>
+                            <tr>
+                                <td><code>maxWorkflowIterations</code></td>
+                                <td><code>number</code></td>
+                                <td><code>1000</code></td>
+                                <td>No</td>
+                                <td>Maximum total phase executions to prevent infinite loops in non-linear workflows</td>
+                            </tr>
+                            <tr>
+                                <td><code>statePersistence</code></td>
+                                <td><code>StatePersistenceConfig</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>State persistence configuration for workflow recovery and distributed execution</td>
+                            </tr>
+                            <tr>
+                                <td><code>handlePhaseCompletion</code></td>
+                                <td><code>(options: HandlePhaseCompletionHookOptions&lt;ResponseDataType&gt;) =&gt; any | Promise&lt;any&gt;</code></td>
+                                <td><code>() => console.log</code></td>
+                                <td>No</td>
+                                <td>Hook called after each phase completes successfully. Receives workflowId, branchId, phaseResult, params, sharedBuffer</td>
+                            </tr>
+                            <tr>
+                                <td><code>handlePhaseError</code></td>
+                                <td><code>(options: HandlePhaseErrorHookOptions&lt;ResponseDataType&gt;) =&gt; any | Promise&lt;any&gt;</code></td>
+                                <td><code>() => console.log</code></td>
+                                <td>No</td>
+                                <td>Hook called when a phase encounters an error</td>
+                            </tr>
+                            <tr>
+                                <td><code>handlePhaseDecision</code></td>
+                                <td><code>(decision: PhaseExecutionDecision, phaseResult: STABLE_WORKFLOW_PHASE_RESULT&lt;ResponseDataType&gt;) =&gt; any | Promise&lt;any&gt;</code></td>
+                                <td><code>() => {}</code></td>
+                                <td>No</td>
+                                <td>Hook called when a phase makes a non-linear decision (JUMP, SKIP, REPLAY, TERMINATE)</td>
+                            </tr>
+                            <tr>
+                                <td><code>handleBranchCompletion</code></td>
+                                <td><code>(options: {workflowId, branchId, branchResults, success}) =&gt; any | Promise&lt;any&gt;</code></td>
+                                <td><code>() => console.log</code></td>
+                                <td>No</td>
+                                <td>Hook called when a branch completes. Receives workflowId, branchId, branchResults, success</td>
+                            </tr>
+                            <tr>
+                                <td><code>handleBranchDecision</code></td>
+                                <td><code>(decision: BranchExecutionDecision, branchResult: BranchExecutionResult&lt;ResponseDataType&gt;) =&gt; any | Promise&lt;any&gt;</code></td>
+                                <td><code>() => {}</code></td>
+                                <td>No</td>
+                                <td>Hook called when a branch makes a decision</td>
+                            </tr>
+                            <tr>
+                                <td><code>maxSerializableChars</code></td>
+                                <td><code>number</code></td>
+                                <td><code>1000</code></td>
+                                <td>No</td>
+                                <td>Maximum characters for serialization in logs</td>
+                            </tr>
+                            <tr>
+                                <td><code>workflowHookParams</code></td>
+                                <td><code>WorkflowHookParams</code></td>
+                                <td><code>{}</code></td>
+                                <td>No</td>
+                                <td>Custom parameters passed to workflow-level hooks (handlePhaseCompletionParams, handlePhaseErrorParams, handlePhaseDecisionParams, handleBranchDecisionParams)</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonRequestData</code></td>
+                                <td><code>Partial&lt;REQUEST_DATA&gt;</code></td>
+                                <td><code>{}</code></td>
+                                <td>No</td>
+                                <td>Common request configuration applied to all phases</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonAttempts</code></td>
+                                <td><code>number</code></td>
+                                <td><code>1</code></td>
+                                <td>No</td>
+                                <td>Default retry attempts for all requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonWait</code></td>
+                                <td><code>number</code></td>
+                                <td><code>0</code></td>
+                                <td>No</td>
+                                <td>Default wait time between retries</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonRetryStrategy</code></td>
+                                <td><code>RETRY_STRATEGY_TYPES</code></td>
+                                <td><code>FIXED</code></td>
+                                <td>No</td>
+                                <td>Default retry strategy</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonCache</code></td>
+                                <td><code>CacheConfig</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Default cache configuration</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonStatePersistence</code></td>
+                                <td><code>StatePersistenceConfig</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Default state persistence for all phases</td>
+                            </tr>
+                            <tr>
+                                <td><code>circuitBreaker</code></td>
+                                <td><code>CircuitBreakerConfig</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Circuit breaker shared across workflow</td>
+                            </tr>
+                            <tr>
+                                <td><code>rateLimit</code></td>
+                                <td><code>RateLimitConfig</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Rate limiting configuration</td>
+                            </tr>
+                            <tr>
+                                <td><code>maxConcurrentRequests</code></td>
+                                <td><code>number</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Maximum concurrent requests</td>
+                            </tr>
+                            <tr>
+                                <td><code>sharedBuffer</code></td>
+                                <td><code>Record&lt;string, any&gt;</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Shared buffer for data exchange across phases</td>
+                            </tr>
+                            <tr>
+                                <td><code>requestGroups</code></td>
+                                <td><code>RequestGroup[]</code></td>
+                                <td><code>[]</code></td>
+                                <td>No</td>
+                                <td>Request group configurations</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonHookParams</code></td>
+                                <td><code>HookParams</code></td>
+                                <td><code>{}</code></td>
+                                <td>No</td>
+                                <td>Default hook parameters</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonPerformAllAttempts</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>Default performAllAttempts setting</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonMaxAllowedWait</code></td>
+                                <td><code>number</code></td>
+                                <td><code>60000</code></td>
+                                <td>No</td>
+                                <td>Default maximum wait time</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonJitter</code></td>
+                                <td><code>number</code></td>
+                                <td><code>0</code></td>
+                                <td>No</td>
+                                <td>Default jitter setting</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonLogAllErrors</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>Default error logging</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonLogAllSuccessfulAttempts</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>Default success logging</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonMaxSerializableChars</code></td>
+                                <td><code>number</code></td>
+                                <td><code>1000</code></td>
+                                <td>No</td>
+                                <td>Default max serialization chars</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonTrialMode</code></td>
+                                <td><code>TRIAL_MODE_OPTIONS</code></td>
+                                <td><code>{ enabled: false }</code></td>
+                                <td>No</td>
+                                <td>Default trial mode</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonResponseAnalyzer</code></td>
+                                <td><code>Function</code></td>
+                                <td><code>() => true</code></td>
+                                <td>No</td>
+                                <td>Default response analyzer</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonResReq</code></td>
+                                <td><code>boolean</code></td>
+                                <td><code>false</code></td>
+                                <td>No</td>
+                                <td>Default resReq value</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonFinalErrorAnalyzer</code></td>
+                                <td><code>Function</code></td>
+                                <td><code>() => false</code></td>
+                                <td>No</td>
+                                <td>Default final error analyzer</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonHandleErrors</code></td>
+                                <td><code>Function</code></td>
+                                <td><code>() => console.log</code></td>
+                                <td>No</td>
+                                <td>Default error handler</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonHandleSuccessfulAttemptData</code></td>
+                                <td><code>Function</code></td>
+                                <td><code>() => console.log</code></td>
+                                <td>No</td>
+                                <td>Default success handler</td>
+                            </tr>
+                            <tr>
+                                <td><code>commonPreExecution</code></td>
+                                <td><code>RequestPreExecutionOptions</code></td>
+                                <td><code>() => {}</code></td>
+                                <td>No</td>
+                                <td>Default pre-execution hook</td>
+                            </tr>
+                            <tr>
+                                <td><code>executionContext</code></td>
+                                <td><code>Partial&lt;ExecutionContext&gt;</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Execution context for logging</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    </div>
             </section>
 
             <section id="retry-strategies" class="doc-section">
@@ -507,8 +1134,7 @@ await stableApiGateway(requests, {
             <section id="workflow-patterns" class="doc-section">
                 <h2>Workflow Execution Patterns</h2>
 
-                <div id="sequential-concurrent" class="subsection">
-                    <h3>Sequential & Concurrent Phases</h3>
+                <h3 id="sequential-concurrent">Sequential & Concurrent Phases</h3>
                     
                     <h4>Sequential Phases (Default)</h4>
                     <p>Phases execute one after another.</p>
@@ -530,10 +1156,8 @@ await stableApiGateway(requests, {
     requests: [...]
   }
 ];</code></pre>
-                </div>
 
-                <div id="mixed-execution" class="subsection">
-                    <h3>Mixed Execution Mode</h3>
+                <h3 id="mixed-execution">Mixed Execution Mode</h3>
                     <p>Mark specific phases for concurrent execution while others run sequentially.</p>
                     <pre><code class="language-typescript">const phases = [
   {
@@ -559,10 +1183,8 @@ await stableApiGateway(requests, {
 const result = await stableWorkflow(phases, {
   enableMixedExecution: true
 });</code></pre>
-                </div>
 
-                <div id="non-linear" class="subsection">
-                    <h3>Non-Linear Workflows</h3>
+                <h3 id="non-linear">Non-Linear Workflows</h3>
                     <p>Implement conditional logic with phase decision hooks.</p>
                     
                     <h4>Available Actions</h4>
@@ -607,10 +1229,8 @@ const result = await stableWorkflow(phases, {
   enableNonLinearExecution: true,
   maxWorkflowIterations: 1000     // Prevent infinite loops
 });</code></pre>
-                </div>
 
-                <div id="branched" class="subsection">
-                    <h3>Branched Workflows</h3>
+                <h3 id="branched">Branched Workflows</h3>
                     <p>Execute independent branches of work, each with its own phases.</p>
                     
                     <pre><code class="language-typescript">const branches = [
@@ -676,7 +1296,6 @@ const result = await stableWorkflow([], {
     logger.warn(`Branch ${branchId} decision:`, decision);
   }
 });</code></pre>
-                </div>
             </section>
 
             <section id="observability" class="doc-section">
@@ -713,12 +1332,11 @@ const result = await stableWorkflow([], {
                 <pre><code class="language-typescript">await stableWorkflow(phases, {
   // Called after each phase completes
   handlePhaseCompletion: async ({ 
-    phaseId, 
     phaseResult, 
-    totalPhasesCompleted,
-    sharedBuffer 
+    sharedBuffer,
+    params
   }) => {
-    logger.info(`Phase ${phaseId} completed:`, {
+    logger.info(`Phase ${phaseResult.phaseId} completed:`, {
       success: phaseResult.success,
       totalRequests: phaseResult.totalRequests,
       executionTime: phaseResult.executionTime
@@ -726,19 +1344,33 @@ const result = await stableWorkflow([], {
   },
   
   // Called when phase encounters error
-  handlePhaseError: async ({ phaseId, error, phaseResult }) => {
-    logger.error(`Phase ${phaseId} failed:`, error);
+  handlePhaseError: async ({ error, phaseResult, params }) => {
+    logger.error(`Phase ${phaseResult.phaseId} failed:`, error);
   },
   
   // Called for non-linear decisions
-  handlePhaseDecision: async ({ phaseId, decision, nextPhaseId }) => {
-    logger.info(`Phase ${phaseId} decision:`, decision);
+  handlePhaseDecision: async ({ workflowId, decision, phaseResult }) => {
+    console.log(`Phase decision: ${decision.action}`);
+    if (decision.targetPhaseId) {
+      console.log(`Target: ${decision.targetPhaseId}`);
+    }
   },
   
-  // Called when branch completes
-  handleBranchCompletion: async ({ branchId, success, branchResults }) => {
-    logger.info(`Branch ${branchId}:`, { success, branchResults });
-  }
+  // Called when branch needs to take a decision
+  handleBranchDecision: async ({ workflowId, branchId, branchResults, success }) => {
+    console.log(`Branch ID: ${branchId}`);
+  },
+
+  // Called upon branch completion
+  handleBranchCompletion: async ({ workflowId, branchResult }) => {
+    console.log(`Branch ${branchResult.branchId} completed`);
+  },
+
+  // Pass parameters to workflow hooks
+  workflowHookParams: {
+    handlePhaseCompletionParams: { environment: 'production' },
+    handlePhaseErrorParams: { severity: 'high' }
+  },
 });</code></pre>
 
                 <h3>Pre-Execution Hooks</h3>
@@ -807,16 +1439,6 @@ await runTest('feature-B', 0.5);  // 50% success rate</code></pre>
             <section id="state-persistence" class="doc-section">
                 <h2>State Persistence</h2>
                 <p>Persist workflow state to external storage (databases, Redis, file systems) for resilience, recovery, and distributed execution.</p>
-
-                <h3>Use Cases</h3>
-                <ul>
-                    <li><strong>Workflow Recovery:</strong> Resume workflows after application restarts or failures</li>
-                    <li><strong>Distributed Systems:</strong> Share state across multiple service instances</li>
-                    <li><strong>Audit Trails:</strong> Track workflow execution history and state changes</li>
-                    <li><strong>Long-Running Workflows:</strong> Persist progress for workflows that span hours or days</li>
-                    <li><strong>Debug & Analysis:</strong> Capture state snapshots for post-mortem analysis</li>
-                </ul>
-
                 <h3>Configuration</h3>
                 <p>State persistence is configured using the <code>StatePersistenceConfig</code> interface:</p>
                 <pre><code class="language-typescript">interface StatePersistenceConfig {
@@ -857,170 +1479,11 @@ const myPersistenceFunction = async ({ executionContext, params, buffer }) => {
     return stored || {};  // Return empty object if nothing stored
   }
 };</code></pre>
-
-                <h3>Basic Usage with Database</h3>
-                <pre><code class="language-typescript">import { stableWorkflow } from '@emmvish/stable-request';
-
-// Database persistence function
-const persistToDatabase = async ({ executionContext, params, buffer }) => {
-  const { workflowId, phaseId } = executionContext;
-  const { db } = params;
-  
-  if (buffer) {
-    // Store state
-    await db.collection('workflow_state').updateOne(
-      { workflowId, phaseId },
-      { $set: { state: buffer, updatedAt: new Date() } },
-      { upsert: true }
-    );
-  } else {
-    // Load state
-    const doc = await db.collection('workflow_state').findOne({ workflowId, phaseId });
-    return doc?.state || {};
-  }
-};
-
-const phases = [
-  {
-    id: 'data-fetch',
-    requests: [...],
-    statePersistence: {
-      persistenceFunction: persistToDatabase,
-      persistenceParams: { db: mongoClient.db('workflows') },
-      loadBeforeHooks: true,
-      storeAfterHooks: true
-    }
-  }
-];
-
-await stableWorkflow(phases, {
-  workflowId: 'data-pipeline-123',
-  sharedBuffer: {}  // Will be populated from persistence
-});</code></pre>
-
-                <h3>Redis Persistence with Distributed Locking</h3>
-                <p>For distributed workflows across multiple instances, use distributed locking to prevent race conditions:</p>
-                <pre><code class="language-typescript">import Redis from 'ioredis';
-
-const redis = new Redis();
-
-const persistToRedis = async ({ executionContext, params, buffer }) => {
-  const { workflowId, phaseId, branchId } = executionContext;
-  const { ttl = 86400, enableLocking = false, namespace = 'workflow' } = params;
-  
-  // Generate hierarchical key
-  const stateKey = `${namespace}:${workflowId}:${branchId || 'main'}:${phaseId || 'global'}`;
-  const lockKey = `lock:${stateKey}`;
-  
-  // Check if we're storing or loading
-  const isStoring = buffer && Object.keys(buffer).length > 0;
-  
-  if (enableLocking) {
-    // Acquire distributed lock (5 second timeout)
-    await redis.setex(lockKey, 5, `${Date.now()}-${Math.random()}`);
-  }
-  
-  try {
-    if (isStoring) {
-      // STORE MODE: Save state with metadata
-      const stateWithMeta = {
-        ...buffer,
-        _meta: {
-          workflowId,
-          phaseId,
-          branchId,
-          timestamp: new Date().toISOString(),
-          version: (buffer._meta?.version || 0) + 1
-        }
-      };
-      
-      await redis.setex(stateKey, ttl, JSON.stringify(stateWithMeta));
-      
-      // Create audit log entry
-      const auditKey = `${namespace}:audit:${workflowId}:${Date.now()}`;
-      await redis.setex(auditKey, ttl * 2, JSON.stringify({
-        action: 'state_saved',
-        phaseId,
-        timestamp: new Date().toISOString(),
-        stateSnapshot: stateWithMeta
-      }));
-      
-    } else {
-      // LOAD MODE: Retrieve state
-      const data = await redis.get(stateKey);
-      if (data) {
-        const parsed = JSON.parse(data);
-        console.log(`Loaded state version: ${parsed._meta?.version || 0}`);
-        return parsed;
-      }
-      return {};
-    }
-  } finally {
-    if (enableLocking) {
-      await redis.del(lockKey);  // Release lock
-    }
-  }
-  
-  return {};
-};
-
-// Usage with locking enabled
-await stableWorkflow(phases, {
-  workflowId: 'distributed-job-456',
-  commonStatePersistence: {
-    persistenceFunction: persistToRedis,
-    persistenceParams: { 
-      ttl: 3600,
-      enableLocking: true,  // Enable distributed locking
-      namespace: 'migration'
-    },
-    loadBeforeHooks: true,
-    storeAfterHooks: true
-  }
-});</code></pre>
-
-                <h3>File System Persistence</h3>
-                <pre><code class="language-typescript">import fs from 'fs/promises';
-import path from 'path';
-
-const persistToFile = async ({ executionContext, params, buffer }) => {
-  const { workflowId, phaseId } = executionContext;
-  const { directory = './workflow-state' } = params;
-  
-  await fs.mkdir(directory, { recursive: true });
-  const filePath = path.join(directory, `${workflowId}-${phaseId}.json`);
-  
-  if (buffer) {
-    // Store state
-    await fs.writeFile(filePath, JSON.stringify(buffer, null, 2));
-    console.log(`State saved to: ${filePath}`);
-  } else {
-    // Load state
-    try {
-      const data = await fs.readFile(filePath, 'utf-8');
-      return JSON.parse(data);
-    } catch (error) {
-      return {}; // File doesn't exist yet
-    }
-  }
-};
-
-const phases = [
-  {
-    id: 'long-running-task',
-    requests: [...],
-    statePersistence: {
-      persistenceFunction: persistToFile,
-      persistenceParams: { directory: './state-snapshots' },
-      loadBeforeHooks: true,
-      storeAfterHooks: true
-    }
-  }
-];</code></pre>
-
                 <h3>Checkpoint-Based Global Persistence</h3>
                 <p>Track workflow progress with global checkpoints that persist completed phases:</p>
-                <pre><code class="language-typescript">async function createCheckpoint({ executionContext, params, buffer }) {
+                <pre><code class="language-typescript">import Redis from 'ioredis';
+const redis = new Redis();
+async function createCheckpoint({ executionContext, params, buffer }) {
   const { workflowId, phaseId } = executionContext;
   const { ttl = 86400 } = params || {};
   
@@ -1041,7 +1504,7 @@ const phases = [
     };
     
     await redis.setex(checkpointKey, ttl, JSON.stringify(checkpointData));
-    console.log(`✅ Checkpoint saved: ${phaseId} (Progress: ${checkpointData.progress}%)`);
+    console.log(`Checkpoint saved: ${phaseId} (Progress: ${checkpointData.progress}%)`);
   } else {
     // LOAD: Return checkpoint data
     const data = await redis.get(checkpointKey);
@@ -1076,7 +1539,7 @@ async function resumeWorkflow(workflowId: string) {
       phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
         // Check if this phase already completed (recovery scenario)
         if (sharedBuffer.completedPhases?.includes('phase-1')) {
-          console.log('✅ Phase-1 already completed, skipping...');
+          console.log('Phase-1 already completed, skipping...');
           return { 
             action: PHASE_DECISION_ACTIONS.SKIP, 
             skipToPhaseId: 'phase-2' 
@@ -1104,7 +1567,7 @@ async function resumeWorkflow(workflowId: string) {
       requests: [...],
       phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
         if (sharedBuffer.completedPhases?.includes('phase-2')) {
-          console.log('✅ Phase-2 already completed, skipping...');
+          console.log('Phase-2 already completed, skipping...');
           return { 
             action: PHASE_DECISION_ACTIONS.SKIP, 
             skipToPhaseId: 'phase-3' 
@@ -1134,124 +1597,13 @@ async function resumeWorkflow(workflowId: string) {
   });
   
   return result;
-}
-
-// Can be called multiple times, will resume from last checkpoint
-await resumeWorkflow('data-migration-789');</code></pre>
-
-                <h3>Best Practices</h3>
-                <div class="best-practice">
-                    <h4>1. Use Appropriate Storage Based on Requirements</h4>
-                    <ul>
-                        <li><strong>Redis:</strong> Fast, distributed, with TTL support - ideal for short-lived workflows</li>
-                        <li><strong>Database:</strong> Durable, queryable - best for audit trails and long-term storage</li>
-                        <li><strong>File System:</strong> Simple, no dependencies - good for development and single-instance apps</li>
-                    </ul>
-                </div>
-
-                <div class="best-practice">
-                    <h4>2. Handle Serialization Carefully</h4>
-                    <pre><code class="language-typescript">// Store only serializable data
-const persistSafely = async ({ buffer }) => {
-  const serializableBuffer = {
-    ...buffer,
-    // Remove non-serializable properties
-    timestamp: buffer.timestamp?.toISOString?.() || buffer.timestamp
-  };
-  await storage.save(serializableBuffer);
-};</code></pre>
-                </div>
-
-                <div class="best-practice">
-                    <h4>3. Implement Error Handling</h4>
-                    <pre><code class="language-typescript">const persistWithFallback = async ({ buffer, params }) => {
-  try {
-    await primaryStorage.save(buffer);
-  } catch (error) {
-    console.error('Primary storage failed, using fallback');
-    await fallbackStorage.save(buffer);
-  }
-};</code></pre>
-                </div>
-
-                <div class="best-practice">
-                    <h4>4. Use TTL for Temporary State</h4>
-                    <p>Set appropriate TTL values to prevent storage bloat:</p>
-                    <pre><code class="language-typescript">statePersistence: {
-  persistenceFunction: persistToRedis,
-  persistenceParams: {
-    ttl: 86400  // 24 hours for short-lived workflows
-  }
 }</code></pre>
-                </div>
-
-                <div class="best-practice">
-                    <h4>5. Include Execution Context in State Keys</h4>
-                    <p>Use workflow ID, phase ID, and branch ID to create unique keys:</p>
-                    <pre><code class="language-typescript">const generateKey = ({ workflowId, phaseId, branchId }) => {
-  return `wf:${workflowId}:br:${branchId || 'main'}:ph:${phaseId || 'global'}`;
-};</code></pre>
-                </div>
-
-                <div class="best-practice">
-                    <h4>6. Choose Phase-Level vs Global Persistence</h4>
-                    <p><strong>Phase-Level:</strong> Configure <code>statePersistence</code> on individual phases for granular control:</p>
-                    <pre><code class="language-typescript">{
-  id: 'extract-data',
-  requests: [...],
-  statePersistence: {
-    persistenceFunction: persistToRedis,
-    persistenceParams: { ttl: 3600 }
-  }
-}</code></pre>
-                    <p><strong>Global Persistence:</strong> Use <code>commonStatePersistence</code> for all phases:</p>
-                    <pre><code class="language-typescript">await stableWorkflow(phases, {
-  commonStatePersistence: {
-    persistenceFunction: createCheckpoint,
-    persistenceParams: { ttl: 7200 }
-  }
-});</code></pre>
-                </div>
-                <h4>Checkpoint Pattern</h4>
-                <pre><code class="language-typescript">// Save checkpoint after each major step
-phases.forEach(phase => {
-  phase.statePersistence = {
-    persistenceFunction: createCheckpoint,
-    loadBeforeHooks: true,
-    storeAfterHooks: true
-  };
-});</code></pre>
-
-                <h4>Distributed Lock Pattern</h4>
-                <pre><code class="language-typescript">const persistWithLock = async ({ executionContext, buffer }) => {
-  const lock = await redis.lock(`lock:${executionContext.workflowId}`, 5000);
-  try {
-    // Read-modify-write with lock
-    const current = await loadState(executionContext);
-    const merged = { ...current, ...buffer };
-    await saveState(executionContext, merged);
-  } finally {
-    await lock.unlock();
-  }
-};</code></pre>
-
-                <h4>Versioned State Pattern</h4>
-                <pre><code class="language-typescript">const persistVersioned = async ({ executionContext, buffer }) => {
-  const version = Date.now();
-  await storage.save({
-    ...executionContext,
-    version,
-    state: buffer,
-    previousVersion: await storage.getLatestVersion(executionContext.workflowId)
-  });
-};</code></pre>
-            </section>
+       </section>
 
             <section id="best-practices" class="doc-section">
                 <h2>Best Practices</h2>
 
-                <div class="best-practice">
-                    <h3>1. Use Exponential Backoff for Most Cases</h3>
+                <h3>1. Use Exponential Backoff for Most Cases</h3>
                     <p>Exponential backoff with jitter is recommended for most retry scenarios to avoid overwhelming services and prevent thundering herd problems.</p>
                     <pre><code class="language-typescript">await stableRequest({
   reqData: { hostname: 'api.example.com', path: '/data' },
@@ -1261,10 +1613,8 @@ phases.forEach(phase => {
   jitter: 500,
   maxAllowedWait: 30000
 });</code></pre>
-                </div>
 
-                <div class="best-practice">
-                    <h3>2. Implement Circuit Breakers for External Services</h3>
+                <h3>2. Implement Circuit Breakers for External Services</h3>
                     <p>Always use circuit breakers when calling external APIs to prevent cascade failures.</p>
                     <pre><code class="language-typescript">const externalServiceBreaker = new CircuitBreaker({
   failureThresholdPercentage: 50,
@@ -1277,10 +1627,8 @@ await stableRequest({
   reqData: { hostname: 'external-api.com', path: '/data' },
   circuitBreaker: externalServiceBreaker
 });</code></pre>
-                </div>
 
-                <div class="best-practice">
-                    <h3>3. Use Request Grouping for Different SLAs</h3>
+                <h3>3. Use Request Grouping for Different SLAs</h3>
                     <p>Separate critical and non-critical requests with different retry policies.</p>
                     <pre><code class="language-typescript">await stableApiGateway(requests, {
   requestGroups: [
@@ -1295,10 +1643,8 @@ await stableRequest({
     }
   ]
 });</code></pre>
-                </div>
 
-                <div class="best-practice">
-                    <h3>4. Enable Caching for Read Operations</h3>
+                <h3>4. Enable Caching for Read Operations</h3>
                     <p>Cache GET requests to reduce load and improve performance.</p>
                     <pre><code class="language-typescript">const cache = new CacheManager({ ttl: 300000 });
 
@@ -1306,10 +1652,8 @@ await stableRequest({
   reqData: { hostname: 'api.example.com', path: '/users', method: 'GET' },
   cache: { cacheInstance: cache }
 });</code></pre>
-                </div>
 
-                <div class="best-practice">
-                    <h3>5. Implement Comprehensive Observability</h3>
+                <h3>5. Implement Comprehensive Observability</h3>
                     <p>Use hooks to track all request attempts and failures for debugging and monitoring.</p>
                     <pre><code class="language-typescript">await stableRequest({
   reqData: { hostname: 'api.example.com', path: '/data' },
@@ -1321,10 +1665,8 @@ await stableRequest({
     metrics.increment('api.success', { endpoint: '/data', attempt });
   }
 });</code></pre>
-                </div>
 
-                <div class="best-practice">
-                    <h3>6. Use Shared Buffers for State Management</h3>
+                <h3>6. Use Shared Buffers for State Management</h3>
                     <p>Share data across phases using sharedBuffer instead of global variables.</p>
                     <pre><code class="language-typescript">const phases = [
   {
@@ -1360,10 +1702,8 @@ await stableRequest({
 await stableWorkflow(phases, {
   sharedBuffer: {}
 });</code></pre>
-                </div>
 
-                <div class="best-practice">
-                    <h3>7. Set Appropriate Timeouts</h3>
+                <h3>7. Set Appropriate Timeouts</h3>
                     <p>Always set timeout values to prevent hanging requests.</p>
                     <pre><code class="language-typescript">await stableRequest({
   reqData: { 
@@ -1373,10 +1713,8 @@ await stableWorkflow(phases, {
   },
   attempts: 3
 });</code></pre>
-                </div>
 
-                <div class="best-practice">
-                    <h3>8. Use Rate Limiting for High-Volume Operations</h3>
+                <h3>8. Use Rate Limiting for High-Volume Operations</h3>
                     <p>Respect API rate limits to avoid being throttled or banned.</p>
                     <pre><code class="language-typescript">await stableApiGateway(largeRequestArray, {
   concurrentExecution: true,
@@ -1386,7 +1724,6 @@ await stableWorkflow(phases, {
     windowMs: 60000  // 100 requests per minute
   }
 });</code></pre>
-                </div>
             </section>
         </main>
     </div>
@@ -1403,7 +1740,7 @@ await stableWorkflow(phases, {
                     <ul>
                         <li><a href="documentation.html">Documentation</a></li>
                         <li><a href="examples.html">Examples</a></li>
-                        <li><a href="https://github.com/manishvarma/stable-request">GitHub</a></li>
+                        <li><a href="https://github.com/Emmvish/stable-request">GitHub</a></li>
                         <li><a href="https://www.npmjs.com/package/@emmvish/stable-request">npm</a></li>
                     </ul>
                 </div>
@@ -1412,7 +1749,7 @@ await stableWorkflow(phases, {
                     <ul>
                         <li><a href="#api-reference">API Reference</a></li>
                         <li><a href="examples.html">Use Cases</a></li>
-                        <li><a href="https://github.com/manishvarma/stable-request/issues">Report Issues</a></li>
+                        <li><a href="https://github.com/Emmvish/stable-request/issues">Report Issues</a></li>
                     </ul>
                 </div>
             </div>
@@ -1453,6 +1790,36 @@ await stableWorkflow(phases, {
 
         document.querySelectorAll('.doc-section').forEach(section => {
             observer.observe(section);
+        });
+        
+        // Add copy buttons to all code blocks
+        document.querySelectorAll('pre code').forEach((codeBlock) => {
+            const pre = codeBlock.parentElement;
+            const button = document.createElement('button');
+            button.className = 'copy-button';
+            button.textContent = 'Copy';
+            button.setAttribute('aria-label', 'Copy code to clipboard');
+            
+            button.addEventListener('click', async () => {
+                const code = codeBlock.textContent;
+                try {
+                    await navigator.clipboard.writeText(code);
+                    button.textContent = 'Copied!';
+                    button.classList.add('copied');
+                    setTimeout(() => {
+                        button.textContent = 'Copy';
+                        button.classList.remove('copied');
+                    }, 2000);
+                } catch (err) {
+                    button.textContent = 'Failed';
+                    setTimeout(() => {
+                        button.textContent = 'Copy';
+                    }, 2000);
+                }
+            });
+            
+            pre.style.position = 'relative';
+            pre.appendChild(button);
         });
     </script>
 </body>

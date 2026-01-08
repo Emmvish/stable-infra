@@ -1,6 +1,6 @@
 # API Reference
 
-Complete API documentation for `@emmvish/stable-request` v1.7.0
+Complete API documentation for `@emmvish/stable-request` `v1.7.1`
 
 ## Table of Contents
 
@@ -239,10 +239,10 @@ Array of workflow phases to execute. See [STABLE_WORKFLOW_PHASE](#stable_workflo
 | `enableBranchExecution` | `boolean` | No | `false` | Enables branch-based workflow execution. |
 | `branches` | `STABLE_WORKFLOW_BRANCH[]` | No | `[]` | Array of workflow branches (when `enableBranchExecution: true`). |
 | `maxWorkflowIterations` | `number` | No | `1000` | Maximum total phase executions to prevent infinite loops in non-linear workflows. |
-| `handlePhaseCompletion` | `Function` | No | `undefined` | Hook called after each phase completes successfully. |
-| `handlePhaseError` | `Function` | No | `undefined` | Hook called when a phase encounters an error. |
-| `handlePhaseDecision` | `Function` | No | `undefined` | Hook called when a phase makes a non-linear decision. |
-| `handleBranchCompletion` | `Function` | No | `undefined` | Hook called when a branch completes. Receives `{ workflowId, branchId, branchResults, success }`. |
+| `handlePhaseCompletion` | `Function` | No | `console.log` | Hook called after each phase completes successfully. |
+| `handlePhaseError` | `Function` | No | `console.log` | Hook called when a phase encounters an error. |
+| `handlePhaseDecision` | `Function` | No | `() => {}` | Hook called when a phase makes a non-linear decision. |
+| `handleBranchCompletion` | `Function` | No | `console.log` | Hook called when a branch completes. |
 | `handleBranchDecision` | `Function` | No | `undefined` | Hook called when a branch makes a decision. |
 | `workflowHookParams` | `WorkflowHookParams` | No | `{}` | Custom parameters passed to workflow-level hooks. |
 | `sharedBuffer` | `Record<string, any>` | No | `{}` | Shared buffer accessible across all phases and branches. |
@@ -967,7 +967,7 @@ interface StatePersistenceConfig {
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `persistenceFunction` | `Function` | ✅ Yes | - | Function to handle state loading and storing. Should return state object when loading, or void/Promise<void> when storing. |
+| `persistenceFunction` | `Function` | Yes | - | Function to handle state loading and storing. Should return state object when loading, or void/Promise<void> when storing. |
 | `persistenceParams` | `any` | No | `undefined` | Custom parameters passed to the persistence function (e.g., database connection, Redis client). |
 | `loadBeforeHooks` | `boolean` | No | `false` | If `true`, loads state from persistence before executing hooks/phases. |
 | `storeAfterHooks` | `boolean` | No | `false` | If `true`, stores state to persistence after executing hooks/phases. |

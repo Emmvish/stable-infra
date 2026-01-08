@@ -36,9 +36,11 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 '\nError:\n',
                 safelyStringify({ error, phaseResult }, maxSerializableChars)
             ),
-        handlePhaseDecision,
-        handleBranchCompletion,
-        handleBranchDecision,
+        handlePhaseDecision = (decision: any, phaseResult: any, maxSerializableChars?: number) => {},
+        handleBranchCompletion = ({ success, branchId, workflowId, maxSerializableChars }: any) => console.info(
+            `stable-request: [Workflow: ${workflowId}] Branch ${branchId} completed with status: ${success ? 'SUCCESS' : 'FAILURE'}`
+        ),
+        handleBranchDecision = (decision: any, branchResult: any, maxSerializableChars?: number) => {},
         maxSerializableChars = 1000,
         requestGroups = [],
         workflowHookParams = {},

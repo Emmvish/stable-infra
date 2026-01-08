@@ -294,7 +294,8 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   ) => any | Promise<any>;
   handlePhaseDecision?: (
     decision: PhaseExecutionDecision,
-    phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>
+    phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>,
+    maxSerializableChars?: number
   ) => any | Promise<any>;
   handleBranchCompletion?: (
     options: {
@@ -302,11 +303,13 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
       branchId: string;
       branchResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
       success: boolean;
+      maxSerializableChars?: number;
     }
   ) => any | Promise<any>;
   handleBranchDecision?: (
     decision: BranchExecutionDecision,
-    branchResult: BranchExecutionResult<ResponseDataType>
+    branchResult: BranchExecutionResult<ResponseDataType>,
+    maxSerializableChars?: number
   ) => any | Promise<any>;
   maxSerializableChars?: number;
   workflowHookParams?: WorkflowHookParams;
@@ -438,9 +441,17 @@ export interface NonLinearWorkflowContext<RequestDataType, ResponseDataType> {
   commonGatewayOptions: any;
   requestGroups: any[];
   logPhaseResults: boolean;
-  handlePhaseCompletion: Function;
-  handlePhaseError: Function;
-  handlePhaseDecision?: Function;
+  handlePhaseCompletion: (
+    options: HandlePhaseCompletionHookOptions<ResponseDataType>
+  ) => any | Promise<any>;
+  handlePhaseError: (
+    options: HandlePhaseErrorHookOptions<ResponseDataType>
+  ) => any | Promise<any>;
+  handlePhaseDecision?: (
+    decision: PhaseExecutionDecision,
+    phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>,
+    maxSerializableChars?: number
+  ) => any | Promise<any>;
   maxSerializableChars: number;
   workflowHookParams: any;
   sharedBuffer?: Record<string, any>;
@@ -522,10 +533,26 @@ export interface BranchWorkflowContext<RequestDataType = any, ResponseDataType =
   commonGatewayOptions: any;
   requestGroups: any[];
   logPhaseResults: boolean;
-  handlePhaseCompletion: Function;
-  handlePhaseError: Function;
-  handleBranchCompletion?: Function;
-  handleBranchDecision?: Function;
+  handlePhaseCompletion: (
+    options: HandlePhaseCompletionHookOptions<ResponseDataType>
+  ) => any | Promise<any>;
+  handlePhaseError: (
+    options: HandlePhaseErrorHookOptions<ResponseDataType>
+  ) => any | Promise<any>;
+  handleBranchCompletion?: (
+    options: {
+      workflowId: string;
+      branchId: string;
+      branchResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
+      success: boolean;
+      maxSerializableChars?: number;
+    }
+  ) => any | Promise<any>;
+  handleBranchDecision?: (
+    decision: BranchExecutionDecision,
+    branchResult: BranchExecutionResult<ResponseDataType>,
+    maxSerializableChars?: number
+  ) => any | Promise<any>;
   maxSerializableChars: number;
   workflowHookParams: any;
   sharedBuffer?: Record<string, any>;

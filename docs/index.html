@@ -7,6 +7,7 @@
     <meta name="keywords" content="nodejs, http, api, gateway, workflow, retry, circuit-breaker, typescript">
     <meta name="author" content="Manish Varma">
     <title>Stable Request - Production-Grade HTTP Workflow Engine</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -15,15 +16,15 @@
 <body>
     <nav class="navbar">
         <div class="container">
-            <div class="nav-brand">
+            <a href="index.html" class="nav-brand">
                 <span class="logo">⚡</span>
-                <span class="brand-name">stable-request</span>
-            </div>
+                <span class="brand-name">Stable Request</span>
+            </a>
             <div class="nav-links">
                 <a href="index.html" class="active">Home</a>
                 <a href="documentation.html">Documentation</a>
                 <a href="examples.html">Examples</a>
-                <a href="https://github.com/manishvarma/stable-request" target="_blank">GitHub</a>
+                <a href="https://github.com/Emmvish/stable-request" target="_blank">GitHub</a>
             </div>
         </div>
     </nav>
@@ -70,7 +71,7 @@
                 <div class="feature-card">
                     <div class="feature-icon">🔄</div>
                     <h3>Workflow-First Architecture</h3>
-                    <p>Organize API calls into phases, branches, and decision trees with full control over execution order and dependencies.</p>
+                    <p>Organize API calls into phases, branches, and decision trees with full control over execution order and state persistence.</p>
                 </div>
                 
                 <div class="feature-card">
@@ -323,6 +324,31 @@ await stableRequest({
 });</code></pre>
                 </div>
             </div>
+
+            <div class="feature-detail">
+                <div class="feature-detail-content">
+                    <h3>💾 State Persistence & Recovery</h3>
+                    <p>Persist workflow state for recovery, distributed coordination, and long-running jobs:</p>
+                    <ul>
+                        <li><strong>Workflow Recovery:</strong> Resume interrupted workflows from last checkpoint</li>
+                        <li><strong>Distributed Processing:</strong> Coordinate multiple workers using Redis/database state</li>
+                        <li><strong>Phase Checkpoints:</strong> Automatically skip completed phases on retry</li>
+                        <li><strong>Flexible Storage:</strong> Database, Redis, or file system backends</li>
+                        <li><strong>Audit Trails:</strong> Track and replay workflow execution history</li>
+                    </ul>
+                    <pre><code class="language-typescript">await stableWorkflow(phases, {
+  workflowId: 'data-migration-123',
+  enableNonLinearExecution: true,
+  sharedBuffer: { completedPhases: [] },
+  commonStatePersistence: {
+    persistenceFunction: persistToRedis,
+    persistenceParams: { ttl: 3600, enableLocking: true },
+    loadBeforeHooks: true,
+    storeAfterHooks: true
+  }
+});</code></pre>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -366,7 +392,7 @@ await stableRequest({
 
     <section class="cta">
         <div class="container">
-            <h2>Ready to Build Resilient APIs?</h2>
+            <h2>Ready to Build Resilient API Integrations?</h2>
             <p>Get started with stable-request today and transform your HTTP workflows</p>
             <div class="cta-buttons">
                 <a href="documentation.html" class="btn btn-primary">Read Documentation</a>
@@ -387,7 +413,7 @@ await stableRequest({
                     <ul>
                         <li><a href="documentation.html">Documentation</a></li>
                         <li><a href="examples.html">Examples</a></li>
-                        <li><a href="https://github.com/manishvarma/stable-request">GitHub</a></li>
+                        <li><a href="https://github.com/Emmvish/stable-request">GitHub</a></li>
                         <li><a href="https://www.npmjs.com/package/@emmvish/stable-request">npm</a></li>
                     </ul>
                 </div>
@@ -396,12 +422,12 @@ await stableRequest({
                     <ul>
                         <li><a href="documentation.html#api-reference">API Reference</a></li>
                         <li><a href="examples.html">Use Cases</a></li>
-                        <li><a href="https://github.com/manishvarma/stable-request/issues">Report Issues</a></li>
+                        <li><a href="https://github.com/Emmvish/stable-request/issues">Report Issues</a></li>
                     </ul>
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; 2026 Manish Varma. Released under the MIT License.</p>
+                <p>&copy; 2026 Manish Varma (Emmvish). Released under the MIT License.</p>
             </div>
         </div>
     </footer>
@@ -418,6 +444,36 @@ await stableRequest({
                     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             });
+        });
+        
+        // Add copy buttons to all code blocks
+        document.querySelectorAll('pre code').forEach((codeBlock) => {
+            const pre = codeBlock.parentElement;
+            const button = document.createElement('button');
+            button.className = 'copy-button';
+            button.textContent = 'Copy';
+            button.setAttribute('aria-label', 'Copy code to clipboard');
+            
+            button.addEventListener('click', async () => {
+                const code = codeBlock.textContent;
+                try {
+                    await navigator.clipboard.writeText(code);
+                    button.textContent = 'Copied!';
+                    button.classList.add('copied');
+                    setTimeout(() => {
+                        button.textContent = 'Copy';
+                        button.classList.remove('copied');
+                    }, 2000);
+                } catch (err) {
+                    button.textContent = 'Failed';
+                    setTimeout(() => {
+                        button.textContent = 'Copy';
+                    }, 2000);
+                }
+            });
+            
+            pre.style.position = 'relative';
+            pre.appendChild(button);
         });
     </script>
 </body>
