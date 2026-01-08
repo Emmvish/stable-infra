@@ -59,7 +59,7 @@
     "axios": "^1.12.2"
   },
   "repository": "github:Emmvish/stable-request",
-  "homepage": "https://github.com/Emmvish/stable-request#readme",
+  "homepage": "https://emmvish.github.io/stable-request",
   "bugs": {
     "url": "https://github.com/Emmvish/stable-request/issues"
   }
