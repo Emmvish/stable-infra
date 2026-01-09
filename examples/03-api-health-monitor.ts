@@ -18,7 +18,9 @@ import {
   stableRequest, 
   RETRY_STRATEGIES,
   CircuitBreaker,
-  CacheManager
+  VALID_REQUEST_PROTOCOLS,
+  REQUEST_METHODS,
+  getGlobalCacheManager
 } from '../src/index';
 
 // Service endpoint configuration
@@ -91,8 +93,8 @@ services.forEach(service => {
   }));
 });
 
-// Initialize cache manager (5 second cache for health checks)
-const healthCheckCache = new CacheManager({ ttl: 5000 });
+// Cache configuration for health checks (5 second cache)
+const healthCheckCacheConfig = { ttl: 5000, enabled: true };
 
 // Track consecutive failures per service
 const failureTracker = new Map<string, number>();
@@ -109,13 +111,14 @@ async function checkServiceHealth(service: ServiceEndpoint): Promise<HealthCheck
       // Request configuration
       reqData: {
         hostname: service.url.replace(/^https?:\/\//, ''),
-        protocol: 'https',
-        path: service.healthCheckPath,
-        method: 'GET',
+        protocol: VALID_REQUEST_PROTOCOLS.HTTPS,
+        path: `/${service.healthCheckPath}`,
+        method: REQUEST_METHODS.GET,
         headers: {
           'User-Agent': 'HealthMonitor/1.0',
           'Accept': 'application/json'
-        }
+        },
+        timeout: service.slaThresholdMs * 2
       },
       
       // Retry configuration based on criticality
@@ -128,16 +131,11 @@ async function checkServiceHealth(service: ServiceEndpoint): Promise<HealthCheck
       circuitBreaker: circuitBreaker,
       
       // Cache successful health checks
-      cacheManager: healthCheckCache,
-      cacheKey: `health:${service.name}`,
-      enableCaching: true,
-      
-      // Timeout based on SLA threshold
-      timeout: service.slaThresholdMs * 2,
-      
+      cache: { ...healthCheckCacheConfig, keyGenerator: () => `health:${service.name}` },
+            
       // Response validation
       resReq: true,
-      validationSchema: (data: any) => {
+      responseAnalyzer: (data: any) => {
         // Validate that we got expected data structure
         return data && typeof data === 'object' && Object.keys(data).length > 0;
       },
@@ -287,15 +285,6 @@ async function monitorAllServices(): Promise<void> {
     console.log(`${stateIcon} ${serviceName.padEnd(30)} CLOSED      (monitoring active)`);
   });
   
-  // Cache statistics
-  const cacheStats = healthCheckCache.getStats();
-  console.log('\n💾 Cache Statistics:');
-  console.log(`   Cached Entries: ${cacheStats.size}`);
-  console.log(`   Valid Entries: ${cacheStats.validEntries}`);
-  console.log(`   Expired Entries: ${cacheStats.expiredEntries}`);
-  
-  console.log('\n' + '═'.repeat(70));
-  
   // Determine overall system health
   const systemHealthy = criticalDown.length === 0 && downServices.length <= 1;
   
@@ -307,6 +296,8 @@ async function monitorAllServices(): Promise<void> {
     console.log('⚠️  System Status: DEGRADED - Non-critical services affected');
   }
   
+  console.log('\n Caching Stats: ', getGlobalCacheManager().getStats())
+  getGlobalCacheManager().clear();
   console.log('═'.repeat(70));
 }
 

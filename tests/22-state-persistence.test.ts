@@ -554,7 +554,7 @@ describe('State Persistence', () => {
         workflowId: 'wf-phase-decision',
         enableNonLinearExecution: true,
         logPhaseResults: false,
-        handlePhaseDecision: (decision: any) => {
+        handlePhaseDecision: ({ decision }: any) => {
           decisionCalled = true;
         },
         workflowHookParams: {

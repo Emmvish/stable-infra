@@ -1268,8 +1268,8 @@ describe('Non-Linear Workflow Execution', () => {
         config: {} as any
       });
 
-      handlePhaseDecision.mockImplementation((decision: any) => {
-        decisions.push(decision);
+      handlePhaseDecision.mockImplementation((options: any) => {
+        decisions.push(options.decision);
       });
 
       const phases = [

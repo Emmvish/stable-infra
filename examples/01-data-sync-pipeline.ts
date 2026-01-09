@@ -17,7 +17,8 @@ import {
   stableWorkflow, 
   RETRY_STRATEGIES, 
   PHASE_DECISION_ACTIONS,
-  CircuitBreaker,
+  REQUEST_METHODS,
+  VALID_REQUEST_PROTOCOLS,
   type STABLE_WORKFLOW_PHASE
 } from '../src/index.js';
 
@@ -53,14 +54,14 @@ const syncState: SyncState = {
 };
 
 // Shared circuit breaker for all API calls
-const sourceApiBreaker = new CircuitBreaker({
+const sourceApiBreaker = {
   failureThresholdPercentage: 50,
   minimumRequests: 3,
   recoveryTimeoutMs: 30000,
   successThresholdPercentage: 60,
   halfOpenMaxRequests: 2,
   trackIndividualAttempts: false
-});
+};
 
 console.log('🚀 Starting Enterprise Data Synchronization Pipeline...\n');
 console.log(`Sync ID: ${syncState.syncId}`);
@@ -79,7 +80,7 @@ const syncPhases: STABLE_WORKFLOW_PHASE[] = [
         requestOptions: {
           reqData: { 
             path: '/users?_limit=5',
-            method: 'GET'
+            method: REQUEST_METHODS.GET
           },
           resReq: true,
           handleSuccessfulAttemptData: async ({ successfulAttemptData, commonBuffer }) => {
@@ -94,7 +95,7 @@ const syncPhases: STABLE_WORKFLOW_PHASE[] = [
         requestOptions: {
           reqData: { 
             path: '/posts?_limit=10',
-            method: 'GET'
+            method: REQUEST_METHODS.GET
           },
           resReq: true,
           handleSuccessfulAttemptData: async ({ successfulAttemptData, commonBuffer }) => {
@@ -109,7 +110,7 @@ const syncPhases: STABLE_WORKFLOW_PHASE[] = [
         requestOptions: {
           reqData: { 
             path: '/comments?_limit=20',
-            method: 'GET'
+            method: REQUEST_METHODS.GET
           },
           resReq: true,
           handleSuccessfulAttemptData: async ({ successfulAttemptData, commonBuffer }) => {
@@ -132,7 +133,7 @@ const syncPhases: STABLE_WORKFLOW_PHASE[] = [
         requestOptions: {
           reqData: { 
             path: '/posts/1', // Dummy endpoint for demo
-            method: 'GET'
+            method: REQUEST_METHODS.GET
           },
           resReq: false,
           preExecution: {
@@ -182,7 +183,7 @@ const syncPhases: STABLE_WORKFLOW_PHASE[] = [
         requestOptions: {
           reqData: { 
             path: '/posts/1', // Dummy endpoint
-            method: 'GET'
+            method: REQUEST_METHODS.GET
           },
           resReq: false,
           preExecution: {
@@ -257,7 +258,7 @@ const syncPhases: STABLE_WORKFLOW_PHASE[] = [
         requestOptions: {
           reqData: { 
             path: '/posts',
-            method: 'POST'
+            method: REQUEST_METHODS.POST
           },
           resReq: true,
           preExecution: {
@@ -295,7 +296,7 @@ const syncPhases: STABLE_WORKFLOW_PHASE[] = [
         requestOptions: {
           reqData: { 
             path: '/posts',
-            method: 'POST'
+            method: REQUEST_METHODS.POST
           },
           resReq: true,
           preExecution: {
@@ -341,7 +342,7 @@ const syncPhases: STABLE_WORKFLOW_PHASE[] = [
         requestOptions: {
           reqData: { 
             path: '/posts?_limit=1',
-            method: 'GET'
+            method: REQUEST_METHODS.GET
           },
           resReq: false,
           preExecution: {
@@ -360,7 +361,6 @@ const syncPhases: STABLE_WORKFLOW_PHASE[] = [
               console.log(`Successfully Uploaded: ${buffer.uploadedRecords}`);
               console.log(`Failed Uploads:    ${buffer.failedRecords}`);
               console.log(`Validation Retries: ${buffer.retryCount}`);
-              console.log(`Circuit Breaker State: ${sourceApiBreaker.getState().state}`);
               console.log('='.repeat(60) + '\n');
               
               return {};
@@ -380,7 +380,7 @@ const syncPhases: STABLE_WORKFLOW_PHASE[] = [
       workflowId: syncState.syncId,
       commonRequestData: {
         hostname: SOURCE_API,
-        protocol: 'https',
+        protocol: VALID_REQUEST_PROTOCOLS.HTTPS,
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'StableRequest-DataSyncPipeline/1.0'
@@ -428,7 +428,7 @@ const syncPhases: STABLE_WORKFLOW_PHASE[] = [
         console.error(`\n❌ Phase "${phaseResult.phaseId}" failed:`, error.message);
       },
       
-      handlePhaseDecision: async (decision, phaseResult) => {
+      handlePhaseDecision: async ({ decision, phaseResult }) => {
         if (decision.action !== PHASE_DECISION_ACTIONS.CONTINUE) {
           console.log(`\n🔀 Phase Decision: ${decision.action}`, decision.metadata || '');
         }
@@ -448,14 +448,6 @@ const syncPhases: STABLE_WORKFLOW_PHASE[] = [
     console.log(`Execution Time:    ${result.executionTime}ms`);
     console.log(`Phase Replays:     ${result.executionHistory.filter(h => h.decision?.action === PHASE_DECISION_ACTIONS.REPLAY).length}`);
     console.log('='.repeat(60));
-    
-    // Circuit breaker final state
-    const breakerState = sourceApiBreaker.getState();
-    console.log('\n📡 Circuit Breaker Final State:');
-    console.log(`   State: ${breakerState.state}`);
-    console.log(`   Total Requests: ${breakerState.totalRequests}`);
-    console.log(`   Failed: ${breakerState.failedRequests}`);
-    console.log(`   Success Rate: ${((breakerState.successfulRequests / breakerState.totalRequests) * 100).toFixed(2)}%`);
     
   } catch (error: any) {
     console.error('\n❌ WORKFLOW FAILED:', error.message);

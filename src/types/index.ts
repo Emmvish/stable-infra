@@ -294,18 +294,10 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
     options: HandlePhaseErrorHookOptions<ResponseDataType>
   ) => any | Promise<any>;
   handlePhaseDecision?: (
-    decision: PhaseExecutionDecision,
-    phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>,
-    maxSerializableChars?: number
+    options: HandlePhaseDecisionHookOptions<ResponseDataType>
   ) => any | Promise<any>;
   handleBranchCompletion?: (
-    options: {
-      workflowId: string;
-      branchId: string;
-      branchResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
-      success: boolean;
-      maxSerializableChars?: number;
-    }
+    options: HandleBranchCompletionHookOptions<ResponseDataType>
   ) => any | Promise<any>;
   handleBranchDecision?: (
     decision: BranchExecutionDecision,
@@ -371,6 +363,12 @@ export interface HandlePhaseCompletionHookOptions<ResponseDataType = any> {
 
 export interface HandlePhaseErrorHookOptions<ResponseDataType = any> extends HandlePhaseCompletionHookOptions<ResponseDataType> {
   error: any;
+}
+
+export interface HandlePhaseDecisionHookOptions<ResponseDataType = any> {
+  decision: PhaseExecutionDecision;
+  phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>;
+  maxSerializableChars?: number;
 }
 
 export interface RateLimitConfig {
@@ -449,9 +447,7 @@ export interface NonLinearWorkflowContext<RequestDataType, ResponseDataType> {
     options: HandlePhaseErrorHookOptions<ResponseDataType>
   ) => any | Promise<any>;
   handlePhaseDecision?: (
-    decision: PhaseExecutionDecision,
-    phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>,
-    maxSerializableChars?: number
+    options: HandlePhaseDecisionHookOptions<ResponseDataType>
   ) => any | Promise<any>;
   maxSerializableChars: number;
   workflowHookParams: any;
@@ -528,6 +524,14 @@ export interface BranchExecutionRecord {
   decision?: BranchExecutionDecision;
 }
 
+export interface HandleBranchCompletionHookOptions<ResponseDataType = any> {
+  workflowId: string;
+  branchId: string;
+  branchResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
+  success: boolean;
+  maxSerializableChars?: number;
+}
+
 export interface BranchWorkflowContext<RequestDataType = any, ResponseDataType = any> {
   branches: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>[];
   workflowId: string;
@@ -541,13 +545,7 @@ export interface BranchWorkflowContext<RequestDataType = any, ResponseDataType =
     options: HandlePhaseErrorHookOptions<ResponseDataType>
   ) => any | Promise<any>;
   handleBranchCompletion?: (
-    options: {
-      workflowId: string;
-      branchId: string;
-      branchResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
-      success: boolean;
-      maxSerializableChars?: number;
-    }
+    options: HandleBranchCompletionHookOptions<ResponseDataType>
   ) => any | Promise<any>;
   handleBranchDecision?: (
     decision: BranchExecutionDecision,

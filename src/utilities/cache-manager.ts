@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 import { AxiosRequestConfig } from 'axios';
 import { CachedResponse, CacheConfig } from '../types/index.js';
 
@@ -195,7 +195,7 @@ export class CacheManager {
         const now = Date.now();
         let prunedCount = 0;
 
-        for (const [key, cached] of this.cache.entries()) {
+        for (const [key, cached] of Array.from(this.cache.entries())) {
             if (now > cached.expiresAt) {
                 this.cache.delete(key);
                 this.accessOrder = this.accessOrder.filter(k => k !== key);

@@ -192,14 +192,8 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
 
           if (handlePhaseDecision) {
             try {
-              const wrappedHook = (options: any) => handlePhaseDecision(
-                options.decision,
-                options.phaseResult,
-                options.maxSerializableChars
-              );
-              
               await executeWithPersistence<void>(
-                wrappedHook,
+                handlePhaseDecision,
                 { decision, phaseResult: lastResult, maxSerializableChars },
                 workflowHookParams?.statePersistence,
                 { workflowId, ...(branchId && { branchId }) },
@@ -398,14 +392,8 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
 
           if (handlePhaseDecision) {
             try {
-              const wrappedHook = (options: any) => handlePhaseDecision(
-                options.decision,
-                options.phaseResult,
-                options.maxSerializableChars
-              );
-              
               await executeWithPersistence<void>(
-                wrappedHook,
+                handlePhaseDecision,
                 { decision, phaseResult, maxSerializableChars },
                 workflowHookParams?.statePersistence,
                 { workflowId, ...(branchId && { branchId }), phaseId },

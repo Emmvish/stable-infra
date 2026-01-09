@@ -19,12 +19,13 @@ import {
   RETRY_STRATEGIES, 
   PHASE_DECISION_ACTIONS,
   CircuitBreaker,
+  REQUEST_METHODS,
+  VALID_REQUEST_PROTOCOLS,
   type STABLE_WORKFLOW_BRANCH,
-  type STABLE_WORKFLOW_PHASE
 } from '../src/index.js';
 
 // Simulated microservices (using JSONPlaceholder for demo)
-const USER_SERVICE = 'jsonplaceholder.typicode.com';
+const HOSTINGNAME = 'jsonplaceholder.typicode.com';
 const INVENTORY_SERVICE = 'jsonplaceholder.typicode.com';
 const PAYMENT_SERVICE = 'jsonplaceholder.typicode.com';
 const NOTIFICATION_SERVICE = 'jsonplaceholder.typicode.com';
@@ -136,7 +137,7 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
             requestOptions: {
               reqData: {
                 path: `/users/${orderContext.customerId}`,
-                method: 'GET'
+                method: REQUEST_METHODS.GET
               },
               resReq: true,
               circuitBreaker: circuitBreakers.userService,
@@ -170,7 +171,7 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
             requestOptions: {
               reqData: {
                 path: `/users/${orderContext.customerId}/todos?_limit=1`,
-                method: 'GET'
+                method: REQUEST_METHODS.GET
               },
               resReq: false,
               preExecution: {
@@ -207,7 +208,7 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
             requestOptions: {
               reqData: {
                 path: '/posts?_limit=5', // Simulating inventory check
-                method: 'GET'
+                method: REQUEST_METHODS.GET
               },
               resReq: true,
               circuitBreaker: circuitBreakers.inventoryService,
@@ -257,7 +258,7 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
             requestOptions: {
               reqData: {
                 path: '/posts',
-                method: 'POST'
+                method: REQUEST_METHODS.POST
               },
               resReq: true,
               preExecution: {
@@ -267,10 +268,10 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
                   
                   return {
                     reqData: {
-                      hostname: USER_SERVICE,
-                      protocol: 'https',
+                      hostname: HOSTINGNAME,
+                      protocol:  VALID_REQUEST_PROTOCOLS.HTTPS,
                       path: '/posts',
-                      method: 'POST',
+                      method: REQUEST_METHODS.POST,
                       body: {
                         orderId: buffer.orderId,
                         items: buffer.items,
@@ -289,8 +290,8 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
         ]
       }
     ],
-    branchDecisionHook: async ({ branchResults, executionNumber, commonBuffer }) => {
-      const buffer = commonBuffer as OrderContext;
+    branchDecisionHook: async ({ branchResults, executionNumber, sharedBuffer }) => {
+      const buffer = sharedBuffer as OrderContext;
       const lastPhase = branchResults[branchResults.length - 1];
       
       // If inventory check failed and we haven't retried too many times
@@ -322,7 +323,7 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
             requestOptions: {
               reqData: {
                 path: `/users/${orderContext.customerId}/albums?_limit=1`,
-                method: 'GET'
+                method: REQUEST_METHODS.GET
               },
               resReq: false,
               preExecution: {
@@ -348,7 +349,7 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
             requestOptions: {
               reqData: {
                 path: '/posts',
-                method: 'POST'
+                method: REQUEST_METHODS.POST
               },
               resReq: true,
               circuitBreaker: circuitBreakers.paymentService,
@@ -359,10 +360,10 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
                   
                   return {
                     reqData: {
-                      hostname: USER_SERVICE,
-                      protocol: 'https',
+                      hostname: HOSTINGNAME,
+                      protocol:  VALID_REQUEST_PROTOCOLS.HTTPS,
                       path: '/posts',
-                      method: 'POST',
+                      method: REQUEST_METHODS.POST,
                       body: {
                         orderId: buffer.orderId,
                         amount: buffer.totalAmount,
@@ -392,8 +393,8 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
         ]
       }
     ],
-    branchDecisionHook: async ({ branchResults, executionNumber, commonBuffer, branchExecutionHistory }) => {
-      const buffer = commonBuffer as OrderContext;
+    branchDecisionHook: async ({ branchResults, executionNumber, sharedBuffer }) => {
+      const buffer = sharedBuffer as OrderContext;
       const paymentPhase = branchResults.find(p => p.phaseId === 'process-payment');
       
       // If payment failed and we have retry budget
@@ -410,7 +411,6 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
         console.log('\n❌ [Payment Branch] Payment failed after all retries - Terminating workflow\n');
         return {
           action: PHASE_DECISION_ACTIONS.TERMINATE,
-          terminateWorkflow: true,
           metadata: { reason: 'Payment processing failed after maximum retries' }
         };
       }
@@ -435,7 +435,7 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
             requestOptions: {
               reqData: {
                 path: '/posts',
-                method: 'POST'
+                method: REQUEST_METHODS.POST
               },
               resReq: false,
               circuitBreaker: circuitBreakers.notificationService,
@@ -446,10 +446,10 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
                   
                   return {
                     reqData: {
-                      hostname: USER_SERVICE,
-                      protocol: 'https',
+                      hostname: HOSTINGNAME,
+                      protocol: VALID_REQUEST_PROTOCOLS.HTTPS,
                       path: '/posts',
-                      method: 'POST',
+                      method: REQUEST_METHODS.POST,
                       body: {
                         type: 'email',
                         orderId: buffer.orderId,
@@ -478,7 +478,7 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
             requestOptions: {
               reqData: {
                 path: '/posts',
-                method: 'POST'
+                method: REQUEST_METHODS.POST
               },
               resReq: false,
               circuitBreaker: circuitBreakers.notificationService,
@@ -489,10 +489,10 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
                   
                   return {
                     reqData: {
-                      hostname: USER_SERVICE,
-                      protocol: 'https',
+                      hostname: HOSTINGNAME,
+                      protocol: VALID_REQUEST_PROTOCOLS.HTTPS,
                       path: '/posts',
-                      method: 'POST',
+                      method: REQUEST_METHODS.POST,
                       body: {
                         type: 'sms',
                         orderId: buffer.orderId,
@@ -521,7 +521,7 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
             requestOptions: {
               reqData: {
                 path: '/posts',
-                method: 'POST'
+                method: REQUEST_METHODS.POST
               },
               resReq: false,
               preExecution: {
@@ -531,10 +531,10 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
                   
                   return {
                     reqData: {
-                      hostname: USER_SERVICE,
-                      protocol: 'https',
+                      hostname: HOSTINGNAME,
+                      protocol: VALID_REQUEST_PROTOCOLS.HTTPS,
                       path: '/posts',
-                      method: 'POST',
+                      method: REQUEST_METHODS.POST,
                       body: {
                         type: 'dashboard',
                         orderId: buffer.orderId,
@@ -575,8 +575,8 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
       
       // Common configuration for all services
       commonRequestData: {
-        hostname: USER_SERVICE,
-        protocol: 'https',
+        hostname: HOSTINGNAME,
+        protocol: VALID_REQUEST_PROTOCOLS.HTTPS,
         headers: {
           'Content-Type': 'application/json',
           'X-Request-ID': orderContext.orderId,
@@ -594,18 +594,22 @@ const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
       // Request grouping for different SLAs
       requestGroups: [
         {
-          groupId: 'critical',
-          commonAttempts: 5,
-          commonWait: 2000,
-          commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
-          commonFinalErrorAnalyzer: async () => false // Always throw for critical
+          id: 'critical',
+          commonConfig: {
+            commonAttempts: 5,
+            commonWait: 2000,
+            commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+            commonFinalErrorAnalyzer: async () => false // Always throw for critical
+          }
         },
         {
-          groupId: 'optional',
-          commonAttempts: 2,
-          commonWait: 500,
-          commonRetryStrategy: RETRY_STRATEGIES.FIXED,
-          commonFinalErrorAnalyzer: async () => true // Suppress errors for optional
+          id: 'optional',
+          commonConfig: {
+            commonAttempts: 2,
+            commonWait: 500,
+            commonRetryStrategy: RETRY_STRATEGIES.FIXED,
+            commonFinalErrorAnalyzer: async () => true // Suppress errors for optional
+          }
         }
       ],
       

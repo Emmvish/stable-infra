@@ -17,7 +17,9 @@
 
 import { 
   stableRequest, 
-  RETRY_STRATEGIES
+  RETRY_STRATEGIES,
+  REQUEST_METHODS,
+  VALID_REQUEST_PROTOCOLS
 } from '../src/index';
 
 // Test scenarios
@@ -91,12 +93,13 @@ async function runChaosTest(scenario: ChaosScenario): Promise<TestResult> {
     const result = await stableRequest({
       reqData: {
         hostname: 'api.example.com',
-        protocol: 'https',
+        protocol: VALID_REQUEST_PROTOCOLS.HTTPS,
         path: '/chaos-test',
-        method: 'GET',
+        method: REQUEST_METHODS.GET,
         headers: {
           'X-Test-Scenario': scenario.name
-        }
+        },
+        timeout: 5000
       },
       
       // Configure retry behavior
@@ -104,7 +107,6 @@ async function runChaosTest(scenario: ChaosScenario): Promise<TestResult> {
       wait: 500,
       retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
       maxAllowedWait: 3000,
-      timeout: 5000,
       
       // Enable trial mode for failure simulation
       trialMode: {
@@ -125,9 +127,8 @@ async function runChaosTest(scenario: ChaosScenario): Promise<TestResult> {
       },
       
       // Error analysis
-      finalErrorAnalyzer: async ({ error, totalAttempts }) => {
-        attemptCount = totalAttempts;
-        console.log(`   ❌ Failed after ${totalAttempts} attempts: ${error}`);
+      finalErrorAnalyzer: async ({ error }) => {
+        console.log(`   ❌ Failed with Error: ${error}`);
         return false; // Re-throw for proper handling
       },
       

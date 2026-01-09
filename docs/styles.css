@@ -382,6 +382,8 @@ pre {
     border-radius: var(--radius-md);
     padding: var(--spacing-lg) !important;
     overflow-x: auto;
+    overflow-y: auto;
+    max-height: 500px;
     margin: var(--spacing-md) 0;
     border: 1px solid var(--border-color);
 }
@@ -910,6 +912,17 @@ code {
 .example-code {
     padding: var(--spacing-xl);
     background: var(--bg-primary);
+}
+
+.example-code pre {
+    max-height: 100px !important;
+    overflow-y: auto !important;
+    overflow-x: auto !important;
+}
+
+.example-code pre code {
+    max-height: 100px !important;
+    display: block !important;
 }
 
 .example-code h4 {

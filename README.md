@@ -260,9 +260,10 @@ await stableRequest({
   reqData: { hostname: 'unreliable-api.example.com', path: '/data' },
   attempts: 3,
   circuitBreaker: {
-    failureThreshold: 5,                        // Open after 5 failures
-    successThreshold: 2,                        // Close after 2 successes in half-open
-    timeout: 60000,                             // Wait 60s before trying again (half-open)
+    failureThresholdPercentage: 50,             // Open after 50% failures
+    minimumRequests: 10,                        // Minimum requests before evaluation
+    recoveryTimeoutMs: 60000,                   // Wait 60s before trying again (half-open)
+    successThresholdPercentage: 20,             // Close after 20% successes in half-open
     trackIndividualAttempts: false              // Track at request level (not attempt level)
   }
 });
@@ -278,9 +279,10 @@ await stableRequest({
 import { CircuitBreaker } from '@emmvish/stable-request';
 
 const sharedBreaker = new CircuitBreaker({
-  failureThreshold: 10,
-  successThreshold: 3,
-  timeout: 120000
+  failureThresholdPercentage: 50,               // 50% failure rate triggers open
+  minimumRequests: 10,                          // Minimum 10 requests before evaluation
+  recoveryTimeoutMs: 120000,                    // 120s timeout in open state
+  successThresholdPercentage: 50                // 50% success rate closes circuit
 });
 
 await stableWorkflow(phases, {
@@ -347,7 +349,7 @@ await stableWorkflow(phases, {
   // Rate limiting (token bucket algorithm)
   rateLimit: {
     maxRequests: 100,                           // 100 requests
-    timeWindow: 60000                           // per 60 seconds
+    windowMs: 60000                             // per 60 seconds
   },
   
   // Concurrency limiting
@@ -363,7 +365,7 @@ const phases = [
     maxConcurrentRequests: 10,                  // Override workflow limit
     rateLimit: {
       maxRequests: 50,
-      timeWindow: 10000
+      windowMs: 10000
     },
     requests: [...]
   }
@@ -374,13 +376,11 @@ const phases = [
 ```typescript
 import { RateLimiter } from '@emmvish/stable-request';
 
-const limiter = new RateLimiter({
-  maxRequests: 1000,
-  timeWindow: 3600000                           // 1000 requests per hour
-});
+const limiter = new RateLimiter(1000, 3600000); // 1000 requests per hour
 
-await limiter.acquire();                        // Waits if limit exceeded
-// Make request
+const state = await limiter.getState();          // Get current state
+console.log(state);
+// { availableTokens: 1000, queueLength: 0, maxRequests: 1000, windowMs: 3600000 }
 ```
 
 ## Workflow Execution Patterns
@@ -659,7 +659,6 @@ const branches = [
       if (branchResult.failedRequests > 0) {
         return { 
           action: PHASE_DECISION_ACTIONS.TERMINATE, 
-          terminateWorkflow: true,              // Terminate entire workflow
           metadata: { reason: 'Critical branch failed' }
         };
       }
@@ -1074,7 +1073,7 @@ await stableWorkflow(phases, {
   },
   
   // Monitor non-linear execution decisions
-  handlePhaseDecision: async ({ workflowId, decision, phaseResult }) => {
+  handlePhaseDecision: async ({ decision, phaseResult }) => {
     console.log(`Phase decision: ${decision.action}`);
     if (decision.targetPhaseId) {
       console.log(`Target: ${decision.targetPhaseId}`);
@@ -1285,12 +1284,13 @@ await stableWorkflow(pollingPhases, {
 ### Webhook Retry with Circuit Breaker
 
 ```typescript
-import { CircuitBreaker, REQUEST_METHODS } from '@emmvish/stable-request';
+import { CircuitBreaker, REQUEST_METHODS, RETRY_STRATEGIES } from '@emmvish/stable-request';
 
 const webhookBreaker = new CircuitBreaker({
-  failureThreshold: 3,
-  successThreshold: 2,
-  timeout: 30000
+  failureThresholdPercentage: 60,               // 60% failure rate triggers open
+  minimumRequests: 5,                           // Minimum 5 requests before evaluation
+  recoveryTimeoutMs: 30000,                     // 30s timeout in open state
+  successThresholdPercentage: 40                // 40% success rate closes circuit
 });
 
 async function sendWebhook(eventData: any) {

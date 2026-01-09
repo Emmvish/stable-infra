@@ -18,7 +18,9 @@ import {
   stableApiGateway, 
   RETRY_STRATEGIES,
   RateLimiter,
-  ConcurrencyLimiter
+  ConcurrencyLimiter,
+  REQUEST_METHODS,
+  VALID_REQUEST_PROTOCOLS
 } from '../src/index';
 import type { API_GATEWAY_REQUEST } from '../src/index';
 
@@ -54,16 +56,13 @@ const imageBatch: ImageJob[] = [
 ];
 
 // Initialize rate limiter (20 requests per second)
-const rateLimiter = new RateLimiter({
-  tokensPerInterval: 20,
-  interval: 1000,
-  maxBurstSize: 25
-});
+const rateLimiter = new RateLimiter(
+  1000,
+  20
+);
 
 // Initialize concurrency limiter (max 5 concurrent requests)
-const concurrencyLimiter = new ConcurrencyLimiter({
-  maxConcurrentRequests: 5
-});
+const concurrencyLimiter = new ConcurrencyLimiter(5);
 
 // Track processing results
 const processingResults = {
@@ -94,8 +93,8 @@ async function processBatchImages(): Promise<ProcessingStats> {
     groupId: job.priority, // Group by priority
     requestOptions: {
       reqData: {
-        path: job.imageUrl,
-        method: 'GET'
+        path: `/${job.imageUrl}`,
+        method: REQUEST_METHODS.GET
       },
       resReq: true,
       
@@ -141,33 +140,40 @@ async function processBatchImages(): Promise<ProcessingStats> {
     // Common configuration for all requests
     commonRequestData: {
       hostname: 'jsonplaceholder.typicode.com',
-      protocol: 'https',
+      protocol: VALID_REQUEST_PROTOCOLS.HTTP,
       headers: {
         'Content-Type': 'application/json',
         'X-Batch-ID': `BATCH-${Date.now()}`,
         'User-Agent': 'ImageProcessor/2.0'
-      }
+      },
+      timeout: 10000
     },
     
     // Request groups with different retry strategies
     requestGroups: [
       {
-        groupId: 'high',
-        commonAttempts: 5,
-        commonWait: 2000,
-        commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+        id: 'high',
+        commonConfig: {
+          commonAttempts: 5,
+          commonWait: 2000,
+          commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+        }
       },
       {
-        groupId: 'normal',
-        commonAttempts: 3,
-        commonWait: 1000,
-        commonRetryStrategy: RETRY_STRATEGIES.LINEAR
+        id: 'normal',
+        commonConfig: {
+          commonAttempts: 3,
+          commonWait: 1000,
+          commonRetryStrategy: RETRY_STRATEGIES.LINEAR
+        }
       },
       {
-        groupId: 'low',
-        commonAttempts: 2,
-        commonWait: 500,
-        commonRetryStrategy: RETRY_STRATEGIES.FIXED
+        id: 'low',
+        commonConfig: {
+          commonAttempts: 2,
+          commonWait: 500,
+          commonRetryStrategy: RETRY_STRATEGIES.FIXED
+        }
       }
     ],
     
@@ -175,10 +181,9 @@ async function processBatchImages(): Promise<ProcessingStats> {
     stopOnFirstError: false,
     
     // Default settings
-    attempts: 3,
-    wait: 1000,
-    timeout: 10000,
-    logAllSuccessfulAttempts: true
+    commonAttempts: 3,
+    commonWait: 1000,
+    commonLogAllSuccessfulAttempts: true
   });
   
   const duration = Date.now() - startTime;

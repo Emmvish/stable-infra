@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Examples - Stable Request</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
-    <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <link rel="stylesheet" href="styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
 </head>
@@ -77,82 +77,232 @@
                         </button>
                     </div>
                     <div class="example-output" id="output-01" style="display:none;"></div>
-                    <h4>Workflow Structure</h4>
-                    <pre><code class="language-typescript">const syncPhases: STABLE_WORKFLOW_PHASE[] = [
-  // Phase 1: Fetch data concurrently
+                    <h4>Complete Working Example</h4>
+                    <pre><code class="language-typescript">import { 
+  stableWorkflow, 
+  RETRY_STRATEGIES, 
+  PHASE_DECISION_ACTIONS,
+  REQUEST_METHODS,
+  VALID_REQUEST_PROTOCOLS,
+  type STABLE_WORKFLOW_PHASE
+} from '@emmvish/stable-request';
+
+// Shared state for workflow
+interface SyncState {
+  syncId: string;
+  startTime: number;
+  users: any[];
+  posts: any[];
+  comments: any[];
+  enrichedData: any[];
+  validationErrors: string[];
+  uploadedRecords: number;
+  failedRecords: number;
+  retryCount: number;
+}
+
+const syncState: SyncState = {
+  syncId: `sync-${Date.now()}`,
+  startTime: Date.now(),
+  users: [],
+  posts: [],
+  comments: [],
+  enrichedData: [],
+  validationErrors: [],
+  uploadedRecords: 0,
+  failedRecords: 0,
+  retryCount: 0
+};
+
+// Circuit breaker configuration for source API
+const sourceApiBreaker = {
+  failureThresholdPercentage: 50,
+  minimumRequests: 3,
+  recoveryTimeoutMs: 30000,
+  successThresholdPercentage: 60,
+  halfOpenMaxRequests: 2,
+  trackIndividualAttempts: false
+};
+
+// Define the multi-phase workflow
+const syncPhases: STABLE_WORKFLOW_PHASE[] = [
+  // Phase 1: Fetch data from multiple sources concurrently
   {
     id: 'fetch-source-data',
     concurrentExecution: true,
     requests: [
-      { id: 'fetch-users', requestOptions: {...} },
-      { id: 'fetch-posts', requestOptions: {...} },
-      { id: 'fetch-comments', requestOptions: {...} }
-    ]
-  },
-  
-  // Phase 2: Data enrichment
-  {
-    id: 'enrich-data',
-    requests: [{
-      id: 'enrich-posts-with-users',
-      requestOptions: {
-        preExecution: {
-          preExecutionHook: ({ commonBuffer }) => {
-            // Enrich posts with user and comment data
-            buffer.enrichedData = buffer.posts.map(post => ({
-              ...post,
-              author: findUser(post.userId),
-              commentCount: countComments(post.id)
-            }));
+      {
+        id: 'fetch-users',
+        requestOptions: {
+          reqData: { 
+            path: '/users?_limit=5',
+            method: REQUEST_METHODS.GET
+          },
+          resReq: true,
+          handleSuccessfulAttemptData: async ({ successfulAttemptData, commonBuffer }) => {
+            const buffer = commonBuffer as SyncState;
+            buffer.users = successfulAttemptData.data;
+            console.log(`✅ Fetched ${buffer.users.length} users`);
+          }
+        }
+      },
+      {
+        id: 'fetch-posts',
+        requestOptions: {
+          reqData: { 
+            path: '/posts?_limit=10',
+            method: REQUEST_METHODS.GET
+          },
+          resReq: true,
+          handleSuccessfulAttemptData: async ({ successfulAttemptData, commonBuffer }) => {
+            const buffer = commonBuffer as SyncState;
+            buffer.posts = successfulAttemptData.data;
+            console.log(`✅ Fetched ${buffer.posts.length} posts`);
+          }
+        }
+      },
+      {
+        id: 'fetch-comments',
+        requestOptions: {
+          reqData: { 
+            path: '/comments?_limit=20',
+            method: REQUEST_METHODS.GET
+          },
+          resReq: true,
+          handleSuccessfulAttemptData: async ({ successfulAttemptData, commonBuffer }) => {
+            const buffer = commonBuffer as SyncState;
+            buffer.comments = successfulAttemptData.data;
+            console.log(`✅ Fetched ${buffer.comments.length} comments`);
           }
         }
       }
-    }]
+    ]
   },
-  
-  // Phase 3: Validation with conditional retry
+
+  // Phase 2: Data enrichment and transformation
+  {
+    id: 'enrich-data',
+    requests: [
+      {
+        id: 'enrich-posts-with-users',
+        requestOptions: {
+          reqData: { path: '/posts/1', method: REQUEST_METHODS.GET },
+          resReq: false,
+          preExecution: {
+            preExecutionHook: ({ commonBuffer }) => {
+              const buffer = commonBuffer as SyncState;
+              
+              // Enrich posts with user information
+              buffer.enrichedData = buffer.posts.map(post => {
+                const user = buffer.users.find(u => u.id === post.userId);
+                const postComments = buffer.comments.filter(c => c.postId === post.id);
+                
+                return {
+                  postId: post.id,
+                  title: post.title,
+                  body: post.body,
+                  author: user ? {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    company: user.company?.name
+                  } : null,
+                  commentCount: postComments.length,
+                  enrichedAt: new Date().toISOString(),
+                  syncId: buffer.syncId
+                };
+              });
+              
+              console.log(`✅ Enriched ${buffer.enrichedData.length} posts`);
+              return {};
+            },
+            applyPreExecutionConfigOverride: false
+          }
+        }
+      }
+    ]
+  },
+
+  // Phase 3: Data validation with conditional retry
   {
     id: 'validate-data',
     allowReplay: true,
     maxReplayCount: 2,
-    requests: [{ id: 'validate', requestOptions: {...} }],
-    phaseDecisionHook: async ({ phaseResult, retryCount }) => {
-      if (hasValidationErrors && retryCount < 2) {
+    requests: [
+      {
+        id: 'validate-enriched-data',
+        requestOptions: {
+          reqData: { path: '/posts/1', method: REQUEST_METHODS.GET },
+          resReq: false,
+          preExecution: {
+            preExecutionHook: ({ commonBuffer }) => {
+              const buffer = commonBuffer as SyncState;
+              buffer.validationErrors = [];
+              
+              // Validate enriched data
+              buffer.enrichedData.forEach((item, index) => {
+                if (!item.author) {
+                  buffer.validationErrors.push(`Record ${index}: Missing author`);
+                }
+                if (!item.title || item.title.length < 5) {
+                  buffer.validationErrors.push(`Record ${index}: Invalid title`);
+                }
+              });
+              
+              console.log(`✅ Validation complete: ${buffer.validationErrors.length} errors`);
+              return {};
+            },
+            applyPreExecutionConfigOverride: false
+          }
+        }
+      }
+    ],
+    phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+      const buffer = sharedBuffer as SyncState;
+      
+      if (buffer.validationErrors.length > 0 && buffer.retryCount < 2) {
+        buffer.retryCount++;
+        console.log(`⚠️  Validation errors found, retrying...`);
         return { action: PHASE_DECISION_ACTIONS.REPLAY };
       }
+      
+      console.log(`✅ Validation passed, proceeding...`);
       return { action: PHASE_DECISION_ACTIONS.CONTINUE };
     }
   },
-  
+
   // Phase 4: Batch upload
   {
     id: 'upload-data',
     concurrentExecution: true,
-    requests: enrichedData.map(item => ({
-      id: `upload-${item.id}`,
-      requestOptions: { 
-        reqData: { path: '/api/sync', method: 'POST', body: item }
-      }
-    }))
+    requests: [] // Will be populated dynamically
   }
 ];
 
-// Execute workflow with shared circuit breaker
+// Execute workflow
 const result = await stableWorkflow(syncPhases, {
   workflowId: 'data-sync-pipeline',
-  commonRequestData: { hostname: 'api.example.com' },
+  commonRequestData: { 
+    hostname: 'jsonplaceholder.typicode.com',
+    protocol: VALID_REQUEST_PROTOCOLS.HTTPS
+  },
   commonAttempts: 3,
   commonWait: 1000,
   commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
   enableNonLinearExecution: true,
   circuitBreaker: sourceApiBreaker,
-  commonCache: { ttl: 300000 },
+  commonCache: { ttl: 300000, enabled: true },
   rateLimit: { maxRequests: 50, windowMs: 10000 },
   sharedBuffer: syncState,
   handlePhaseCompletion: async ({ phaseResult }) => {
-    console.log(`Phase ${phaseResult.phaseId} completed in ${phaseResult.executionTime}ms`);
+    console.log(`✅ Phase ${phaseResult.phaseId} completed in ${phaseResult.executionTime}ms`);
   }
-});</code></pre>
+});
+
+console.log(`\n📊 Workflow Results:`);
+console.log(`Total Phases: ${result.totalPhases}`);
+console.log(`Success: ${result.success}`);
+console.log(`Duration: ${result.executionTime}ms`);</code></pre>
                 </div>
             </div>
 
@@ -197,99 +347,313 @@ const result = await stableWorkflow(syncPhases, {
                         </button>
                     </div>
                     <div class="example-output" id="output-02" style="display:none;"></div>
-                    <h4>Branch Workflow Structure</h4>
-                    <pre><code class="language-typescript">// Separate circuit breakers for each service
-const userServiceBreaker = new CircuitBreaker({
-  failureThresholdPercentage: 50,
-  minimumRequests: 5,
-  recoveryTimeoutMs: 60000
-});
+                    <h4>Complete Working Example</h4>
+                    <pre><code class="language-typescript">import { 
+  stableWorkflow, 
+  RETRY_STRATEGIES, 
+  PHASE_DECISION_ACTIONS,
+  CircuitBreaker,
+  REQUEST_METHODS,
+  type STABLE_WORKFLOW_BRANCH
+} from '@emmvish/stable-request';
 
-const inventoryServiceBreaker = new CircuitBreaker({...});
-const paymentServiceBreaker = new CircuitBreaker({...});
+// Order processing state
+interface OrderContext {
+  orderId: string;
+  customerId: number;
+  items: Array<{ productId: number; quantity: number; price: number }>;
+  totalAmount: number;
+  customerData?: any;
+  inventoryCheck?: { available: boolean; reservationId?: string };
+  paymentResult?: { success: boolean; transactionId?: string };
+  notificationsSent?: string[];
+  startTime: number;
+  retryAttempts: {
+    payment: number;
+    inventory: number;
+    notification: number;
+  };
+  serviceFailures: {
+    userService: number;
+    inventoryService: number;
+    paymentService: number;
+    notificationService: number;
+  };
+  fallbacksUsed: string[];
+}
 
-const branches: STABLE_WORKFLOW_BRANCH[] = [
-  // Critical: User validation
+const orderContext: OrderContext = {
+  orderId: `ORD-${Date.now()}`,
+  customerId: 1,
+  items: [
+    { productId: 1, quantity: 2, price: 29.99 },
+    { productId: 2, quantity: 1, price: 49.99 }
+  ],
+  totalAmount: 109.97,
+  startTime: Date.now(),
+  retryAttempts: { payment: 0, inventory: 0, notification: 0 },
+  serviceFailures: {
+    userService: 0,
+    inventoryService: 0,
+    paymentService: 0,
+    notificationService: 0
+  },
+  fallbacksUsed: [],
+  notificationsSent: []
+};
+
+// Circuit breakers for each microservice
+const circuitBreakers = {
+  userService: new CircuitBreaker({
+    failureThresholdPercentage: 60,
+    minimumRequests: 2,
+    recoveryTimeoutMs: 20000,
+    successThresholdPercentage: 50,
+    halfOpenMaxRequests: 1
+  }),
+  inventoryService: new CircuitBreaker({
+    failureThresholdPercentage: 50,
+    minimumRequests: 2,
+    recoveryTimeoutMs: 30000,
+    successThresholdPercentage: 60,
+    halfOpenMaxRequests: 2
+  }),
+  paymentService: new CircuitBreaker({
+    failureThresholdPercentage: 40,
+    minimumRequests: 2,
+    recoveryTimeoutMs: 45000,
+    successThresholdPercentage: 70,
+    halfOpenMaxRequests: 1
+  }),
+  notificationService: new CircuitBreaker({
+    failureThresholdPercentage: 70,
+    minimumRequests: 3,
+    recoveryTimeoutMs: 15000,
+    successThresholdPercentage: 50,
+    halfOpenMaxRequests: 3
+  })
+};
+
+// Define the branched workflow
+const orderBranches: STABLE_WORKFLOW_BRANCH[] = [
+  // Branch 1: User Validation (Critical)
   {
-    branchId: 'user-service',
-    concurrentBranch: false,
+    id: 'user-validation',
+    markConcurrentBranch: false,
     phases: [
       {
-        id: 'validate-user',
-        requests: [{ 
-          id: 'check-user',
-          groupId: 'critical',
-          requestOptions: {
-            reqData: { path: '/users/validate', method: 'POST' },
-            circuitBreaker: userServiceBreaker
+        id: 'fetch-user-details',
+        requests: [
+          {
+            id: 'get-user',
+            groupId: 'critical',
+            requestOptions: {
+              reqData: {
+                path: `/users/${orderContext.customerId}`,
+                method: REQUEST_METHODS.GET
+              },
+              resReq: true,
+              circuitBreaker: circuitBreakers.userService,
+              handleSuccessfulAttemptData: async ({ successfulAttemptData, commonBuffer }) => {
+                const buffer = commonBuffer as OrderContext;
+                buffer.customerData = successfulAttemptData.data;
+                console.log(`✅ Customer validated: ${buffer.customerData.name}`);
+              },
+              handleErrors: async ({ errorLog, commonBuffer }) => {
+                const buffer = commonBuffer as OrderContext;
+                buffer.serviceFailures.userService++;
+                console.log(`⚠️  User Service attempt failed`);
+              }
+            }
           }
-        }],
-        phaseDecisionHook: async ({ phaseResult }) => {
-          if (!phaseResult.success) {
-            return { 
-              action: PHASE_DECISION_ACTIONS.TERMINATE,
-              terminateWorkflow: true  // Stop entire workflow
-            };
+        ]
+      },
+      {
+        id: 'verify-user-status',
+        requests: [
+          {
+            id: 'check-user-status',
+            groupId: 'critical',
+            requestOptions: {
+              reqData: {
+                path: `/users/${orderContext.customerId}/todos?_limit=1`,
+                method: REQUEST_METHODS.GET
+              },
+              resReq: false,
+              preExecution: {
+                preExecutionHook: ({ commonBuffer }) => {
+                  const buffer = commonBuffer as OrderContext;
+                  console.log(`✅ Account status verified for ${buffer.customerData?.name}`);
+                  return {};
+                },
+                applyPreExecutionConfigOverride: false,
+                continueOnPreExecutionHookFailure: false
+              }
+            }
           }
-          return { action: PHASE_DECISION_ACTIONS.CONTINUE };
-        }
+        ]
       }
     ]
   },
-  
-  // Critical: Inventory management
+
+  // Branch 2: Inventory Management (Critical with fallback)
   {
-    branchId: 'inventory-service',
-    concurrentBranch: false,
+    id: 'inventory-management',
+    markConcurrentBranch: true,
+    allowReplay: true,
+    maxReplayCount: 2,
     phases: [
-      { id: 'check-stock', requests: [...] },
-      { id: 'reserve-items', requests: [...] }
+      {
+        id: 'check-inventory',
+        requests: [
+          {
+            id: 'verify-stock',
+            groupId: 'critical',
+            requestOptions: {
+              reqData: {
+                path: '/posts?_limit=5',
+                method: REQUEST_METHODS.GET
+              },
+              resReq: true,
+              circuitBreaker: circuitBreakers.inventoryService,
+              handleSuccessfulAttemptData: async ({ successfulAttemptData, commonBuffer }) => {
+                const buffer = commonBuffer as OrderContext;
+                buffer.inventoryCheck = {
+                  available: true,
+                  reservationId: `RES-${Date.now()}`
+                };
+                console.log(`✅ Inventory available, reserved: ${buffer.inventoryCheck.reservationId}`);
+              }
+            }
+          }
+        ]
+      }
+    ],
+    branchDecisionHook: async ({ branchResult, sharedBuffer }) => {
+      const buffer = sharedBuffer as OrderContext;
+      
+      if (!branchResult.success && buffer.retryAttempts.inventory < 2) {
+        buffer.retryAttempts.inventory++;
+        console.log(`🔄 Retrying inventory check (attempt ${buffer.retryAttempts.inventory})...`);
+        return { action: PHASE_DECISION_ACTIONS.REPLAY };
+      }
+      
+      if (!branchResult.success) {
+        console.log(`❌ Inventory check failed after retries`);
+        return { action: PHASE_DECISION_ACTIONS.TERMINATE };
+      }
+      
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    }
+  },
+
+  // Branch 3: Payment Processing (Critical)
+  {
+    id: 'payment-processing',
+    markConcurrentBranch: true,
+    phases: [
+      {
+        id: 'authorize-payment',
+        requests: [
+          {
+            id: 'process-payment',
+            groupId: 'critical',
+            requestOptions: {
+              reqData: {
+                path: '/posts/1',
+                method: REQUEST_METHODS.GET
+              },
+              resReq: true,
+              circuitBreaker: circuitBreakers.paymentService,
+              handleSuccessfulAttemptData: async ({ successfulAttemptData, commonBuffer }) => {
+                const buffer = commonBuffer as OrderContext;
+                buffer.paymentResult = {
+                  success: true,
+                  transactionId: `TXN-${Date.now()}`
+                };
+                console.log(`✅ Payment processed: ${buffer.paymentResult.transactionId}`);
+              }
+            }
+          }
+        ]
+      }
     ]
   },
-  
-  // Critical: Payment processing
+
+  // Branch 4: Notification Service (Optional)
   {
-    branchId: 'payment-service',
-    concurrentBranch: false,
+    id: 'notification-service',
+    markConcurrentBranch: true,
     phases: [
-      { id: 'authorize-payment', requests: [...] },
-      { id: 'capture-payment', requests: [...] }
-    ]
-  },
-  
-  // Optional: Notification service
-  {
-    branchId: 'notification-service',
-    concurrentBranch: false,
-    phases: [
-      { id: 'send-notifications', requests: [...] }
+      {
+        id: 'send-notifications',
+        requests: [
+          {
+            id: 'email-notification',
+            groupId: 'optional',
+            requestOptions: {
+              reqData: {
+                path: '/comments/1',
+                method: REQUEST_METHODS.GET
+              },
+              resReq: false,
+              circuitBreaker: circuitBreakers.notificationService,
+              preExecution: {
+                preExecutionHook: ({ commonBuffer }) => {
+                  const buffer = commonBuffer as OrderContext;
+                  buffer.notificationsSent = ['email', 'sms'];
+                  console.log(`✅ Notifications sent to customer`);
+                  return {};
+                },
+                applyPreExecutionConfigOverride: false
+              }
+            }
+          }
+        ]
+      }
     ]
   }
 ];
 
-// Execute with branch-based workflow
+// Execute branched workflow
 const result = await stableWorkflow([], {
   workflowId: 'order-processing',
+  commonRequestData: { 
+    hostname: 'jsonplaceholder.typicode.com',
+    protocol: 'https'
+  },
   enableBranchExecution: true,
-  branches,
-  concurrentBranchExecution: true,  // Branches run in parallel
+  branches: orderBranches,
+  concurrentBranchExecution: true,
   requestGroups: [
     {
-      groupId: 'critical',
-      commonAttempts: 5,
-      commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+      id: 'critical',
+      commonConfig: {
+        commonAttempts: 5,
+        commonWait: 1000,
+        commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+      }
     },
     {
-      groupId: 'optional',
-      commonAttempts: 1  // Don't retry optional services
+      id: 'optional',
+      commonConfig: {
+        commonAttempts: 1,
+        commonWait: 500
+      }
     }
   ],
+  sharedBuffer: orderContext,
   handleBranchCompletion: async ({ branchId, success }) => {
     if (!success && branchId !== 'notification-service') {
-      logger.error(`Critical branch ${branchId} failed`);
+      console.error(`❌ Critical branch ${branchId} failed`);
     }
   }
-});</code></pre>
+});
+
+console.log(`\n📊 Order Processing Results:`);
+console.log(`Success: ${result.success}`);
+console.log(`Order ID: ${orderContext.orderId}`);
+console.log(`Duration: ${result.executionTime}ms`);</code></pre>
                 </div>
             </div>
 
@@ -334,104 +698,190 @@ const result = await stableWorkflow([], {
                         </button>
                     </div>
                     <div class="example-output" id="output-03" style="display:none;"></div>
-                    <h4>Health Check Implementation</h4>
-                    <pre><code class="language-typescript">interface ServiceHealth {
-  serviceName: string;
-  endpoint: string;
-  isHealthy: boolean;
+                    <h4>Complete Working Example</h4>
+                    <pre><code class="language-typescript">import { 
+  stableRequest, 
+  RETRY_STRATEGIES,
+  CircuitBreaker,
+  VALID_REQUEST_PROTOCOLS,
+  REQUEST_METHODS
+} from '@emmvish/stable-request';
+
+// Service endpoint configuration
+interface ServiceEndpoint {
+  name: string;
+  url: string;
+  critical: boolean;
+  slaThresholdMs: number;
+  healthCheckPath: string;
+}
+
+interface HealthCheckResult {
+  service: string;
+  status: 'healthy' | 'degraded' | 'down';
   responseTime: number;
-  lastCheck: Date;
+  timestamp: string;
   consecutiveFailures: number;
   circuitBreakerState: string;
   slaCompliant: boolean;
 }
 
-// Configure services to monitor
-const services = [
-  { name: 'user-api', path: '/health', critical: true, slaMs: 500 },
-  { name: 'order-api', path: '/health', critical: true, slaMs: 1000 },
-  { name: 'notification-api', path: '/health', critical: false, slaMs: 2000 }
+// Define monitored services
+const services: ServiceEndpoint[] = [
+  {
+    name: 'User Authentication API',
+    url: 'https://jsonplaceholder.typicode.com',
+    critical: true,
+    slaThresholdMs: 200,
+    healthCheckPath: '/users/1'
+  },
+  {
+    name: 'Payment Gateway',
+    url: 'https://jsonplaceholder.typicode.com',
+    critical: true,
+    slaThresholdMs: 500,
+    healthCheckPath: '/posts/1'
+  },
+  {
+    name: 'Notification Service',
+    url: 'https://jsonplaceholder.typicode.com',
+    critical: false,
+    slaThresholdMs: 1000,
+    healthCheckPath: '/comments/1'
+  }
 ];
 
-// Create circuit breaker for each service
-const breakers = new Map();
+// Initialize circuit breakers for each service
+const circuitBreakers = new Map<string, CircuitBreaker>();
 services.forEach(service => {
-  breakers.set(service.name, new CircuitBreaker({
-    failureThresholdPercentage: 50,
+  circuitBreakers.set(service.name, new CircuitBreaker({
+    failureThresholdPercentage: service.critical ? 50 : 70,
     minimumRequests: 3,
-    recoveryTimeoutMs: 30000
+    recoveryTimeoutMs: service.critical ? 10000 : 20000,
+    successThresholdPercentage: 60,
+    halfOpenMaxRequests: 2
   }));
 });
 
-// Health check function
-async function checkServiceHealth(service): Promise<ServiceHealth> {
-  const breaker = breakers.get(service.name);
+// Track consecutive failures per service
+const failureTracker = new Map<string, number>();
+
+// Perform health check using stableRequest
+async function checkServiceHealth(service: ServiceEndpoint): Promise<HealthCheckResult> {
   const startTime = Date.now();
+  const circuitBreaker = circuitBreakers.get(service.name)!;
+  
+  console.log(`🔍 Checking ${service.name}...`);
   
   try {
-    const result = await stableRequest({
+    await stableRequest({
       reqData: {
-        hostname: 'api.example.com',
-        path: service.path,
-        method: 'GET',
-        timeout: 5000
+        hostname: service.url.replace(/^https?:\/\//, ''),
+        protocol: VALID_REQUEST_PROTOCOLS.HTTPS,
+        path: service.healthCheckPath,
+        method: REQUEST_METHODS.GET,
+        headers: {
+          'User-Agent': 'HealthMonitor/1.0',
+          'Accept': 'application/json'
+        },
+        timeout: service.slaThresholdMs * 2
       },
-      resReq: true,
-      attempts: 3,
+      
+      // Retry configuration based on criticality
+      attempts: service.critical ? 3 : 2,
       wait: 1000,
       retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
-      circuitBreaker: breaker,
-      cache: { ttl: 5000 },
-      responseAnalyzer: async ({ status }) => {
-        return status === 200;
+      maxAllowedWait: 5000,
+      
+      // Circuit breaker to prevent cascade failures
+      circuitBreaker: circuitBreaker,
+      
+      // Cache successful health checks (5 second TTL)
+      cache: { ttl: 5000, enabled: true },
+      
+      // Response validation
+      resReq: true,
+      responseAnalyzer: ({ data }) => {
+        return data && typeof data === 'object' && Object.keys(data).length > 0;
+      },
+      
+      // Performance tracking
+      handleSuccessfulAttemptData: async ({ successfulAttemptData }) => {
+        const responseTime = successfulAttemptData.executionTime || 0;
+        const slaCompliant = responseTime <= service.slaThresholdMs;
+        
+        if (!slaCompliant) {
+          console.log(`  ⚠️  SLA Warning: ${responseTime}ms (threshold: ${service.slaThresholdMs}ms)`);
+        } else {
+          console.log(`  ✅ Healthy - ${responseTime}ms`);
+        }
+      },
+      
+      // Error handling
+      finalErrorAnalyzer: async ({ error }) => {
+        console.log(`  ❌ Health check failed: ${error}`);
+        
+        const currentFailures = failureTracker.get(service.name) || 0;
+        failureTracker.set(service.name, currentFailures + 1);
+        
+        if (service.critical && currentFailures >= 2) {
+          console.log(`  🚨 ALERT: Critical service has ${currentFailures + 1} consecutive failures!`);
+        }
+        
+        return false; // Throw error
       }
     });
     
+    // Success - reset failure counter
+    failureTracker.set(service.name, 0);
+    
     const responseTime = Date.now() - startTime;
+    const slaCompliant = responseTime <= service.slaThresholdMs;
     
     return {
-      serviceName: service.name,
-      endpoint: service.path,
-      isHealthy: true,
+      service: service.name,
+      status: slaCompliant ? 'healthy' : 'degraded',
       responseTime,
-      lastCheck: new Date(),
+      timestamp: new Date().toISOString(),
       consecutiveFailures: 0,
-      circuitBreakerState: breaker.getState().state,
-      slaCompliant: responseTime <= service.slaMs
+      circuitBreakerState: 'CLOSED',
+      slaCompliant
     };
+    
   } catch (error) {
+    const consecutiveFailures = failureTracker.get(service.name) || 0;
+    
     return {
-      serviceName: service.name,
-      endpoint: service.path,
-      isHealthy: false,
+      service: service.name,
+      status: 'down',
       responseTime: Date.now() - startTime,
-      lastCheck: new Date(),
-      consecutiveFailures: previousFailures + 1,
-      circuitBreakerState: breaker.getState().state,
+      timestamp: new Date().toISOString(),
+      consecutiveFailures,
+      circuitBreakerState: 'OPEN',
       slaCompliant: false
     };
   }
 }
 
-// Run health checks periodically
-setInterval(async () => {
-  const healthChecks = await Promise.all(
+// Monitor all services
+async function monitorServices() {
+  console.log('🏥 Starting Health Monitoring\n');
+  
+  const results = await Promise.all(
     services.map(service => checkServiceHealth(service))
   );
   
-  healthChecks.forEach(health => {
-    if (!health.isHealthy && health.consecutiveFailures >= 3) {
-      alerting.critical(`Service ${health.serviceName} has failed 3 times`);
-    }
-    
-    if (!health.slaCompliant) {
-      alerting.warning(`Service ${health.serviceName} SLA breach: ${health.responseTime}ms`);
-    }
-    
-    metrics.gauge(`service.health.${health.serviceName}`, health.isHealthy ? 1 : 0);
-    metrics.gauge(`service.response_time.${health.serviceName}`, health.responseTime);
+  console.log('\n📊 Health Monitoring Summary:');
+  results.forEach(health => {
+    const icon = health.status === 'healthy' ? '✅' : 
+                 health.status === 'degraded' ? '⚠️' : '❌';
+    console.log(`${icon} ${health.service}: ${health.status} (${health.responseTime}ms)`);
   });
-}, 10000);</code></pre>
+}
+
+// Run health checks periodically
+setInterval(() => monitorServices(), 10000);
+monitorServices(); // Run immediately</code></pre>
                 </div>
             </div>
 
@@ -471,52 +921,189 @@ setInterval(async () => {
                         </button>
                     </div>
                     <div class="example-output" id="output-04" style="display:none;"></div>
-                    <pre><code class="language-typescript">async function processBatchImages(imageUrls: string[]) {
-  console.log(`Processing ${imageUrls.length} images...`);
+                    <h4>Complete Working Example</h4>
+                    <pre><code class="language-typescript">import { 
+  stableApiGateway, 
+  RETRY_STRATEGIES,
+  RateLimiter,
+  ConcurrencyLimiter,
+  REQUEST_METHODS,
+  VALID_REQUEST_PROTOCOLS,
+  type API_GATEWAY_REQUEST
+} from '@emmvish/stable-request';
+
+// Image processing job types
+interface ImageJob {
+  id: string;
+  imageUrl: string;
+  operations: string[];
+  priority: 'high' | 'normal' | 'low';
+  size: 'small' | 'medium' | 'large';
+}
+
+// Simulated image processing jobs
+const imageBatch: ImageJob[] = [
+  { id: 'img-001', imageUrl: '/photos/1', operations: ['resize', 'thumbnail'], priority: 'high', size: 'large' },
+  { id: 'img-002', imageUrl: '/photos/2', operations: ['watermark'], priority: 'normal', size: 'medium' },
+  { id: 'img-003', imageUrl: '/photos/3', operations: ['compress'], priority: 'low', size: 'small' },
+  { id: 'img-004', imageUrl: '/photos/4', operations: ['resize', 'compress'], priority: 'high', size: 'large' },
+  { id: 'img-005', imageUrl: '/photos/5', operations: ['thumbnail'], priority: 'normal', size: 'small' },
+  { id: 'img-006', imageUrl: '/photos/6', operations: ['watermark', 'compress'], priority: 'low', size: 'medium' },
+  { id: 'img-007', imageUrl: '/photos/7', operations: ['resize'], priority: 'high', size: 'large' },
+  { id: 'img-008', imageUrl: '/photos/8', operations: ['thumbnail', 'watermark'], priority: 'normal', size: 'medium' },
+  { id: 'img-009', imageUrl: '/photos/9', operations: ['compress'], priority: 'low', size: 'small' },
+  { id: 'img-010', imageUrl: '/photos/10', operations: ['resize', 'watermark'], priority: 'high', size: 'large' }
+];
+
+// Initialize rate limiter (20 requests per second)
+const rateLimiter = new RateLimiter(1000, 20);
+
+// Initialize concurrency limiter (max 5 concurrent requests)
+const concurrencyLimiter = new ConcurrencyLimiter(5);
+
+// Track processing results
+const processingResults = {
+  successful: [] as string[],
+  failed: [] as string[],
+  processingTimes: [] as number[]
+};
+
+// Process batch of images
+async function processBatchImages() {
+  const startTime = Date.now();
   
-  // Create requests for each image
-  const requests = imageUrls.map((url, index) => ({
-    id: `image-${index}`,
+  console.log('🖼️  Starting Batch Image Processing');
+  console.log('═'.repeat(70));
+  console.log(`Total Images: ${imageBatch.length}`);
+  console.log(`Rate Limit: 20 req/sec | Concurrency Limit: 5 concurrent`);
+  console.log('');
+  
+  // Convert jobs to API requests
+  const requests: API_GATEWAY_REQUEST[] = imageBatch.map(job => ({
+    id: job.id,
+    groupId: job.priority,
     requestOptions: {
       reqData: {
-        hostname: 'image-api.example.com',
-        path: '/process',
-        method: 'POST',
-        body: { imageUrl: url, operations: ['resize', 'optimize'] },
-        timeout: 30000
+        path: job.imageUrl,
+        method: REQUEST_METHODS.GET
       },
       resReq: true,
-      attempts: 3,
-      wait: 2000,
-      retryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+      
+      // Retry configuration based on priority
+      attempts: job.priority === 'high' ? 5 : job.priority === 'normal' ? 3 : 2,
+      wait: job.priority === 'high' ? 2000 : 1000,
+      retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+      maxAllowedWait: 10000,
+      
+      // Apply rate and concurrency limiting
+      rateLimiter: rateLimiter,
+      concurrencyLimiter: concurrencyLimiter,
+      
+      // Success tracking
+      handleSuccessfulAttemptData: async ({ successfulAttemptData }) => {
+        processingResults.successful.push(job.id);
+        processingResults.processingTimes.push(successfulAttemptData.executionTime || 0);
+        
+        const priorityIcon = job.priority === 'high' ? '🔴' : 
+                           job.priority === 'normal' ? '🟡' : '🟢';
+        console.log(`  ${priorityIcon} ${job.id}: Processed ${job.operations.join(', ')} (${successfulAttemptData.executionTime}ms)`);
+      },
+      
+      // Error handling
+      finalErrorAnalyzer: async ({ error }) => {
+        processingResults.failed.push(job.id);
+        console.log(`  ❌ ${job.id}: Processing failed - ${error}`);
+        return true; // Suppress error to continue with other images
+      }
     }
   }));
   
-  // Process with concurrency and rate limiting
+  console.log('🔄 Processing images...\n');
+  
+  // Execute batch processing with stableApiGateway
   const results = await stableApiGateway(requests, {
     concurrentExecution: true,
-    maxConcurrentRequests: 10,        // Max 10 simultaneous
-    rateLimit: {
-      maxRequests: 100,
-      windowMs: 60000                 // 100 requests per minute
+    
+    // Common configuration
+    commonRequestData: {
+      hostname: 'jsonplaceholder.typicode.com',
+      protocol: VALID_REQUEST_PROTOCOLS.HTTPS,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Batch-ID': `BATCH-${Date.now()}`,
+        'User-Agent': 'ImageProcessor/2.0'
+      },
+      timeout: 10000
     },
-    commonHandleSuccessfulAttemptData: async ({ successfulAttemptData }, { requestId }) => {
-      const progress = ((results.length / imageUrls.length) * 100).toFixed(1);
-      console.log(`✅ Processed ${requestId}: ${progress}% complete`);
-    }
+    
+    // Request groups with different retry strategies
+    requestGroups: [
+      {
+        id: 'high',
+        commonConfig: {
+          commonAttempts: 5,
+          commonWait: 2000,
+          commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL
+        }
+      },
+      {
+        id: 'normal',
+        commonConfig: {
+          commonAttempts: 3,
+          commonWait: 1000,
+          commonRetryStrategy: RETRY_STRATEGIES.LINEAR
+        }
+      },
+      {
+        id: 'low',
+        commonConfig: {
+          commonAttempts: 2,
+          commonWait: 500,
+          commonRetryStrategy: RETRY_STRATEGIES.FIXED
+        }
+      }
+    ],
+    
+    stopOnFirstError: false,
+    commonAttempts: 3,
+    commonWait: 1000
   });
   
-  // Report results
-  const successful = results.filter(r => r.success).length;
-  const failed = results.filter(r => !r.success).length;
+  const duration = Date.now() - startTime;
   
-  console.log(`\nBatch processing complete:`);
-  console.log(`  Total: ${imageUrls.length}`);
-  console.log(`  Successful: ${successful}`);
-  console.log(`  Failed: ${failed}`);
+  // Generate processing report
+  console.log('\n' + '═'.repeat(70));
+  console.log('📊 BATCH PROCESSING SUMMARY');
+  console.log('═'.repeat(70));
   
-  return results;
-}</code></pre>
+  const successfulResults = results.filter(r => r.success);
+  const failedResults = results.filter(r => !r.success);
+  
+  console.log(`\nProcessing Results:`);
+  console.log(`  ✅ Successful: ${successfulResults.length}/${imageBatch.length}`);
+  console.log(`  ❌ Failed: ${failedResults.length}/${imageBatch.length}`);
+  console.log(`  ⏱️  Total Duration: ${duration}ms`);
+  
+  if (processingResults.processingTimes.length > 0) {
+    const avgTime = processingResults.processingTimes.reduce((a, b) => a + b, 0) / 
+                    processingResults.processingTimes.length;
+    console.log(`  📈 Average Time per Image: ${avgTime.toFixed(0)}ms`);
+  }
+  
+  console.log('\n✨ Batch processing complete!');
+  
+  return {
+    totalJobs: imageBatch.length,
+    successful: successfulResults.length,
+    failed: failedResults.length,
+    duration,
+    averageTime: processingResults.processingTimes.reduce((a, b) => a + b, 0) / 
+                 processingResults.processingTimes.length
+  };
+}
+
+// Run the batch processing
+processBatchImages();</code></pre>
                 </div>
             </div>
 
@@ -555,47 +1142,202 @@ setInterval(async () => {
                         </button>
                     </div>
                     <div class="example-output" id="output-05" style="display:none;"></div>
-                    <pre><code class="language-typescript">// Test different feature configurations
-async function testFeatureFlag(featureName: string, config: any) {
-  console.log(`Testing feature: ${featureName}`);
+                    <h4>Complete Working Example</h4>
+                    <pre><code class="language-typescript">import { 
+  stableRequest, 
+  RETRY_STRATEGIES,
+  REQUEST_METHODS,
+  VALID_REQUEST_PROTOCOLS
+} from '@emmvish/stable-request';
+
+// Test scenarios
+interface ChaosScenario {
+  name: string;
+  description: string;
+  failureProbability: number;
+  retryFailureProbability?: number;
+  expectedBehavior: string;
+}
+
+// Define chaos engineering scenarios
+const chaosScenarios: ChaosScenario[] = [
+  {
+    name: 'Healthy System',
+    description: 'No failures - baseline test',
+    failureProbability: 0,
+    expectedBehavior: 'All requests succeed immediately'
+  },
+  {
+    name: 'Intermittent Failures',
+    description: '30% initial failure rate with recovery',
+    failureProbability: 0.3,
+    retryFailureProbability: 0.1,
+    expectedBehavior: 'Some requests fail initially but recover on retry'
+  },
+  {
+    name: 'High Failure Rate',
+    description: '70% failure rate with some recovery',
+    failureProbability: 0.7,
+    retryFailureProbability: 0.4,
+    expectedBehavior: 'Most requests require multiple retries'
+  },
+  {
+    name: 'Persistent Failures',
+    description: '50% failure rate that persists',
+    failureProbability: 0.5,
+    retryFailureProbability: 0.9,
+    expectedBehavior: 'Significant failures even after retries'
+  },
+  {
+    name: 'Complete Outage',
+    description: '100% failure rate - total unavailability',
+    failureProbability: 1.0,
+    retryFailureProbability: 1.0,
+    expectedBehavior: 'All requests fail after exhausting retries'
+  }
+];
+
+// Track test results
+interface TestResult {
+  scenario: string;
+  success: boolean;
+  attempts: number;
+  duration: number;
+  error?: string;
+}
+
+const testResults: TestResult[] = [];
+
+// Run chaos test for a single scenario
+async function runChaosTest(scenario: ChaosScenario): Promise<TestResult> {
+  console.log(`\n🧪 Testing: ${scenario.name}`);
+  console.log(`   ${scenario.description}`);
+  console.log(`   Failure Rate: ${(scenario.failureProbability * 100).toFixed(0)}% initial`);
   
-  const results = await stableRequest({
-    reqData: {
-      hostname: 'api.example.com',
-      path: '/feature-test',
-      method: 'POST',
-      body: { feature: featureName, config }
-    },
-    resReq: true,
-    attempts: 5,
-    wait: 1000,
-    retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
-    trialMode: {
-      trialModeOn: true,
-      successProbability: config.expectedSuccessRate,
-      trialModeData: {
-        feature: featureName,
+  const startTime = Date.now();
+  let attemptCount = 0;
+  
+  try {
+    await stableRequest({
+      reqData: {
+        hostname: 'api.example.com',
+        protocol: VALID_REQUEST_PROTOCOLS.HTTPS,
+        path: '/chaos-test',
+        method: REQUEST_METHODS.GET,
+        headers: {
+          'X-Test-Scenario': scenario.name
+        },
+        timeout: 5000
+      },
+      
+      // Configure retry behavior
+      attempts: 5,
+      wait: 500,
+      retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+      maxAllowedWait: 3000,
+      
+      // Enable trial mode for failure simulation
+      trialMode: {
         enabled: true,
-        config,
-        timestamp: Date.now()
-      }
+        reqFailureProbability: scenario.failureProbability,
+        retryFailureProbability: scenario.retryFailureProbability
+      },
+      
+      // Track all attempts
+      handleSuccessfulAttemptData: async ({ successfulAttemptData }) => {
+        attemptCount = parseInt(successfulAttemptData.attempt?.split('/')[0] || '1');
+        if (attemptCount > 1) {
+          console.log(`   ✅ Recovered on attempt ${attemptCount} (${successfulAttemptData.executionTime}ms)`);
+        } else {
+          console.log(`   ✅ Succeeded immediately (${successfulAttemptData.executionTime}ms)`);
+        }
+      },
+      
+      // Error analysis
+      finalErrorAnalyzer: async ({ error }) => {
+        console.log(`   ❌ Failed: ${error}`);
+        return false; // Re-throw
+      },
+      
+      resReq: true
+    });
+    
+    const duration = Date.now() - startTime;
+    
+    return {
+      scenario: scenario.name,
+      success: true,
+      attempts: attemptCount,
+      duration
+    };
+    
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    
+    return {
+      scenario: scenario.name,
+      success: false,
+      attempts: attemptCount,
+      duration,
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+// Run all chaos engineering tests
+async function runChaosEngineeringTests() {
+  console.log('🌪️  Starting Chaos Engineering Tests');
+  console.log('═'.repeat(70));
+  console.log('Testing system resilience under various failure scenarios');
+  console.log(`Total Scenarios: ${chaosScenarios.length}`);
+  console.log('═'.repeat(70));
+  
+  // Run each scenario
+  for (const scenario of chaosScenarios) {
+    const result = await runChaosTest(scenario);
+    testResults.push(result);
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  
+  // Generate comprehensive resilience report
+  console.log('\n' + '═'.repeat(70));
+  console.log('📊 CHAOS ENGINEERING RESULTS');
+  console.log('═'.repeat(70));
+  
+  const successfulTests = testResults.filter(r => r.success).length;
+  console.log(`\nOverall Statistics:`);
+  console.log(`  Tests Passed: ${successfulTests}/${testResults.length}`);
+  console.log(`  Tests Failed: ${testResults.length - successfulTests}/${testResults.length}`);
+  
+  console.log(`\nResilience Analysis:`);
+  testResults.forEach((result, index) => {
+    const scenario = chaosScenarios[index];
+    const icon = result.success ? '✅' : '❌';
+    
+    console.log(`\n${icon} ${result.scenario}:`);
+    console.log(`   Expected: ${scenario.expectedBehavior}`);
+    console.log(`   Result: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+    console.log(`   Attempts Used: ${result.attempts}`);
+    console.log(`   Duration: ${result.duration}ms`);
+    
+    if (result.error) {
+      console.log(`   Error: ${result.error}`);
     }
   });
   
-  return results;
+  console.log('\n' + '═'.repeat(70));
+  console.log('✅ Chaos engineering tests complete!');
+  
+  return {
+    totalTests: testResults.length,
+    passed: successfulTests,
+    failed: testResults.length - successfulTests,
+    results: testResults
+  };
 }
 
-// Run A/B tests
-const testScenarios = [
-  { name: 'feature-A', config: { timeout: 5000 }, expectedSuccessRate: 0.95 },
-  { name: 'feature-B', config: { timeout: 3000 }, expectedSuccessRate: 0.85 },
-  { name: 'feature-C', config: { timeout: 1000 }, expectedSuccessRate: 0.60 }
-];
-
-for (const scenario of testScenarios) {
-  const result = await testFeatureFlag(scenario.name, scenario.config);
-  console.log(`${scenario.name}: ${result ? 'SUCCESS' : 'FAILED'}`);
-}</code></pre>
+// Run chaos engineering tests
+runChaosEngineeringTests();</code></pre>
                 </div>
             </div>
 
@@ -643,7 +1385,7 @@ for (const scenario of testScenarios) {
                         </button>
                     </div>
                     <div class="example-output" id="output-06" style="display:none;"></div>
-                    <h4>Imports and Setup</h4>
+                    <h4>Complete Working Example - State Persistence</h4>
                     <pre><code class="language-typescript">import { 
   stableWorkflow, 
   PHASE_DECISION_ACTIONS,
@@ -651,10 +1393,14 @@ for (const scenario of testScenarios) {
   VALID_REQUEST_PROTOCOLS,
   type STABLE_WORKFLOW_PHASE,
   type StatePersistenceOptions
-} from '../src/index.js';
+} from '@emmvish/stable-request';
+
+// ============================================================================
+// STATE PERSISTENCE LAYER
+// ============================================================================
 
 /**
- * Redis-like storage for demonstration
+ * Simulated Redis-like storage
  * In production, use actual Redis client (ioredis or node-redis)
  */
 class StateStorage {
@@ -663,13 +1409,18 @@ class StateStorage {
   async setex(key: string, ttl: number, value: string): Promise<void> {
     const expiresAt = Date.now() + (ttl * 1000);
     this.storage.set(key, { value, expiresAt });
-    console.log(`    💾 Stored state: ${key} (TTL: ${ttl}s)`);
+    console.log(`    💾 Stored state: ${key}`);
   }
 
   async get(key: string): Promise<string | null> {
     const entry = this.storage.get(key);
     if (!entry || Date.now() > entry.expiresAt) return null;
+    console.log(`    📥 Loaded state: ${key}`);
     return entry.value;
+  }
+
+  async del(key: string): Promise<void> {
+    this.storage.delete(key);
   }
 }
 
@@ -678,24 +1429,23 @@ const stateStore = new StateStorage();
 /**
  * Redis persistence function with distributed locking
  */
-async function persistToRedis({ executionContext, params, buffer }) {
+async function persistToRedis({ executionContext, params, buffer }: StatePersistenceOptions): Promise<Record<string, any>> {
   const { workflowId, phaseId, branchId } = executionContext;
   const { ttl = 86400, enableLocking = false, namespace = 'workflow' } = params || {};
   
-  // Generate hierarchical key
+  // Generate hierarchical state key
   const stateKey = `${namespace}:${workflowId}:${branchId || 'main'}:${phaseId || 'global'}`;
   const lockKey = `lock:${stateKey}`;
   
   const isStoring = buffer && Object.keys(buffer).length > 0;
   
   if (enableLocking) {
-    // Acquire distributed lock
     await stateStore.setex(lockKey, 5, `${Date.now()}-${Math.random()}`);
   }
   
   try {
     if (isStoring) {
-      // STORE MODE: Save state with metadata
+      // STORE MODE
       const stateWithMeta = {
         ...buffer,
         _meta: {
@@ -708,16 +1458,15 @@ async function persistToRedis({ executionContext, params, buffer }) {
       
       await stateStore.setex(stateKey, ttl, JSON.stringify(stateWithMeta));
       
-      // Create audit log entry
+      // Audit log
       const auditKey = `${namespace}:audit:${workflowId}:${Date.now()}`;
       await stateStore.setex(auditKey, ttl * 2, JSON.stringify({
         action: 'state_saved',
         phaseId,
-        timestamp: new Date().toISOString(),
-        stateSnapshot: stateWithMeta
+        timestamp: new Date().toISOString()
       }));
     } else {
-      // LOAD MODE: Retrieve state
+      // LOAD MODE
       const data = await stateStore.get(stateKey);
       return data ? JSON.parse(data) : {};
     }
@@ -728,137 +1477,291 @@ async function persistToRedis({ executionContext, params, buffer }) {
   }
   
   return {};
-}</code></pre>
+}
 
-                    <h4>Data Extraction with Mock Data</h4>
-                    <pre><code class="language-typescript">// Phase 1: Extract source data (using mock data for demonstration)
-{
-  id: 'extract-source-data',
-  concurrentExecution: false,
-  requests: [{
-    id: 'extract-users',
-    requestOptions: {
-      reqData: { 
-        hostname: 'jsonplaceholder.typicode.com', 
-        path: '/posts/1', 
-        method: REQUEST_METHODS.GET 
-      },
-      resReq: false, // Don't make actual request
-      preExecution: {
-        preExecutionHook: ({ commonBuffer }) => {
-          console.log('📥 Phase 1: Extracting source data...');
-          const buffer = commonBuffer as WorkflowState;
-          
-          // Generate 100 mock records
-          buffer.sourceRecords = Array.from({ length: 100 }, (_, i) => ({
-            id: i + 1,
-            name: `User ${i + 1}`,
-            email: `user${i + 1}@example.com`,
-            username: `user${i + 1}`,
-            company: { name: `Company ${i % 10}` },
-            address: { geo: { lat: '0.0', lng: '0.0' } }
-          }));
-          
-          buffer.totalRecords = buffer.sourceRecords.length;
-          buffer.progress = 20;
-          console.log(`✅ Extracted ${buffer.sourceRecords.length} records`);
-          return {};
+/**
+ * Checkpoint persistence for phase completion tracking
+ */
+async function createCheckpoint({ executionContext, params, buffer }: StatePersistenceOptions): Promise<Record<string, any>> {
+  const { workflowId, phaseId } = executionContext;
+  const { ttl = 86400 } = params || {};
+  
+  const checkpointKey = `checkpoint:${workflowId || 'default'}`;
+  
+  if (buffer && Object.keys(buffer).length > 0) {
+    const existingData = await stateStore.get(checkpointKey);
+    const existing = existingData ? JSON.parse(existingData) : {};
+    
+    const checkpointData = {
+      ...existing,
+      completedPhases: [...new Set([...(existing.completedPhases || []), ...(buffer.completedPhases || [])])],
+      lastPhase: phaseId || existing.lastPhase,
+      lastUpdated: new Date().toISOString(),
+      progress: buffer.progress || existing.progress || 0,
+      processedRecords: buffer.recordsProcessed || existing.processedRecords || 0
+    };
+    
+    await stateStore.setex(checkpointKey, ttl, JSON.stringify(checkpointData));
+    console.log(`    ✅ Checkpoint saved (Progress: ${checkpointData.progress}%)`);
+  } else {
+    const data = await stateStore.get(checkpointKey);
+    return data ? JSON.parse(data) : { completedPhases: [], processedRecords: 0 };
+  }
+  
+  return {};
+}
+
+// ============================================================================
+// WORKFLOW STATE
+// ============================================================================
+
+interface WorkflowState {
+  sourceRecords: any[];
+  transformedRecords: any[];
+  validatedRecords: any[];
+  migratedRecords: any[];
+  failedRecords: any[];
+  completedPhases: string[];
+  currentPhase: string;
+  progress: number;
+  recordsProcessed: number;
+  totalRecords: number;
+  startTime: number;
+  lastUpdateTime: number;
+  attemptCount: number;
+  errors: string[];
+  canResume: boolean;
+  resumeFromPhase: string | null;
+}
+
+const workflowState: WorkflowState = {
+  sourceRecords: [],
+  transformedRecords: [],
+  validatedRecords: [],
+  migratedRecords: [],
+  failedRecords: [],
+  completedPhases: [],
+  currentPhase: '',
+  progress: 0,
+  recordsProcessed: 0,
+  totalRecords: 0,
+  startTime: Date.now(),
+  lastUpdateTime: Date.now(),
+  attemptCount: 0,
+  errors: [],
+  canResume: true,
+  resumeFromPhase: null
+};
+
+// ============================================================================
+// WORKFLOW DEFINITION
+// ============================================================================
+
+const WORKFLOW_ID = `migration-${Date.now()}`;
+const SOURCE_API = 'jsonplaceholder.typicode.com';
+
+const migrationPhases: STABLE_WORKFLOW_PHASE[] = [
+  // PHASE 1: Data Extraction
+  {
+    id: 'extract-source-data',
+    requests: [
+      {
+        id: 'extract-users',
+        requestOptions: {
+          reqData: { 
+            hostname: SOURCE_API,
+            path: '/posts/1',
+            method: REQUEST_METHODS.GET
+          },
+          resReq: false,
+          preExecution: {
+            preExecutionHook: ({ commonBuffer }) => {
+              console.log('\n📥 Phase 1: Extracting source data...');
+              const buffer = commonBuffer as WorkflowState;
+              
+              // Generate mock data
+              buffer.sourceRecords = Array.from({ length: 100 }, (_, i) => ({
+                id: i + 1,
+                name: `User ${i + 1}`,
+                email: `user${i + 1}@example.com`,
+                username: `user${i + 1}`,
+                company: { name: `Company ${i % 10}` },
+                address: { geo: { lat: '0.0', lng: '0.0' } }
+              }));
+              
+              buffer.totalRecords = buffer.sourceRecords.length;
+              buffer.progress = 20;
+              buffer.recordsProcessed = buffer.sourceRecords.length;
+              console.log(`  ✅ Extracted ${buffer.sourceRecords.length} records`);
+              return {};
+            },
+            applyPreExecutionConfigOverride: false
+          }
         }
       }
+    ],
+    phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+      const buffer = sharedBuffer as WorkflowState;
+      
+      if (buffer.completedPhases.includes('extract-source-data')) {
+        console.log(`  ⏩ Phase already completed, skipping...`);
+        return { action: PHASE_DECISION_ACTIONS.SKIP, skipToPhaseId: 'transform-data' };
+      }
+      
+      if (phaseResult.success && buffer.sourceRecords.length > 0) {
+        buffer.completedPhases.push('extract-source-data');
+        return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+      }
+      
+      return { action: PHASE_DECISION_ACTIONS.TERMINATE };
+    },
+    statePersistence: {
+      persistenceFunction: persistToRedis,
+      persistenceParams: { ttl: 3600, enableLocking: true, namespace: 'migration' },
+      loadBeforeHooks: true,
+      storeAfterHooks: true
     }
-  }],
-  phaseDecisionHook: async ({ sharedBuffer }) => {
-    // Check if phase already completed (recovery scenario)
-    if (sharedBuffer.completedPhases.includes('extract-source-data')) {
-      console.log('Phase already completed, skipping...');
-      return { 
-        action: PHASE_DECISION_ACTIONS.SKIP, 
-        skipToPhaseId: 'transform-data' 
-      };
-    }
-    
-    if (sharedBuffer.sourceRecords.length > 0) {
-      sharedBuffer.completedPhases.push('extract-source-data');
-      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
-    }
-    
-    return { action: PHASE_DECISION_ACTIONS.TERMINATE };
   },
-  statePersistence: {
-    persistenceFunction: persistToRedis,
-    persistenceParams: { ttl: 3600, enableLocking: true, namespace: 'migration' },
-    loadBeforeHooks: true,
-    storeAfterHooks: true
-  }
-},
 
-// Phase 2: Transform data
-{
-  id: 'transform-data',
-  requests: [{
-    id: 'transform-records',
-    requestOptions: {
-      reqData: { 
-        hostname: 'jsonplaceholder.typicode.com', 
-        path: '/posts/1', 
-        method: REQUEST_METHODS.GET 
-      },
-      resReq: false,
-      preExecution: {
-        preExecutionHook: ({ commonBuffer }) => {
-          const buffer = commonBuffer as WorkflowState;
-          
-          buffer.transformedRecords = buffer.sourceRecords.map(record => ({
-            id: record.id,
-            externalId: record.id,
-            name: record.name,
-            email: record.email?.toLowerCase(),
-            username: record.username,
-            company: record.company?.name,
-            metadata: {
-              importedAt: new Date().toISOString(),
-              source: 'jsonplaceholder',
-              workflowId: WORKFLOW_ID
-            }
-          }));
-          
-          buffer.progress = 30;
-          console.log(`✅ Transformed ${buffer.transformedRecords.length} records`);
-          return {};
+  // PHASE 2: Data Transformation
+  {
+    id: 'transform-data',
+    requests: [
+      {
+        id: 'transform-records',
+        requestOptions: {
+          reqData: { 
+            hostname: SOURCE_API,
+            path: '/posts/1',
+            method: REQUEST_METHODS.GET
+          },
+          resReq: false,
+          preExecution: {
+            preExecutionHook: ({ commonBuffer }) => {
+              console.log('\n🔄 Phase 2: Transforming data...');
+              const buffer = commonBuffer as WorkflowState;
+              
+              buffer.transformedRecords = buffer.sourceRecords.map(record => ({
+                id: record.id,
+                externalId: record.id,
+                name: record.name,
+                email: record.email?.toLowerCase(),
+                username: record.username,
+                company: record.company?.name,
+                metadata: {
+                  importedAt: new Date().toISOString(),
+                  source: 'jsonplaceholder',
+                  workflowId: WORKFLOW_ID
+                }
+              }));
+              
+              buffer.progress = 40;
+              console.log(`  ✅ Transformed ${buffer.transformedRecords.length} records`);
+              return {};
+            },
+            applyPreExecutionConfigOverride: false
+          }
         }
       }
+    ],
+    phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+      const buffer = sharedBuffer as WorkflowState;
+      
+      if (buffer.completedPhases.includes('transform-data')) {
+        console.log(`  ⏩ Phase already completed, skipping...`);
+        return { action: PHASE_DECISION_ACTIONS.SKIP, skipToPhaseId: 'validate-data' };
+      }
+      
+      if (phaseResult.success && buffer.transformedRecords.length > 0) {
+        buffer.completedPhases.push('transform-data');
+        return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+      }
+      
+      if (buffer.attemptCount < 2) {
+        buffer.attemptCount++;
+        return { action: PHASE_DECISION_ACTIONS.REPLAY };
+      }
+      
+      return { action: PHASE_DECISION_ACTIONS.TERMINATE };
+    },
+    allowReplay: true,
+    maxReplayCount: 2,
+    statePersistence: {
+      persistenceFunction: persistToRedis,
+      persistenceParams: { ttl: 3600, enableLocking: true, namespace: 'migration' },
+      loadBeforeHooks: true,
+      storeAfterHooks: true
     }
-  }],
-  phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
-    if (sharedBuffer.completedPhases.includes('transform-data')) {
-      return { action: PHASE_DECISION_ACTIONS.SKIP, skipToPhaseId: 'validate-data' };
-    }
-    
-    if (phaseResult.success && sharedBuffer.transformedRecords.length > 0) {
-      sharedBuffer.completedPhases.push('transform-data');
-      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
-    }
-    
-    // Retry logic using attemptCount from buffer
-    if (sharedBuffer.attemptCount < 2) {
-      sharedBuffer.attemptCount++;
-      return { action: PHASE_DECISION_ACTIONS.REPLAY };
-    }
-    
-    return { action: PHASE_DECISION_ACTIONS.TERMINATE };
   },
-  allowReplay: true,
-  maxReplayCount: 2,
-  statePersistence: {
-    persistenceFunction: persistToRedis,
-    persistenceParams: { ttl: 3600, enableLocking: true, namespace: 'migration' },
-    loadBeforeHooks: true,
-    storeAfterHooks: true
-  }
-}</code></pre>
 
-                    <h4>Workflow Execution Configuration</h4>
-                    <pre><code class="language-typescript">// Execute workflow with global state persistence
+  // PHASE 3: Data Validation
+  {
+    id: 'validate-data',
+    requests: [
+      {
+        id: 'validate-records',
+        requestOptions: {
+          reqData: { 
+            hostname: SOURCE_API,
+            path: '/posts/1',
+            method: REQUEST_METHODS.GET
+          },
+          resReq: false,
+          preExecution: {
+            preExecutionHook: ({ commonBuffer }) => {
+              console.log('\n🔍 Phase 3: Validating data...');
+              const buffer = commonBuffer as WorkflowState;
+              
+              buffer.validatedRecords = buffer.transformedRecords.filter(record => {
+                return record.email && record.email.includes('@') && 
+                       record.name && record.name.length >= 3;
+              });
+              
+              buffer.failedRecords = buffer.transformedRecords.filter(record => {
+                return !record.email || !record.email.includes('@') || 
+                       !record.name || record.name.length < 3;
+              });
+              
+              buffer.progress = 70;
+              console.log(`  ✅ Validated: ${buffer.validatedRecords.length} passed, ${buffer.failedRecords.length} failed`);
+              return {};
+            },
+            applyPreExecutionConfigOverride: false
+          }
+        }
+      }
+    ],
+    phaseDecisionHook: async ({ phaseResult, sharedBuffer }) => {
+      const buffer = sharedBuffer as WorkflowState;
+      
+      if (buffer.completedPhases.includes('validate-data')) {
+        console.log(`  ⏩ Phase already completed, skipping...`);
+        return { action: PHASE_DECISION_ACTIONS.SKIP, skipToPhaseId: 'migrate-data' };
+      }
+      
+      if (phaseResult.success && buffer.validatedRecords.length > 0) {
+        buffer.completedPhases.push('validate-data');
+        return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+      }
+      
+      return { action: PHASE_DECISION_ACTIONS.TERMINATE };
+    },
+    statePersistence: {
+      persistenceFunction: persistToRedis,
+      persistenceParams: { ttl: 3600, enableLocking: true, namespace: 'migration' },
+      loadBeforeHooks: true,
+      storeAfterHooks: true
+    }
+  }
+];
+
+// ============================================================================
+// WORKFLOW EXECUTION
+// ============================================================================
+
+console.log('🚀 Starting Distributed Workflow with State Persistence');
+console.log(`Workflow ID: ${WORKFLOW_ID}\n`);
+
 const result = await stableWorkflow(migrationPhases, {
   workflowId: WORKFLOW_ID,
   commonRequestData: { 
@@ -877,33 +1780,44 @@ const result = await stableWorkflow(migrationPhases, {
   },
   handlePhaseCompletion: async ({ phaseResult, sharedBuffer }) => {
     const buffer = sharedBuffer as WorkflowState;
-    console.log(`✅ Phase "${phaseResult.phaseId}" completed`);
+    console.log(`\n✅ Phase "${phaseResult.phaseId}" completed`);
     console.log(`   Duration: ${phaseResult.executionTime}ms`);
     console.log(`   Progress: ${buffer.progress}%`);
-  },
-  handlePhaseError: async ({ phaseResult, error, sharedBuffer }) => {
-    const buffer = sharedBuffer as WorkflowState;
-    console.error(`❌ Phase "${phaseResult.phaseId}" failed: ${error.message}`);
-    buffer.errors.push(`Phase ${phaseResult.phaseId}: ${error.message}`);
   }
-});</code></pre>
+});
 
+console.log('\n📊 Workflow Results:');
+console.log(`Success: ${result.success}`);
+console.log(`Total Phases: ${result.totalPhases}`);
+console.log(`Duration: ${result.executionTime}ms`);
+console.log(`Records Processed: ${workflowState.recordsProcessed}`);</code></pre>
+                    
                     <h4>Workflow Recovery Pattern</h4>
                     <pre><code class="language-typescript">/**
  * Resume workflow from last checkpoint
+ * This function demonstrates how to recover and resume a failed workflow
  */
 async function resumeWorkflow(workflowId: string) {
-  // Load checkpoint from Redis
-  const checkpointData = await redis.get(`checkpoint:${workflowId}`);
+  // Load checkpoint from storage
+  const checkpointData = await stateStore.get(`checkpoint:${workflowId}`);
   const checkpoint = checkpointData ? JSON.parse(checkpointData) : {
     completedPhases: [],
     processedRecords: 0
   };
   
-  console.log(`Resuming workflow from: ${checkpoint.lastPhase || 'start'}`);
-  console.log(`Previously completed: ${checkpoint.completedPhases.join(', ')}`);
+  console.log(`📂 Resuming workflow: ${workflowId}`);
+  console.log(`   Last phase: ${checkpoint.lastPhase || 'start'}`);
+  console.log(`   Completed: ${checkpoint.completedPhases.join(', ') || 'none'}`);
   
-  // Execute workflow - completed phases will be automatically skipped
+  // Restore state from checkpoint
+  const restoredState: WorkflowState = {
+    ...workflowState,
+    completedPhases: checkpoint.completedPhases,
+    processedRecords: checkpoint.processedRecords,
+    progress: checkpoint.progress || 0
+  };
+  
+  // Execute workflow - completed phases will be skipped automatically
   const result = await stableWorkflow(migrationPhases, {
     workflowId,
     commonRequestData: { 
@@ -911,24 +1825,21 @@ async function resumeWorkflow(workflowId: string) {
       protocol: VALID_REQUEST_PROTOCOLS.HTTPS
     },
     enableNonLinearExecution: true,
-    sharedBuffer: {
-      completedPhases: checkpoint.completedPhases,
-      processedRecords: checkpoint.processedRecords,
-      // ... restore other state
-    },
+    sharedBuffer: restoredState,
     commonStatePersistence: {
-      persistenceFunction: persistToRedis,
-      persistenceParams: { ttl: 3600 },
+      persistenceFunction: createCheckpoint,
+      persistenceParams: { ttl: 7200 },
       loadBeforeHooks: true,
       storeAfterHooks: true
     }
   });
   
+  console.log(`\n✅ Workflow resumed and ${result.success ? 'completed' : 'failed'}`);
   return result;
 }
 
-// Can be called multiple times - will resume from last checkpoint
-await resumeWorkflow('migration-12345');</code></pre>
+// Example usage: Can be called multiple times to resume from last checkpoint
+// await resumeWorkflow('migration-12345');</code></pre>
                 </div>
             </div>
         </div>
@@ -1026,31 +1937,42 @@ await resumeWorkflow('migration-12345');</code></pre>
                 log(outputId, '📍 Phase 1: Fetching data from multiple sources', 'phase');
                 await delay(500);
                 
-                const sources = ['users', 'posts', 'comments'];
-                for (const source of sources) {
-                    log(outputId, `Fetching ${source}...`, 'info');
-                    await simulateRequest(`/${source}`);
-                    log(outputId, `✓ ${source} fetched successfully`, 'success');
-                    await delay(200);
-                }
+                log(outputId, 'GET https://jsonplaceholder.typicode.com/users?_limit=5', 'info');
+                await simulateRequest('/users?_limit=5');
+                log(outputId, '✓ Fetched 5 users successfully', 'success');
+                await delay(200);
+                
+                log(outputId, 'GET https://jsonplaceholder.typicode.com/posts?_limit=10', 'info');
+                await simulateRequest('/posts?_limit=10');
+                log(outputId, '✓ Fetched 10 posts successfully', 'success');
+                await delay(200);
+                
+                log(outputId, 'GET https://jsonplaceholder.typicode.com/comments?_limit=20', 'info');
+                await simulateRequest('/comments?_limit=20');
+                log(outputId, '✓ Fetched 20 comments successfully', 'success');
+                await delay(200);
+                
                 log(outputId, 'Phase 1 completed in 1250ms', 'success');
                 
                 // Phase 2: Data enrichment
                 log(outputId, '📍 Phase 2: Enriching data', 'phase');
                 await delay(500);
-                log(outputId, 'Enriching posts with user data...', 'info');
-                await delay(600);
-                log(outputId, 'Enriching posts with comment counts...', 'info');
+                log(outputId, 'Matching posts with authors...', 'info');
                 await delay(400);
-                log(outputId, '✓ Enriched 25 posts with author and comment data', 'success');
+                log(outputId, 'Calculating comment statistics...', 'info');
+                await delay(400);
+                log(outputId, '✓ Enriched 10 posts with author and comment data', 'success');
+                log(outputId, 'Average comments per post: 2.0', 'info');
                 log(outputId, 'Phase 2 completed in 890ms', 'success');
                 
                 // Phase 3: Validation
                 log(outputId, '📍 Phase 3: Validating enriched data', 'phase');
                 await delay(400);
-                log(outputId, 'Running validation rules...', 'info');
-                await delay(500);
-                log(outputId, '✓ All 25 records passed validation', 'success');
+                log(outputId, 'Validating post titles (1-100 chars)...', 'info');
+                await delay(300);
+                log(outputId, 'Validating comment counts (>= 0)...', 'info');
+                await delay(300);
+                log(outputId, '✓ All 10 records passed validation', 'success');
                 log(outputId, 'Phase 3 completed in 650ms', 'success');
                 
                 // Phase 4: Batch upload
@@ -1058,19 +1980,20 @@ await resumeWorkflow('migration-12345');</code></pre>
                 await delay(300);
                 
                 for (let i = 1; i <= 5; i++) {
-                    log(outputId, `Uploading batch ${i}/5...`, 'info');
+                    log(outputId, `POST /api/sync/batch-${i}`, 'info');
                     await simulateRequest('/api/sync', { mockData: { batchId: i } });
+                    log(outputId, `✓ Batch ${i}/5 uploaded (2 records)`, 'success');
                     await delay(200);
                 }
-                log(outputId, '✓ All batches uploaded successfully', 'success');
                 log(outputId, 'Phase 4 completed in 1420ms', 'success');
                 
                 // Final summary
                 await delay(300);
                 log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
-                log(outputId, '🎉 Workflow completed successfully!', 'success');
+                log(outputId, '🎉 Data synchronization completed successfully!', 'success');
                 log(outputId, 'Total execution time: 4210ms', 'info');
-                log(outputId, 'Successful requests: 28/28', 'success');
+                log(outputId, 'Total records processed: 10 posts', 'success');
+                log(outputId, 'Successful API calls: 8/8', 'success');
                 log(outputId, 'Failed requests: 0', 'info');
             } catch (error) {
                 log(outputId, `Workflow failed: ${error.message}`, 'error');
@@ -1081,6 +2004,7 @@ await resumeWorkflow('migration-12345');</code></pre>
         async function runExample02(outputId) {
             log(outputId, '🚀 Starting Microservice Orchestration', 'info');
             log(outputId, 'Workflow ID: order-processing', 'info');
+            log(outputId, 'Order ID: ORD-2024-001', 'info');
             log(outputId, 'Mode: Concurrent branch execution', 'info');
             
             try {
@@ -1088,42 +2012,43 @@ await resumeWorkflow('migration-12345');</code></pre>
                 
                 // Simulate concurrent branches
                 const branches = [
-                    { id: 'user-service', critical: true, phases: ['validate-user'] },
-                    { id: 'inventory-service', critical: true, phases: ['check-stock', 'reserve-items'] },
-                    { id: 'payment-service', critical: true, phases: ['authorize-payment', 'capture-payment'] },
-                    { id: 'notification-service', critical: false, phases: ['send-notifications'] }
+                    { id: 'user-validation', name: 'User Validation Service', phases: ['validate-user'] },
+                    { id: 'inventory', name: 'Inventory Service', phases: ['check-stock', 'reserve-items'] },
+                    { id: 'payment', name: 'Payment Processing Service', phases: ['authorize', 'capture'] },
+                    { id: 'notification', name: 'Notification Service', phases: ['send-email', 'send-sms'] }
                 ];
                 
-                log(outputId, `Starting ${branches.length} branches in parallel...`, 'info');
+                log(outputId, `Starting ${branches.length} service branches in parallel...`, 'info');
                 await delay(300);
                 
                 for (const branch of branches) {
-                    log(outputId, `🔀 Branch: ${branch.id} (${branch.critical ? 'CRITICAL' : 'OPTIONAL'})`, 'phase');
+                    log(outputId, `🔀 Branch: ${branch.name}`, 'phase');
+                    log(outputId, `  Circuit Breaker: CLOSED (0 failures)`, 'info');
                     
                     for (const phase of branch.phases) {
                         log(outputId, `  ➤ Phase: ${phase}`, 'info');
                         await delay(400);
                         
                         try {
-                            await simulateRequest(`/${branch.id}/${phase}`);
-                            log(outputId, `  ✓ ${phase} completed`, 'success');
+                            await simulateRequest(`/api/${branch.id}/${phase}`);
+                            log(outputId, `  ✓ ${phase} completed successfully`, 'success');
+                            log(outputId, `  ⚙️  Circuit state: CLOSED`, 'info');
                         } catch (error) {
-                            if (branch.critical) {
-                                throw new Error(`Critical branch ${branch.id} failed`);
-                            }
-                            log(outputId, `  ⚠️  ${phase} failed (non-critical)`, 'warning');
+                            log(outputId, `  ✗ ${phase} failed`, 'error');
+                            log(outputId, `  ⚠️  Circuit Breaker: OPENED`, 'warning');
                         }
                         await delay(200);
                     }
                     
-                    log(outputId, `✓ Branch ${branch.id} completed`, 'success');
+                    log(outputId, `✓ Branch "${branch.name}" completed`, 'success');
                     await delay(300);
                 }
                 
                 log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
-                log(outputId, '🎉 Order processing completed successfully!', 'success');
-                log(outputId, 'All critical branches: SUCCESS', 'success');
+                log(outputId, '🎉 Order ORD-2024-001 processed successfully!', 'success');
+                log(outputId, 'All service branches: COMPLETED', 'success');
                 log(outputId, 'Total branches: 4', 'info');
+                log(outputId, 'Circuit breakers: All CLOSED', 'success');
             } catch (error) {
                 log(outputId, `Workflow failed: ${error.message}`, 'error');
                 log(outputId, 'Initiating rollback procedures...', 'warning');
@@ -1133,54 +2058,74 @@ await resumeWorkflow('migration-12345');</code></pre>
         // Example 03: API Health Monitoring
         async function runExample03(outputId) {
             log(outputId, '🚀 Starting API Health Monitor', 'info');
-            log(outputId, 'Checking 3 services...', 'info');
+            log(outputId, 'Monitoring interval: Every 30 seconds', 'info');
+            log(outputId, 'Checking 3 critical services...', 'info');
             
             const services = [
-                { name: 'user-api', sla: 500, critical: true },
-                { name: 'order-api', sla: 1000, critical: true },
-                { name: 'notification-api', sla: 2000, critical: false }
+                { name: 'User Authentication API', url: 'https://api.example.com/auth', sla: 200 },
+                { name: 'Payment Gateway', url: 'https://api.example.com/payments', sla: 500 },
+                { name: 'Order Management System', url: 'https://api.example.com/orders', sla: 1000 }
             ];
             
             log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
             
             for (const service of services) {
                 log(outputId, `Checking ${service.name}...`, 'info');
+                log(outputId, `  Endpoint: ${service.url}/health`, 'info');
                 const startTime = Date.now();
                 
                 try {
-                    await simulateRequest(`/${service.name}/health`);
-                    const responseTime = Date.now() - startTime;
+                    await simulateRequest(`/health`);
+                    const responseTime = Math.floor(Math.random() * service.sla * 0.8); // Simulate good response
                     const slaCompliant = responseTime <= service.sla;
                     
                     if (slaCompliant) {
-                        log(outputId, `✓ ${service.name}: HEALTHY (${responseTime}ms, SLA: ${service.sla}ms)`, 'success');
+                        log(outputId, `✓ ${service.name}: HEALTHY`, 'success');
+                        log(outputId, `  Response time: ${responseTime}ms (SLA: ${service.sla}ms)`, 'success');
+                        log(outputId, `  Status: ✓ Within SLA`, 'success');
                     } else {
-                        log(outputId, `⚠️  ${service.name}: SLA BREACH (${responseTime}ms > ${service.sla}ms)`, 'warning');
+                        log(outputId, `⚠️  ${service.name}: SLA BREACH`, 'warning');
+                        log(outputId, `  Response time: ${responseTime}ms > ${service.sla}ms`, 'warning');
                     }
                     
                     log(outputId, `  Circuit Breaker: CLOSED`, 'info');
-                    log(outputId, `  Consecutive Failures: 0`, 'info');
+                    log(outputId, `  Consecutive Failures: 0/3`, 'info');
                 } catch (error) {
                     log(outputId, `✗ ${service.name}: UNHEALTHY`, 'error');
-                    log(outputId, `  Circuit Breaker: OPEN`, 'warning');
+                    log(outputId, `  Error: Connection timeout`, 'error');
+                    log(outputId, `  Circuit Breaker: OPEN (Cooling down)`, 'warning');
                 }
                 
-                await delay(400);
+                await delay(500);
             }
             
             log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
             log(outputId, '✓ Health check cycle completed', 'success');
             log(outputId, 'Healthy services: 3/3', 'success');
+            log(outputId, 'SLA compliance: 100%', 'success');
         }
 
         // Example 04: Batch Image Processing
         async function runExample04(outputId) {
             log(outputId, '🚀 Starting Batch Image Processing', 'info');
             
-            const imageCount = 20;
-            log(outputId, `Processing ${imageCount} images...`, 'info');
-            log(outputId, 'Concurrency limit: 10', 'info');
+            const images = [
+                { id: 'IMG001', priority: 'high', icon: '🔴' },
+                { id: 'IMG002', priority: 'high', icon: '🔴' },
+                { id: 'IMG003', priority: 'normal', icon: '🟡' },
+                { id: 'IMG004', priority: 'normal', icon: '🟡' },
+                { id: 'IMG005', priority: 'normal', icon: '🟡' },
+                { id: 'IMG006', priority: 'normal', icon: '🟡' },
+                { id: 'IMG007', priority: 'normal', icon: '🟡' },
+                { id: 'IMG008', priority: 'low', icon: '🟢' },
+                { id: 'IMG009', priority: 'low', icon: '🟢' },
+                { id: 'IMG010', priority: 'low', icon: '🟢' }
+            ];
+            
+            log(outputId, `Processing ${images.length} images...`, 'info');
+            log(outputId, 'Concurrency limit: 5', 'info');
             log(outputId, 'Rate limit: 100 requests/minute', 'info');
+            log(outputId, 'Priority order: 🔴 High → 🟡 Normal → 🟢 Low', 'info');
             
             log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
             
@@ -1188,62 +2133,69 @@ await resumeWorkflow('migration-12345');</code></pre>
             let successful = 0;
             let failed = 0;
             
-            for (let i = 1; i <= imageCount; i++) {
+            for (const img of images) {
                 try {
-                    await simulateRequest('/process-image', { mockData: { imageId: i } });
+                    log(outputId, `${img.icon} Processing ${img.id} (${img.priority} priority)...`, 'info');
+                    await simulateRequest('/process-image', { mockData: { imageId: img.id } });
                     processed++;
                     successful++;
-                    const progress = ((processed / imageCount) * 100).toFixed(1);
-                    log(outputId, `✓ Processed image-${i}: ${progress}% complete`, 'success');
+                    const progress = ((processed / images.length) * 100).toFixed(0);
+                    log(outputId, `✓ ${img.id} completed - Progress: ${progress}%`, 'success');
+                    await delay(300);
                 } catch (error) {
                     processed++;
                     failed++;
-                    log(outputId, `✗ Failed image-${i}`, 'error');
+                    log(outputId, `✗ Failed ${img.id}`, 'error');
                 }
-                
-                if (i % 5 === 0) await delay(300);
             }
             
             log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
             log(outputId, '🎉 Batch processing complete!', 'success');
-            log(outputId, `Total: ${imageCount}`, 'info');
+            log(outputId, `Total: ${images.length}`, 'info');
             log(outputId, `Successful: ${successful}`, 'success');
             log(outputId, `Failed: ${failed}`, failed > 0 ? 'warning' : 'info');
+            log(outputId, 'Processing time: ~3.5s', 'info');
         }
 
         // Example 05: Feature Flag Testing
         async function runExample05(outputId) {
-            log(outputId, '🚀 Starting Feature Flag Testing', 'info');
-            log(outputId, 'Testing 3 feature configurations with trial mode', 'info');
+            log(outputId, '🚀 Starting Chaos Engineering with Trial Mode', 'info');
+            log(outputId, 'Testing API resilience under different failure scenarios', 'info');
+            log(outputId, 'Using StableRequest trial mode for comparison', 'info');
             
             const scenarios = [
-                { name: 'feature-A', successRate: 0.95 },
-                { name: 'feature-B', successRate: 0.85 },
-                { name: 'feature-C', successRate: 0.60 }
+                { name: 'Scenario 1: Healthy Baseline', failureRate: 0.0, icon: '✅' },
+                { name: 'Scenario 2: Intermittent Failures', failureRate: 0.3, icon: '⚠️' },
+                { name: 'Scenario 3: High Failure Rate', failureRate: 0.7, icon: '🔴' },
+                { name: 'Scenario 4: Persistent Failures', failureRate: 0.5, icon: '❌' },
+                { name: 'Scenario 5: Complete Outage', failureRate: 1.0, icon: '💀' }
             ];
             
             log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
             
             for (const scenario of scenarios) {
-                log(outputId, `Testing ${scenario.name}...`, 'info');
-                log(outputId, `  Expected success rate: ${(scenario.successRate * 100)}%`, 'info');
+                log(outputId, `${scenario.icon} ${scenario.name}`, 'phase');
+                log(outputId, `  Simulated failure rate: ${(scenario.failureRate * 100)}%`, 'info');
                 
-                let attempts = 5;
+                let attempts = 10;
                 let successes = 0;
+                let failures = 0;
                 
                 for (let i = 1; i <= attempts; i++) {
-                    const success = Math.random() < scenario.successRate;
-                    if (success) {
-                        successes++;
-                        log(outputId, `  Attempt ${i}: SUCCESS`, 'success');
+                    const willFail = Math.random() < scenario.failureRate;
+                    if (willFail) {
+                        failures++;
+                        log(outputId, `  Attempt ${i}/10: ✗ FAILED (simulated error)`, 'error');
                     } else {
-                        log(outputId, `  Attempt ${i}: FAILED`, 'error');
+                        successes++;
+                        log(outputId, `  Attempt ${i}/10: ✓ SUCCESS`, 'success');
                     }
-                    await delay(200);
+                    await delay(150);
                 }
                 
                 const actualRate = (successes / attempts * 100).toFixed(0);
-                log(outputId, `✓ ${scenario.name} completed: ${actualRate}% success rate`, 'success');
+                log(outputId, `  Result: ${successes} successes, ${failures} failures`, 'info');
+                log(outputId, `✓ ${scenario.name}: ${actualRate}% success rate`, successes > failures ? 'success' : 'warning');
                 await delay(400);
             }
             
@@ -1254,8 +2206,9 @@ await resumeWorkflow('migration-12345');</code></pre>
         // Example 06: State Persistence Workflow
         async function runExample06(outputId) {
             log(outputId, '🚀 Starting Distributed Workflow with State Persistence', 'info');
-            log(outputId, 'Workflow ID: migration-12345', 'info');
+            log(outputId, 'Workflow ID: data-migration-2024', 'info');
             log(outputId, 'Using Redis-based state persistence', 'info');
+            log(outputId, 'Lock: Distributed lock acquired for 5 minutes', 'info');
             
             log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
             
@@ -1263,61 +2216,58 @@ await resumeWorkflow('migration-12345');</code></pre>
                 // Phase 1: Extract
                 log(outputId, '📍 Phase 1: Extract source data', 'phase');
                 await delay(500);
-                log(outputId, '📥 Extracting source data...', 'info');
+                log(outputId, '📥 Connecting to source database...', 'info');
+                await delay(400);
+                log(outputId, 'Fetching user records from legacy system...', 'info');
                 await delay(600);
-                log(outputId, '✓ Extracted 100 records', 'success');
-                log(outputId, '💾 Stored state: migration:migration-12345:main:extract-source-data (TTL: 3600s)', 'info');
-                log(outputId, 'Progress: 20%', 'info');
+                log(outputId, '✓ Extracted 1000 records from source', 'success');
+                log(outputId, '💾 State key: workflow:data-migration-2024:main:extract-data', 'info');
+                log(outputId, '💾 Stored state snapshot (TTL: 3600s)', 'info');
+                log(outputId, 'Progress: 33%', 'info');
                 await delay(300);
                 
                 // Phase 2: Transform
                 log(outputId, '📍 Phase 2: Transform data', 'phase');
                 await delay(500);
-                log(outputId, 'Loading previous state from Redis...', 'info');
+                log(outputId, '🔄 Loading previous state from Redis...', 'info');
                 await delay(400);
-                log(outputId, '✓ State loaded: 100 source records', 'info');
-                log(outputId, 'Transforming records...', 'info');
-                await delay(700);
-                log(outputId, '✓ Transformed 100 records', 'success');
-                log(outputId, '💾 Stored state: migration:migration-12345:main:transform-data (TTL: 3600s)', 'info');
-                log(outputId, 'Progress: 40%', 'info');
+                log(outputId, '✓ Loaded: 1000 records from extract phase', 'info');
+                log(outputId, 'Normalizing data formats...', 'info');
+                await delay(500);
+                log(outputId, 'Enriching with metadata...', 'info');
+                await delay(400);
+                log(outputId, '✓ Transformed 1000 records successfully', 'success');
+                log(outputId, '💾 State key: workflow:data-migration-2024:main:transform-data', 'info');
+                log(outputId, '💾 Stored state snapshot (TTL: 3600s)', 'info');
+                log(outputId, 'Progress: 66%', 'info');
                 await delay(300);
                 
                 // Phase 3: Validate
                 log(outputId, '📍 Phase 3: Validate data', 'phase');
                 await delay(500);
-                log(outputId, 'Loading previous state from Redis...', 'info');
+                log(outputId, '🔄 Loading previous state from Redis...', 'info');
                 await delay(400);
-                log(outputId, 'Running validation rules...', 'info');
-                await delay(600);
-                log(outputId, '✓ All records validated', 'success');
-                log(outputId, '💾 Stored state: migration:migration-12345:main:validate-data (TTL: 3600s)', 'info');
-                log(outputId, 'Progress: 60%', 'info');
-                await delay(300);
-                
-                // Phase 4: Load
-                log(outputId, '📍 Phase 4: Load to destination', 'phase');
+                log(outputId, '✓ Loaded: 1000 transformed records', 'info');
+                log(outputId, 'Running data quality rules...', 'info');
                 await delay(500);
-                log(outputId, 'Uploading records in batches...', 'info');
-                
-                for (let i = 1; i <= 5; i++) {
-                    await delay(400);
-                    log(outputId, `  Batch ${i}/5 uploaded (${i * 20} records)`, 'success');
-                    const progress = 60 + (i * 8);
-                    log(outputId, `  Progress: ${progress}%`, 'info');
-                }
-                
+                log(outputId, 'Checking referential integrity...', 'info');
+                await delay(400);
+                log(outputId, '✓ All 1000 records passed validation', 'success');
+                log(outputId, '💾 State key: workflow:data-migration-2024:main:validate-data', 'info');
                 log(outputId, '💾 Stored final state (TTL: 7200s)', 'info');
                 log(outputId, 'Progress: 100%', 'success');
+                await delay(300);
                 
                 log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
                 log(outputId, '🎉 Workflow completed successfully!', 'success');
-                log(outputId, 'Total records processed: 100', 'success');
-                log(outputId, 'Workflow can be resumed from any checkpoint', 'info');
-                log(outputId, 'State persisted with distributed locking', 'info');
+                log(outputId, 'Total records processed: 1000', 'success');
+                log(outputId, '💾 All checkpoints saved to Redis', 'info');
+                log(outputId, '🔒 Distributed lock released', 'info');
+                log(outputId, 'Workflow can be resumed from any phase', 'info');
             } catch (error) {
                 log(outputId, `Workflow interrupted: ${error.message}`, 'error');
-                log(outputId, '💾 State checkpoint saved - can resume later', 'warning');
+                log(outputId, '💾 State checkpoint saved - can resume from last phase', 'warning');
+                log(outputId, '🔒 Lock will auto-expire in 5 minutes', 'warning');
             }
         }
 

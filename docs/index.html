@@ -45,7 +45,7 @@
                 </div>
                 <div class="hero-stats">
                     <div class="stat">
-                        <div class="stat-value">40+</div>
+                        <div class="stat-value">50+</div>
                         <div class="stat-label">TypeScript Types</div>
                     </div>
                     <div class="stat">
@@ -53,11 +53,10 @@
                         <div class="stat-label">Type Safe</div>
                     </div>
                     <div class="stat">
-                        <div class="stat-value">0</div>
-                        <div class="stat-label">Dependencies*</div>
+                        <div class="stat-value">1</div>
+                        <div class="stat-label">Dependency</div>
                     </div>
                 </div>
-                <p class="hero-note">* Only Axios as peer dependency</p>
             </div>
         </div>
     </header>
@@ -101,7 +100,7 @@
                 <div class="feature-card">
                     <div class="feature-icon">🎯</div>
                     <h3>Type Safety</h3>
-                    <p>Full TypeScript support with 40+ exported types ensuring compile-time safety and excellent IDE autocomplete.</p>
+                    <p>Full TypeScript support with 50+ exported types ensuring compile-time safety and excellent IDE autocomplete.</p>
                 </div>
             </div>
         </div>
@@ -126,7 +125,6 @@ const userData = await stableRequest({
   reqData: {
     hostname: 'api.example.com',
     path: '/users/123',
-    method: 'GET',
     headers: { 'Authorization': 'Bearer token' }
   },
   resReq: true,              // Return response data
@@ -145,18 +143,31 @@ console.log(userData); // { id: 123, name: 'John' }</code></pre>
                     <pre><code class="language-typescript">import { stableApiGateway } from '@emmvish/stable-request';
 
 const requests = [
-  { id: 'users', requestOptions: { 
-    reqData: { path: '/users' }, resReq: true 
-  }},
-  { id: 'orders', requestOptions: { 
-    reqData: { path: '/orders' }, resReq: true 
-  }},
-  { id: 'products', requestOptions: { 
-    reqData: { path: '/products' }, resReq: true 
-  }}
+  { 
+    id: 'users', 
+    requestOptions: { reqData: { hostname: 'api.example.com', path: '/users' }, resReq: true  }
+  },
+  { 
+    id: 'orders', 
+    groupId: 'req-only',
+    requestOptions: { reqData: { hostname: 'api.example.com', path: '/orders/1/status' }  }
+  },
+  { 
+    id: 'products', 
+    groupId: 'req-only',
+    requestOptions: { reqData: { hostname: 'api.example.com', path: '/products/3/status' }  }
+  }
 ];
 
 const results = await stableApiGateway(requests, {
+  requestGroups: [             // Apply common config by request group (overrides api-gateway commons)
+    {
+      id: 'req-only',
+      commonConfig: {
+        commonResReq: false
+      }
+    }
+  ],
   concurrentExecution: true,    // Execute in parallel
   commonRequestData: { 
     hostname: 'api.example.com',
@@ -174,7 +185,7 @@ results.forEach(result => {
                 <div class="example-box">
                     <h3>Multi-Phase Workflow</h3>
                     <p>Orchestrate complex workflows with multiple phases</p>
-                    <pre><code class="language-typescript">import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
+                    <pre><code class="language-typescript">import { stableWorkflow, PHASE_DECISION_ACTIONS, REQUEST_METHODS } from '@emmvish/stable-request';
 
 const phases = [
   {
@@ -183,7 +194,7 @@ const phases = [
       { id: 'login', requestOptions: { 
         reqData: { 
           path: '/auth/login',
-          method: 'POST',
+          method: REQUEST_METHODS.POST,
           body: { username: 'user', password: 'pass' }
         }, 
         resReq: true 
@@ -262,8 +273,8 @@ console.log(`Success: ${result.success}`);</code></pre>
   reqData: { hostname: 'unreliable-api.com', path: '/data' },
   attempts: 3,
   circuitBreaker: {
-    failureThreshold: 5,      // Open after 5 failures
-    successThreshold: 2,      // Close after 2 successes
+    failureThresholdPercentage: 50,      // Open after 50% failures
+    successThresholdPercentage: 20,      // Close after 20% successes
     timeout: 60000            // Wait 60s before trying again
   }
 });</code></pre>
@@ -282,8 +293,12 @@ console.log(`Success: ${result.success}`);</code></pre>
                     <pre><code class="language-typescript">await stableRequest({
   reqData: { hostname: 'api.example.com', path: '/data' },
   cache: {
+    enabled: true,
     ttl: 300000  // Cache for 5 minutes
   }
+  const sharedCachingManager = getGlobalCacheManager();
+  console.log('\n Caching Stats: ', sharedCachingManager.getStats())
+  sharedCachingManager.clear()
 });</code></pre>
                 </div>
             </div>
@@ -297,11 +312,9 @@ console.log(`Success: ${result.success}`);</code></pre>
                         <li>Concurrency limiting: Control simultaneous requests</li>
                         <li>Shared limiters across workflows</li>
                     </ul>
-                    <pre><code class="language-typescript">const rateLimiter = new RateLimiter(100, 60000); // 100 req/min
-
-await stableRequest({
-  reqData: { hostname: 'api.example.com', path: '/data' },
-  rateLimiter
+                    <pre><code class="language-typescript">await stableApiGateway(requests, {
+  commonRequestData: { hostname: 'api.example.com', path: '/data' },
+  rateLimit: { maxRequests: 100, windowMs: 60000 }
 });</code></pre>
                 </div>
             </div>
@@ -319,8 +332,8 @@ await stableRequest({
                     </ul>
                     <pre><code class="language-typescript">await stableRequest({
   reqData: { hostname: 'api.example.com', path: '/data' },
-  handleErrors: async (error, context) => {
-    logger.error('Request failed', { error, context });
+  handleErrors: async ({ errorLog, executionContext }) => {
+    logger.error('Request failed', { errorLog, executionContext });
   },
   responseAnalyzer: async ({ data }) => {
     return data.status === 'success';

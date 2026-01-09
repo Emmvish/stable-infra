@@ -1,6 +1,6 @@
 # API Reference
 
-Complete API documentation for `@emmvish/stable-request` `v1.7.2`
+Complete API documentation for `@emmvish/stable-request` `v1.7.3`
 
 ## Table of Contents
 
@@ -245,7 +245,7 @@ Array of workflow phases to execute. See [STABLE_WORKFLOW_PHASE](#stable_workflo
 | `maxWorkflowIterations` | `number` | No | `1000` | Maximum total phase executions to prevent infinite loops in non-linear workflows. |
 | `handlePhaseCompletion` | `(options: HandlePhaseCompletionHookOptions) => any \| Promise<any>` | No | `console.log` | Hook called after each phase completes successfully. |
 | `handlePhaseError` | `(options: HandlePhaseErrorHookOptions) => any \| Promise<any>` | No | `console.log` | Hook called when a phase encounters an error. |
-| `handlePhaseDecision` | `(decision: PhaseExecutionDecision, phaseResult: STABLE_WORKFLOW_PHASE_RESULT, maxSerializableChars?: number) => any \| Promise<any>` | No | `() => {}` | Hook called when a phase makes a non-linear decision. |
+| `handlePhaseDecision` | `(options: HandlePhaseDecisionHookOptions) => any \| Promise<any>` | No | `() => {}` | Hook called when a phase makes a non-linear decision. |
 | `handleBranchCompletion` | `(options: { workflowId: string, branchId: string, branchResults: STABLE_WORKFLOW_PHASE_RESULT[], success: boolean, maxSerializableChars?: number }) => any \| Promise<any>` | No | `console.log` | Hook called when a branch completes. |
 | `handleBranchDecision` | `(decision: BranchExecutionDecision, branchResult: BranchExecutionResult, maxSerializableChars?: number) => any \| Promise<any>` | No | `undefined` | Hook called when a branch makes a decision. |
 | `workflowHookParams` | `WorkflowHookParams` | No | `{}` | Custom parameters passed to workflow-level hooks. |
@@ -1123,6 +1123,8 @@ const persistToFile = async ({ executionContext, params, buffer }) => {
 
 #### `ResponseAnalysisHookOptions`
 
+Options passed to the `responseAnalyzer` hook function. This interface extends from base hook options and includes all inherited properties.
+
 ```typescript
 interface ResponseAnalysisHookOptions<RequestDataType = any, ResponseDataType = any> {
   data: ResponseDataType;
@@ -1130,24 +1132,57 @@ interface ResponseAnalysisHookOptions<RequestDataType = any, ResponseDataType = 
   params?: any;
   trialMode?: TRIAL_MODE_OPTIONS;
   preExecutionResult?: any;
+  executionContext?: ExecutionContext;
   commonBuffer?: Record<string, any>;
 }
 ```
 
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `data` | `ResponseDataType` | Response data returned from the request. |
+| `reqData` | `AxiosRequestConfig<RequestDataType>` | Axios request configuration. |
+| `params` | `any` | Custom parameters from `hookParams.responseAnalyzerParams`. |
+| `trialMode` | `TRIAL_MODE_OPTIONS` | Trial mode configuration (if enabled). |
+| `preExecutionResult` | `any` | Result from pre-execution hook (if used). |
+| `executionContext` | `ExecutionContext` | Execution context (workflowId, phaseId, etc.). |
+| `commonBuffer` | `Record<string, any>` | Shared buffer for state management. |
+
 #### `FinalErrorAnalysisHookOptions`
+
+Options passed to the `finalErrorAnalyzer` hook function after all retry attempts are exhausted.
 
 ```typescript
 interface FinalErrorAnalysisHookOptions<RequestDataType = any> {
+  // Own properties
   error: any;
+  
+  // Inherited from AnalysisHookOptions and ObservabilityHooksOptions
   reqData: AxiosRequestConfig<RequestDataType>;
   params?: any;
   trialMode?: TRIAL_MODE_OPTIONS;
   preExecutionResult?: any;
+  executionContext?: ExecutionContext;
   commonBuffer?: Record<string, any>;
 }
 ```
 
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `error` | `any` | The final error after all retry attempts failed. |
+| `reqData` | `AxiosRequestConfig<RequestDataType>` | Axios request configuration. |
+| `params` | `any` | Custom parameters from `hookParams.finalErrorAnalyzerParams`. |
+| `trialMode` | `TRIAL_MODE_OPTIONS` | Trial mode configuration (if enabled). |
+| `preExecutionResult` | `any` | Result from pre-execution hook (if used). |
+| `executionContext` | `ExecutionContext` | Execution context (workflowId, phaseId, etc.). |
+| `commonBuffer` | `Record<string, any>` | Shared buffer for state management. |
+
 #### `HandleErrorHookOptions`
+
+Options passed to the `handleErrors` hook function for each failed attempt.
 
 ```typescript
 interface HandleErrorHookOptions<RequestDataType = any> {
@@ -1156,11 +1191,26 @@ interface HandleErrorHookOptions<RequestDataType = any> {
   params?: any;
   maxSerializableChars?: number;
   preExecutionResult?: any;
+  executionContext?: ExecutionContext;
   commonBuffer?: Record<string, any>;
 }
 ```
 
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|  
+| `errorLog` | `ERROR_LOG` | Structured error log with timestamp, attempt number, error message, etc. |
+| `reqData` | `AxiosRequestConfig<RequestDataType>` | Axios request configuration. |
+| `params` | `any` | Custom parameters from `hookParams.handleErrorsParams`. |
+| `maxSerializableChars` | `number` | Maximum characters for serialization in logs. |
+| `preExecutionResult` | `any` | Result from pre-execution hook (if used). |
+| `executionContext` | `ExecutionContext` | Execution context (workflowId, phaseId, etc.). |
+| `commonBuffer` | `Record<string, any>` | Shared buffer for state management. |
+
 #### `HandleSuccessfulAttemptDataHookOptions`
+
+Options passed to the `handleSuccessfulAttemptData` hook function for each successful attempt.
 
 ```typescript
 interface HandleSuccessfulAttemptDataHookOptions<RequestDataType = any, ResponseDataType = any> {
@@ -1169,9 +1219,22 @@ interface HandleSuccessfulAttemptDataHookOptions<RequestDataType = any, Response
   params?: any;
   maxSerializableChars?: number;
   preExecutionResult?: any;
+  executionContext?: ExecutionContext;
   commonBuffer?: Record<string, any>;
 }
 ```
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `successfulAttemptData` | `SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>` | Structured success log with attempt number, timestamp, data, etc. |
+| `reqData` | `AxiosRequestConfig<RequestDataType>` | Axios request configuration. |
+| `params` | `any` | Custom parameters from `hookParams.handleSuccessfulAttemptDataParams`. |
+| `maxSerializableChars` | `number` | Maximum characters for serialization in logs. |
+| `preExecutionResult` | `any` | Result from pre-execution hook (if used). |
+| `executionContext` | `ExecutionContext` | Execution context (workflowId, phaseId, etc.). |
+| `commonBuffer` | `Record<string, any>` | Shared buffer for state management. |
 
 #### `PreExecutionHookOptions`
 
@@ -1200,6 +1263,50 @@ interface HandlePhaseCompletionHookOptions<ResponseDataType = any> {
 
 Extends `HandlePhaseCompletionHookOptions` with additional `error` property.
 
+#### `HandleBranchCompletionHookOptions`
+
+Options passed to the `handleBranchCompletion` hook function when a branch completes execution.
+
+```typescript
+interface HandleBranchCompletionHookOptions<ResponseDataType = any> {
+  workflowId: string;
+  branchId: string;
+  branchResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
+  success: boolean;
+  maxSerializableChars?: number;
+}
+```
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `workflowId` | `string` | Unique identifier of the workflow. |
+| `branchId` | `string` | Unique identifier of the completed branch. |
+| `branchResults` | `STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[]` | Array of phase results from this branch execution. |
+| `success` | `boolean` | Whether the branch completed successfully. |
+| `maxSerializableChars` | `number` | Maximum characters for serialization in logs. |
+
+#### `HandlePhaseDecisionHookOptions`
+
+Options passed to the `handlePhaseDecision` hook function when a phase makes a non-linear execution decision.
+
+```typescript
+interface HandlePhaseDecisionHookOptions<ResponseDataType = any> {
+  decision: PhaseExecutionDecision;
+  phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>;
+  maxSerializableChars?: number;
+}
+```
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `decision` | `PhaseExecutionDecision` | The decision made by the phase (CONTINUE, JUMP, SKIP, REPLAY, TERMINATE). |
+| `phaseResult` | `STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>` | The complete result of the phase that made the decision. |
+| `maxSerializableChars` | `number` | Maximum characters for serialization in logs. |
+
 #### `PhaseDecisionHookOptions`
 
 ```typescript
@@ -1213,7 +1320,6 @@ interface PhaseDecisionHookOptions<ResponseDataType = any> {
   sharedBuffer?: Record<string, any>;
   params?: any;
   concurrentPhaseResults?: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
-  maxSerializableChars?: number;
 }
 ```
 
@@ -1231,7 +1337,6 @@ interface BranchDecisionHookOptions<ResponseDataType = any> {
   sharedBuffer?: Record<string, any>;
   params?: any;
   concurrentBranchResults?: BranchExecutionResult<ResponseDataType>[];
-  maxSerializableChars?: number;
 }
 ```
 
@@ -1247,7 +1352,6 @@ interface PhaseExecutionDecision {
   targetPhaseId?: string;      // Required for JUMP and SKIP actions
   replayCount?: number;
   metadata?: Record<string, any>;
-  maxSerializableChars?: number;
 }
 ```
 
@@ -1258,8 +1362,6 @@ interface BranchExecutionDecision {
   action: PHASE_DECISION_ACTIONS;
   targetBranchId?: string;     // Required for JUMP action
   metadata?: Record<string, any>;
-  terminateWorkflow?: boolean; // If true, terminates entire workflow
-  maxSerializableChars?: number;
 }
 ```
 
