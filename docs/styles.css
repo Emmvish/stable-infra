@@ -915,13 +915,13 @@ code {
 }
 
 .example-code pre {
-    max-height: 100px !important;
+    max-height: 500px !important;
     overflow-y: auto !important;
     overflow-x: auto !important;
 }
 
 .example-code pre code {
-    max-height: 100px !important;
+    max-height: 500px !important;
     display: block !important;
 }
 
