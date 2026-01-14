@@ -1,6 +1,6 @@
 # API Reference
 
-Complete API documentation for `@emmvish/stable-request` `v1.8.0`
+Complete API documentation for `@emmvish/stable-request` `v1.7.3`
 
 ## Table of Contents
 
