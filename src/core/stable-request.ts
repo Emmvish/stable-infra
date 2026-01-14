@@ -11,6 +11,7 @@ import {
   PreExecutionHookOptions,
   ReqFnResponse, 
   STABLE_REQUEST,
+  STABLE_REQUEST_RESULT,
   SUCCESSFUL_ATTEMPT_DATA,
 } from '../types/index.js';
 
@@ -20,16 +21,19 @@ import {
   executeWithPersistence,
   formatLogContext,
   generateAxiosRequestConfig,
+  getGlobalCircuitBreaker,
   getNewDelayTime,
+  getGlobalCacheManager,
   delay,
   reqFn,
   safelyStringify,
-  validateTrialModeProbabilities
+  validateTrialModeProbabilities,
+  MetricsAggregator
 } from '../utilities/index.js';
 
 export async function stableRequest<RequestDataType = any, ResponseDataType = any>(
   options: STABLE_REQUEST<RequestDataType, ResponseDataType>
-): Promise<ResponseDataType | boolean> {
+): Promise<STABLE_REQUEST_RESULT<ResponseDataType>> {
   const { 
     preExecution = {
       preExecutionHook: ({ inputParams, commonBuffer }: PreExecutionHookOptions) => {},
@@ -103,6 +107,37 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
   } = options;
   let attempts = givenAttempts;
   const reqData: AxiosRequestConfig<RequestDataType> = generateAxiosRequestConfig<RequestDataType>(givenReqData);
+  
+  const requestStartTime = Date.now();
+  const errorLogs: ERROR_LOG[] = [];
+  const successfulAttemptsList: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>[] = [];
+  let totalAttemptsMade = 0;
+  
+  const buildResult = (success: boolean, data?: ResponseDataType, error?: string): STABLE_REQUEST_RESULT<ResponseDataType> => {
+    const totalExecutionTime = Date.now() - requestStartTime;
+    const successfulAttemptsCount = successfulAttemptsList.length;
+    const failedAttemptsCount = totalAttemptsMade - successfulAttemptsCount;
+    
+    return {
+      success,
+      ...(data !== undefined && { data }),
+      ...(error && { error }),
+      ...(errorLogs.length > 0 && { errorLogs }),
+      ...(successfulAttemptsList.length > 0 && { successfulAttempts: successfulAttemptsList }),
+      metrics: {
+        totalAttempts: totalAttemptsMade,
+        successfulAttempts: successfulAttemptsCount,
+        failedAttempts: failedAttemptsCount,
+        totalExecutionTime,
+        averageAttemptTime: totalAttemptsMade > 0 ? totalExecutionTime / totalAttemptsMade : 0,
+        infrastructureMetrics: {
+          ...(circuitBreakerInstance && { circuitBreaker: MetricsAggregator.extractCircuitBreakerMetrics(circuitBreakerInstance) }),
+          ...(cache && getGlobalCacheManager() && { cache: MetricsAggregator.extractCacheMetrics(getGlobalCacheManager()) })
+        }
+      }
+    };
+  };
+  
   let circuitBreakerInstance: CircuitBreaker | null = null;
   if (circuitBreaker) {
     circuitBreakerInstance = circuitBreaker instanceof CircuitBreaker
@@ -124,6 +159,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     do {
       attempts--;
       const currentAttempt = maxAttempts - attempts;
+      totalAttemptsMade = currentAttempt;
       if (circuitBreakerInstance) {
         const cbConfig = circuitBreakerInstance.getState().config;
         if (cbConfig.trackIndividualAttempts || currentAttempt === 1) {
@@ -144,7 +180,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
               safelyStringify(res?.data, maxSerializableChars)
             );
           }
-          return resReq ? res?.data! : true;
+          return buildResult(true, resReq ? res?.data! : true as any);
         }
         
       } catch(attemptError: any) {
@@ -227,6 +263,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
           executionTime: res.executionTime,
           statusCode: res.statusCode
         };
+        errorLogs.push(errorLog);
         try {
           await executeWithPersistence<void>(
             handleErrors,
@@ -263,6 +300,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
             executionTime: res.executionTime,
             statusCode: res.statusCode
           };
+          successfulAttemptsList.push(successfulAttemptLog);
           try {
             await executeWithPersistence<void>(
               handleSuccessfulAttemptData,
@@ -312,7 +350,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
           safelyStringify(lastSuccessfulAttemptData as Record<string, any>, maxSerializableChars)
         );
       }
-      return resReq ? lastSuccessfulAttemptData! : true;
+      return buildResult(true, resReq ? lastSuccessfulAttemptData! : true as any);
     } else if (res.ok) {
       if (trialMode.enabled) {
         const finalResponse = res?.data ?? lastSuccessfulAttemptData;
@@ -321,7 +359,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
           safelyStringify(finalResponse, maxSerializableChars)
         );
       }
-      return resReq ? res?.data ?? lastSuccessfulAttemptData! : true;
+      return buildResult(true, resReq ? (res?.data ?? lastSuccessfulAttemptData!) : true as any);
     } else {
       throw new Error(
         safelyStringify(
@@ -365,7 +403,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     if(!errorAnalysisResult) {
       throw e;
     } else {
-      return false;
+      return buildResult(false, undefined, e.message || 'Request failed');
     }
   }
 }

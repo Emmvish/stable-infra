@@ -1,6 +1,7 @@
 import { stableApiGateway } from '../core/index.js';
 import { executeWithPersistence } from './execute-with-persistence.js';
 import { formatLogContext } from './format-log-context';
+import { MetricsAggregator } from './metrics-aggregator.js';
 import { STABLE_WORKFLOW_PHASE, STABLE_WORKFLOW_PHASE_RESULT } from '../types/index.js';
 
 export async function executePhase<RequestDataType = any, ResponseDataType = any>(
@@ -51,8 +52,10 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
     );
 
     const phaseExecutionTime = Date.now() - phaseStartTime;
-    const phaseSuccessCount = phaseResponses.filter(r => r.success).length;
-    const phaseFailureCount = phaseResponses.filter(r => !r.success).length;
+    
+    const responses = Array.from(phaseResponses);
+    const phaseSuccessCount = responses.filter(r => r.success).length;
+    const phaseFailureCount = responses.filter(r => !r.success).length;
 
     const phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType> = {
         workflowId,
@@ -62,16 +65,22 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
         success: phaseFailureCount === 0,
         executionTime: phaseExecutionTime,
         timestamp: new Date(phaseStartTime).toISOString(),
-        totalRequests: phaseResponses.length,
+        totalRequests: responses.length,
         successfulRequests: phaseSuccessCount,
         failedRequests: phaseFailureCount,
-        responses: phaseResponses
+        responses: responses
     };
+
+    phaseResult.metrics = MetricsAggregator.extractPhaseMetrics(phaseResult);
+    
+    if (phaseResponses.metrics?.infrastructureMetrics) {
+        phaseResult.infrastructureMetrics = phaseResponses.metrics.infrastructureMetrics;
+    }
 
     if (logPhaseResults) {
         console.info(
             `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Phase ${phaseId} completed:`,
-            `${phaseSuccessCount}/${phaseResponses.length} successful`,
+            `${phaseSuccessCount}/${responses.length} successful`,
             `(${phaseExecutionTime}ms)`
         );
     }

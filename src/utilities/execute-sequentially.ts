@@ -4,6 +4,7 @@ import { prepareApiRequestOptions } from './prepare-api-request-options.js';
 import {
     API_GATEWAY_REQUEST,
     API_GATEWAY_RESPONSE,
+    STABLE_REQUEST_RESULT,
     SEQUENTIAL_REQUEST_EXECUTION_OPTIONS 
 } from '../types/index.js';
 import { CircuitBreaker, CircuitBreakerOpenError } from "./circuit-breaker.js";
@@ -44,20 +45,19 @@ export async function executeSequentially<RequestDataType = any, ResponseDataTyp
                 }
             };
             
-            const stableReq = await stableRequest<RequestDataType, ResponseDataType>(finalRequestOptions);
+            const requestResult = await stableRequest<RequestDataType, ResponseDataType>(finalRequestOptions);
             
             if (circuitBreaker && !circuitBreaker.getState().config.trackIndividualAttempts) {
                 circuitBreaker.recordSuccess();
             }
             
-            const isSuccess = stableReq !== false;
             responses.push({
                 requestId: req.id,
                 ...(req.groupId && { groupId: req.groupId }),
-                success: isSuccess,
-                ...(isSuccess && typeof stableReq !== 'boolean' && { data: stableReq as ResponseDataType }),
-                ...(!isSuccess && {
-                    error: 'Request was unsuccessful, but the error was analyzed successfully!'
+                success: requestResult.success,
+                ...(requestResult.data !== undefined && { data: requestResult.data }),
+                ...(!requestResult.success && {
+                    error: requestResult.error || 'Request was unsuccessful, but the error was analyzed successfully!'
                 })
             });
             

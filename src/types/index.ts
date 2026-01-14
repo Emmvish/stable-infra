@@ -79,6 +79,23 @@ export interface API_GATEWAY_RESPONSE<ResponseDataType = any> {
   error?: string;
 }
 
+export interface API_GATEWAY_RESULT<ResponseDataType = any> extends Array<API_GATEWAY_RESPONSE<ResponseDataType>> {
+  metrics?: {
+    totalRequests: number;
+    successfulRequests: number;
+    failedRequests: number;
+    successRate: number;
+    failureRate: number;
+    requestGroups?: RequestGroupMetrics[];
+    infrastructureMetrics?: {
+      circuitBreaker?: CircuitBreakerDashboardMetrics;
+      cache?: CacheDashboardMetrics;
+      rateLimiter?: RateLimiterDashboardMetrics;
+      concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
+    };
+  };
+}
+
 export type ApiRequestOptionsMapping = {
   localKey: string;
   commonKey: string;
@@ -235,6 +252,25 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   statePersistence?: StatePersistenceConfig;
 }
 
+export interface STABLE_REQUEST_RESULT<ResponseDataType = any> {
+  success: boolean;
+  data?: ResponseDataType;
+  error?: string;
+  errorLogs?: ERROR_LOG[];
+  successfulAttempts?: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>[];
+  metrics?: {
+    totalAttempts: number;
+    successfulAttempts: number;
+    failedAttempts: number;
+    totalExecutionTime: number;
+    averageAttemptTime: number;
+    infrastructureMetrics?: {
+      circuitBreaker?: CircuitBreakerDashboardMetrics;
+      cache?: CacheDashboardMetrics;
+    };
+  };
+}
+
 export interface SUCCESSFUL_ATTEMPT_DATA<ResponseDataType = any> {
   attempt: string;
   timestamp: string;
@@ -324,6 +360,13 @@ export interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any> {
   skipped?: boolean;
   decision?: PhaseExecutionDecision;
   error?: string;
+  metrics?: PhaseMetrics;
+  infrastructureMetrics?: {
+    circuitBreaker?: CircuitBreakerDashboardMetrics;
+    cache?: CacheDashboardMetrics;
+    rateLimiter?: RateLimiterDashboardMetrics;
+    concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
+  };
 }
 
 export interface STABLE_WORKFLOW_RESULT<ResponseDataType = any> {
@@ -343,6 +386,14 @@ export interface STABLE_WORKFLOW_RESULT<ResponseDataType = any> {
   terminatedEarly?: boolean;
   terminationReason?: string;
   error?: string;
+  metrics?: WorkflowMetrics;
+  requestGroupMetrics?: RequestGroupMetrics[];
+  infrastructureMetrics?: {
+    circuitBreaker?: CircuitBreakerDashboardMetrics;
+    cache?: CacheDashboardMetrics;
+    rateLimiter?: RateLimiterDashboardMetrics;
+    concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
+  };
 }
 
 export interface WorkflowHookParams {
@@ -512,6 +563,7 @@ export interface BranchExecutionResult<ResponseDataType = any> {
   executionNumber: number;
   skipped?: boolean;
   error?: string;
+  metrics?: BranchMetrics;
 }
 
 export interface BranchExecutionRecord {
@@ -569,4 +621,196 @@ export interface EXECUTE_BRANCH_WORKFLOW_RESPONSE<ResponseDataType = any> {
   failedRequests: number;
   terminatedEarly: boolean;
   terminationReason?: string;
+}
+
+export interface WorkflowMetrics {
+  workflowId: string;
+  success: boolean;
+  executionTime: number;
+  timestamp: string;
+  totalPhases: number;
+  completedPhases: number;
+  skippedPhases: number;
+  failedPhases: number;
+  phaseCompletionRate: number;
+  averagePhaseExecutionTime: number;
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  requestSuccessRate: number;
+  requestFailureRate: number;
+  terminatedEarly: boolean;
+  terminationReason?: string;
+  totalPhaseReplays: number;
+  totalPhaseSkips: number;
+  totalBranches?: number;
+  completedBranches?: number;
+  failedBranches?: number;
+  branchSuccessRate?: number;
+  throughput: number;
+  averageRequestDuration?: number;
+}
+
+export interface BranchMetrics {
+  branchId: string;
+  branchIndex: number;
+  executionNumber: number;
+  success: boolean;
+  executionTime: number;
+  skipped: boolean;
+  totalPhases: number;
+  completedPhases: number;
+  failedPhases: number;
+  phaseCompletionRate: number; 
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  requestSuccessRate: number;
+  hasDecision: boolean;
+  decisionAction?: string;
+  error?: string;
+}
+
+export interface PhaseMetrics {
+  phaseId: string;
+  phaseIndex: number;
+  workflowId: string;
+  branchId?: string;
+  executionNumber: number;
+  success: boolean;
+  skipped: boolean;
+  executionTime: number;
+  timestamp: string;
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  requestSuccessRate: number;
+  requestFailureRate: number;
+  hasDecision: boolean;
+  decisionAction?: string;
+  targetPhaseId?: string;
+  replayCount?: number;
+  error?: string;
+}
+
+export interface RequestGroupMetrics {
+  groupId: string;
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  successRate: number;
+  failureRate: number;
+  requestIds: string[];
+}
+
+export interface RequestMetrics {
+  requestId: string;
+  groupId?: string;
+  success: boolean;
+  hasError: boolean;
+  errorMessage?: string;
+}
+
+export interface CircuitBreakerDashboardMetrics {
+  state: string;
+  isHealthy: boolean;
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  failurePercentage: number;
+  stateTransitions: number;
+  lastStateChangeTime: number;
+  timeSinceLastStateChange: number;
+  openCount: number;
+  totalOpenDuration: number;
+  averageOpenDuration: number;
+  isCurrentlyOpen: boolean;
+  openUntil: number | null;
+  timeUntilRecovery: number | null;
+  recoveryAttempts: number;
+  successfulRecoveries: number;
+  failedRecoveries: number;
+  recoverySuccessRate: number;
+  config: {
+    failureThresholdPercentage: number;
+    minimumRequests: number;
+    recoveryTimeoutMs: number;
+    successThresholdPercentage: number;
+    halfOpenMaxRequests: number;
+  };
+}
+
+export interface CacheDashboardMetrics {
+  isEnabled: boolean;
+  currentSize: number;
+  maxSize: number;
+  validEntries: number;
+  expiredEntries: number;
+  utilizationPercentage: number;
+  totalRequests: number;
+  hits: number;
+  misses: number;
+  hitRate: number;
+  missRate: number;
+  sets: number;
+  evictions: number;
+  expirations: number;
+  averageGetTime: number;
+  averageSetTime: number;
+  averageCacheAge: number;
+  oldestEntryAge: number | null;
+  newestEntryAge: number | null;
+  networkRequestsSaved: number;
+  cacheEfficiency: number;
+}
+
+export interface RateLimiterDashboardMetrics {
+  maxRequests: number;
+  windowMs: number;
+  availableTokens: number;
+  queueLength: number;
+  requestsInCurrentWindow: number;
+  totalRequests: number;
+  completedRequests: number;
+  throttledRequests: number;
+  throttleRate: number;
+  currentRequestRate: number;
+  peakRequestRate: number;
+  averageRequestRate: number;
+  peakQueueLength: number;
+  averageQueueWaitTime: number;
+  isThrottling: boolean;
+  utilizationPercentage: number;
+}
+
+export interface ConcurrencyLimiterDashboardMetrics {
+  limit: number;
+  running: number;
+  queueLength: number;
+  utilizationPercentage: number;
+  totalRequests: number;
+  completedRequests: number;
+  failedRequests: number;
+  queuedRequests: number;
+  successRate: number;
+  peakConcurrency: number;
+  averageConcurrency: number;
+  concurrencyUtilization: number;
+  peakQueueLength: number;
+  averageQueueWaitTime: number;
+  averageExecutionTime: number;
+  isAtCapacity: boolean;
+  hasQueuedRequests: boolean;
+}
+
+export interface SystemMetrics {
+  workflow?: WorkflowMetrics;
+  branches: BranchMetrics[];
+  phases: PhaseMetrics[];
+  requestGroups: RequestGroupMetrics[];
+  requests: RequestMetrics[];
+  circuitBreaker?: CircuitBreakerDashboardMetrics;
+  cache?: CacheDashboardMetrics;
+  rateLimiter?: RateLimiterDashboardMetrics;
+  concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
 }

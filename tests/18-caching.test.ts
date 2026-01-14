@@ -531,7 +531,8 @@ describe('Caching', () => {
         }
       });
 
-      expect(result1).toEqual({ id: 1, name: 'Test' });
+      expect(result1.success).toBe(true);
+      expect(result1.data).toEqual({ id: 1, name: 'Test' });
       expect(requestCount).toBe(1);
 
       // Second request - should use cache
@@ -547,7 +548,8 @@ describe('Caching', () => {
         }
       });
 
-      expect(result2).toEqual({ id: 1, name: 'Test' });
+      expect(result2.success).toBe(true);
+      expect(result2.data).toEqual({ id: 1, name: 'Test' });
       expect(requestCount).toBe(1); // No additional request
     });
 
@@ -590,8 +592,10 @@ describe('Caching', () => {
       });
 
       expect(requestCount).toBe(2); // Both hit API
-      expect(result1).toEqual({ count: 1 });
-      expect(result2).toEqual({ count: 2 });
+      expect(result1.success).toBe(true);
+      expect(result1.data).toEqual({ count: 1 });
+      expect(result2.success).toBe(true);
+      expect(result2.data).toEqual({ count: 2 });
     });
 
     it('should respect cache-control headers when enabled', async () => {
@@ -756,7 +760,8 @@ describe('Caching', () => {
         }
       });
 
-      expect(result).toEqual({ success: true });
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual({ success: true });
       expect(mockedAxios.request).toHaveBeenCalledTimes(2);
     });
 
@@ -830,7 +835,8 @@ describe('Caching', () => {
         }
       });
 
-      expect(result1).toEqual({ success: true });
+      expect(result1.success).toBe(true);
+      expect(result1.data).toEqual({ success: true });
       expect(mockedAxios.request).toHaveBeenCalledTimes(2); // Failed once, succeeded on retry
 
       // Second request should use cache
@@ -846,7 +852,8 @@ describe('Caching', () => {
         }
       });
 
-      expect(result2).toEqual({ success: true });
+      expect(result2.success).toBe(true);
+      expect(result2.data).toEqual({ success: true });
       expect(mockedAxios.request).toHaveBeenCalledTimes(2); // No additional call
     });
 
@@ -905,7 +912,8 @@ describe('Caching', () => {
         cache: { enabled: true }
       });
 
-      expect(result1).toBe(true);
+      expect(result1.success).toBe(true);
+      expect(result1.data).toBe(true);
 
       // Second request from cache
       const result2 = await stableRequest({
@@ -914,7 +922,8 @@ describe('Caching', () => {
         cache: { enabled: true }
       });
 
-      expect(result2).toBe(true);
+      expect(result2.success).toBe(true);
+      expect(result2.data).toBe(true);
       expect(mockedAxios.request).toHaveBeenCalledTimes(1);
     });
 

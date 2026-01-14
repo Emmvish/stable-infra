@@ -1,7 +1,8 @@
 import { stableRequest } from "../core/index.js";
 import {
     API_GATEWAY_REQUEST,
-    API_GATEWAY_RESPONSE ,
+    API_GATEWAY_RESPONSE,
+    STABLE_REQUEST_RESULT,
     CONCURRENT_REQUEST_EXECUTION_OPTIONS,
 } from '../types/index.js';
 import { prepareApiRequestData } from "./prepare-api-request-data.js";
@@ -72,11 +73,11 @@ export async function executeConcurrently<RequestDataType = any, ResponseDataTyp
         requestExecutionOptions.rateLimit.maxRequests > 0 &&
         requestExecutionOptions.rateLimit.windowMs > 0;
 
-    let stableRequests: Promise<boolean | ResponseDataType>[];
-    let settledResponses: PromiseSettledResult<boolean | ResponseDataType>[];
+    let stableRequests: Promise<STABLE_REQUEST_RESULT<ResponseDataType>>[];
+    let settledResponses: PromiseSettledResult<STABLE_REQUEST_RESULT<ResponseDataType>>[];
 
     if (stopOnFirstError) {
-        const results: PromiseSettledResult<boolean | ResponseDataType>[] = [];
+        const results: PromiseSettledResult<STABLE_REQUEST_RESULT<ResponseDataType>>[] = [];
         let errorDetected = false;
         const activePromises = new Set<Promise<void>>();
 
@@ -90,7 +91,7 @@ export async function executeConcurrently<RequestDataType = any, ResponseDataTyp
             )
             : null;
 
-        const createExecutor = (fn: () => Promise<boolean | ResponseDataType>) => {
+        const createExecutor = (fn: () => Promise<STABLE_REQUEST_RESULT<ResponseDataType>>) => {
             if (concurrencyLimiter && rateLimiter) {
                 return () => concurrencyLimiter.execute(() => rateLimiter.execute(fn));
             } else if (concurrencyLimiter) {
@@ -167,15 +168,14 @@ export async function executeConcurrently<RequestDataType = any, ResponseDataTyp
         const req = requests[i];
         
         if(res.status === 'fulfilled') {
-            const value = res.value;
-            const isSuccess = value !== false;
+            const requestResult = res.value;
             responses.push({
                 requestId: req.id,
                 ...(req.groupId && { groupId: req.groupId }),
-                success: isSuccess,
-                ...(isSuccess && typeof value !== 'boolean' && { data: value as ResponseDataType }),
-                ...(!isSuccess && {
-                    error: 'Request was unsuccessful, but the error was analyzed successfully!'
+                success: requestResult.success,
+                ...(requestResult.data !== undefined && { data: requestResult.data }),
+                ...(!requestResult.success && {
+                    error: requestResult.error || 'Request was unsuccessful, but the error was analyzed successfully!'
                 })
             });
         } else {

@@ -1,6 +1,7 @@
 import { executeNonLinearWorkflow } from './execute-non-linear-workflow.js';
 import { executeWithPersistence } from './execute-with-persistence.js';
 import { formatLogContext } from './format-log-context.js';
+import { MetricsAggregator } from './metrics-aggregator.js';
 import { PHASE_DECISION_ACTIONS } from '../enums/index.js';
 import {
   STABLE_WORKFLOW_BRANCH,
@@ -97,6 +98,8 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
         executionNumber
       };
 
+      branchResult.metrics = MetricsAggregator.extractBranchMetrics(branchResult);
+
       return {
         branchResult,
         phaseResults: result.phaseResults,
@@ -111,19 +114,23 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
         error
       );
 
+      const errorBranchResult: BranchExecutionResult<ResponseDataType> = {
+        workflowId,
+        branchId: branch.id,
+        branchIndex,
+        success: false,
+        executionTime: Date.now() - branchStartTime,
+        completedPhases: 0,
+        phaseResults: [],
+        executionNumber,
+        error: error?.message || 'Branch execution failed',
+        decision: undefined
+      };
+
+      errorBranchResult.metrics = MetricsAggregator.extractBranchMetrics(errorBranchResult);
+
       return {
-        branchResult: {
-          workflowId,
-          branchId: branch.id,
-          branchIndex,
-          success: false,
-          executionTime: Date.now() - branchStartTime,
-          completedPhases: 0,
-          phaseResults: [],
-          executionNumber,
-          error: error?.message || 'Branch execution failed',
-          decision: undefined
-        },
+        branchResult: errorBranchResult,
         phaseResults: [],
         executionHistory: [],
         totalRequests: 0,
@@ -172,6 +179,8 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
         skipped: true,
         error: `Exceeded max replay count of ${maxReplayCount}`
       };
+
+      skippedResult.metrics = MetricsAggregator.extractBranchMetrics(skippedResult);
 
       branchResults.push(skippedResult);
 
@@ -376,6 +385,9 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
               executionNumber: 1,
               skipped: true
             };
+
+            skippedResult.metrics = MetricsAggregator.extractBranchMetrics(skippedResult);
+
             branchResults.push(skippedResult);
 
             branchExecutionHistory.push({

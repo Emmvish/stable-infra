@@ -261,6 +261,85 @@ commonStatePersistence: {
 
 ---
 
+### Example 7: Real-Time Metrics Monitoring & Performance Dashboard
+
+A comprehensive metrics collection and analysis system demonstrating:
+- **Multi-level metrics extraction** (request, phase, branch, workflow)
+- **Infrastructure metrics** (circuit breaker, cache, rate limiter, concurrency limiter)
+- **Real-time performance monitoring** with automated alerting
+- **Health score calculation** for system assessment
+- **Bottleneck identification** and optimization recommendations
+- **SLA compliance tracking** with configurable thresholds
+- **Performance dashboard** with detailed metric visualization
+- **Request grouping** with priority-based policies
+
+```bash
+npx tsx examples/07-real-time-metrics-monitoring.ts
+```
+
+**Key Features Demonstrated:**
+- ✅ MetricsAggregator utility class usage
+- ✅ Multi-branch workflow with concurrent execution
+- ✅ Request-level metrics (attempts, execution time)
+- ✅ Phase-level metrics (throughput, completion rate)
+- ✅ Branch-level metrics (parallel performance)
+- ✅ Workflow-level metrics (end-to-end performance)
+- ✅ Circuit breaker health monitoring
+- ✅ Cache performance analysis (hit rate, efficiency)
+- ✅ Rate limiter utilization tracking
+- ✅ Concurrency limiter metrics
+- ✅ Automated alert generation (CRITICAL/WARNING/INFO)
+- ✅ Health score calculation (0-100 scale)
+- ✅ SLA threshold validation
+- ✅ Bottleneck identification
+- ✅ Performance optimization recommendations
+- ✅ Real-time monitoring hooks
+- ✅ Request grouping with priority policies
+- ✅ Comprehensive dashboard visualization
+
+**Use Case:** Monitor and analyze performance of complex multi-branch workflows in production environments, identify bottlenecks, track SLA compliance, and receive automated alerts with actionable recommendations for optimization.
+
+**Metrics Covered:**
+- **Workflow**: Execution time, throughput, success rates, phase completion rates, branch statistics
+- **Phases**: Individual phase performance, request distribution, decision tracking
+- **Branches**: Concurrent execution performance, phase completion analysis
+- **Infrastructure**: Circuit breaker state, cache efficiency, rate limiter utilization, concurrency metrics
+- **Alerts**: Automated detection of performance issues, SLA violations, infrastructure problems
+
+**Sample Output:**
+```
+📊 REAL-TIME METRICS DASHBOARD
+================================================================================
+
+📈 WORKFLOW METRICS:
+  Workflow ID: metrics-monitoring-demo
+  Status: ✅ SUCCESS
+  Total Execution Time: 3847ms
+  Throughput: 13.24 requests/second
+
+  Phase Statistics:
+    Completion Rate: 100.00%
+    Avg Execution Time: 962.33ms
+
+  Request Statistics:
+    Total: 51 | Successful: 51 | Failed: 0
+    Success Rate: 100.00%
+
+⚙️  INFRASTRUCTURE METRICS:
+  🔌 Circuit Breaker: ✅ CLOSED
+    Health: ✅ Healthy
+    Failure Rate: 0.00%
+
+  💾 Cache:
+    Hit Rate: 45.23%
+    Network Requests Saved: 23
+    Cache Efficiency: 88.76%
+
+🏥 SYSTEM HEALTH SCORE: 100/100 (EXCELLENT)
+```
+
+---
+
 ## Architecture Patterns Demonstrated
 
 ### 1. **Multi-Phase Pipeline Pattern** (Example 1)
@@ -340,6 +419,55 @@ Checkpoint Checkpoint Checkpoint Checkpoint Final
  Redis      Redis      Redis      Redis    Cleanup
 ```
 
+### 7. **Real-Time Metrics Monitoring Pattern** (Example 7)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Workflow Execution                         │
+│  (Multi-branch with Request Grouping & Infrastructure)          │
+└────────────────────────┬────────────────────────────────────────┘
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+┌───────▼──────┐  ┌─────▼─────┐  ┌──────▼───────┐
+│ Data Branch  │  │ Processing │  │ Enrichment   │
+│  (Sequential)│  │  (Parallel)│  │  (Parallel)  │
+└───────┬──────┘  └─────┬─────┘  └──────┬───────┘
+        │                │                │
+        └────────────────┼────────────────┘
+                         │
+        ┌────────────────┴────────────────┐
+        │                                  │
+┌───────▼────────┐              ┌─────────▼────────┐
+│ Infrastructure │              │  Metrics Layer   │
+│   Components   │              │   Aggregation    │
+│                │              │                  │
+│ • Circuit      │              │ • Workflow Level │
+│   Breaker      │──────────────▶ • Branch Level   │
+│ • Cache        │              │ • Phase Level    │
+│ • Rate Limiter │              │ • Request Level  │
+│ • Concurrency  │              │ • Infrastructure │
+└────────┬───────┘              └─────────┬────────┘
+         │                                 │
+         └────────────────┬────────────────┘
+                          │
+                ┌─────────▼──────────┐
+                │  Metrics Monitor   │
+                │  & Alert Engine    │
+                │                    │
+                │ • SLA Validation   │
+                │ • Threshold Checks │
+                │ • Alert Generation │
+                │ • Health Scoring   │
+                └─────────┬──────────┘
+                          │
+        ┌─────────────────┼─────────────────┐
+        │                 │                 │
+┌───────▼──────┐  ┌───────▼──────┐  ┌──────▼───────┐
+│   Dashboard  │  │    Alerts    │  │ Recommendations│
+│ (Visualization)│  │(CRITICAL/WARN)│ │ (Optimization) │
+└──────────────┘  └──────────────┘  └────────────────┘
+```
+
 ## Advanced Features Showcased
 
 ### Resilience & Reliability
@@ -372,6 +500,11 @@ Checkpoint Checkpoint Checkpoint Checkpoint Final
 - **State Versioning**: Track all state changes with timestamps
 - **Audit Trails**: Complete history of workflow state modifications
 - **Progress Tracking**: Real-time workflow progress visibility across instances
+- **Metrics Aggregation**: Multi-level metrics extraction (request → system)
+- **Performance Dashboards**: Real-time visualization of all metrics
+- **Automated Alerting**: CRITICAL/WARNING/INFO alerts with recommendations
+- **Health Scoring**: 0-100 system health score calculation
+- **Bottleneck Detection**: Identify performance bottlenecks automatically
 
 ### Performance Optimization
 - **Response Caching**: TTL-based caching with cache-control support
@@ -380,6 +513,8 @@ Checkpoint Checkpoint Checkpoint Checkpoint Final
 - **Shared State Management**: Efficient data passing across phases
 - **Resource Management**: Rate and concurrency limiting
 - **Throughput Analysis**: Real-time performance metrics
+- **Cache Efficiency Tracking**: Hit rates and network request savings
+- **Performance Profiling**: Detailed execution time analysis
 
 ## Production Considerations
 
@@ -395,15 +530,18 @@ These examples demonstrate patterns suitable for:
 - **Resilience Testing**: With chaos engineering and failure simulation
 - **Distributed Workflows**: With state persistence and recovery
 - **Long-Running Operations**: With checkpoint-based resumption
+- **Performance Optimization**: With metrics-driven insights and bottleneck detection
+- **Real-Time Monitoring**: With automated alerting and health scoring
 
 ## Core Functions Demonstrated
 
-### stableRequest (Examples 1, 2, 3, 5)
+### stableRequest (Examples 1, 2, 3, 5, 7)
 - Individual HTTP request handling with advanced retry logic
 - Circuit breaker integration for failure isolation
 - Response caching for performance optimization
 - Trial mode for failure simulation and testing
 - Comprehensive error handling and recovery
+- Detailed request-level metrics collection
 
 ### stableApiGateway (Example 4)
 - Concurrent batch request processing
@@ -411,8 +549,9 @@ These examples demonstrate patterns suitable for:
 - Rate and concurrency limiting
 - Different retry strategies per group
 - Partial failure tolerance
+- Gateway-level metrics aggregation
 
-### stableWorkflow (Examples 1, 2, 6)
+### stableWorkflow (Examples 1, 2, 6, 7)
 - Multi-phase workflow orchestration
 - Branch workflows for parallel execution
 - Non-linear execution with phase decisions
@@ -420,6 +559,15 @@ These examples demonstrate patterns suitable for:
 - Complex conditional logic
 - State persistence for workflow recovery
 - Distributed execution with locking
+- Comprehensive workflow-level metrics
+
+### MetricsAggregator (Example 7)
+- Multi-level metrics extraction (request → system)
+- Workflow metrics computation
+- Branch and phase metrics analysis
+- Infrastructure metrics collection
+- Request group metrics aggregation
+- System-wide metrics aggregation
 
 ## Customization
 

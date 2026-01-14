@@ -61,7 +61,8 @@ describe('State Persistence', () => {
         }
       });
 
-      expect(result).toEqual(mockData);
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockData);
       // Persistence is called: load before responseAnalyzer, store after responseAnalyzer, store after handleSuccessfulAttemptData
       // May also be called for preExecution hook
       expect(persistenceFn).toHaveBeenCalled();
@@ -155,7 +156,8 @@ describe('State Persistence', () => {
         }
       });
 
-      expect(result).toEqual(mockData);
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockData);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('State persistence: Failed to load state')
       );
@@ -658,7 +660,8 @@ describe('State Persistence', () => {
         }
       });
 
-      expect(result).toEqual(mockData);
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockData);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('State persistence: Failed to load state')
       );
@@ -715,7 +718,8 @@ describe('State Persistence', () => {
         }
       });
 
-      expect(result).toEqual(mockData);
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockData);
       expect(buffer.steps).toContain('preExecution');
       expect(buffer.steps).toContain('responseAnalyzer');
       // handleSuccessfulAttemptData may or may not complete before test ends

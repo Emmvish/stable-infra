@@ -10,7 +10,8 @@ import {
     executeWithPersistence,
     safelyStringify,
     CircuitBreaker,
-    formatLogContext
+    formatLogContext,
+    MetricsAggregator
 } from '../utilities/index.js';
 
 export async function stableWorkflow<RequestDataType = any, ResponseDataType = any>(
@@ -101,7 +102,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
             const workflowExecutionTime = Date.now() - workflowStartTime;
             const workflowSuccess = failedRequests === 0;
 
-            return {
+            const result: STABLE_WORKFLOW_RESULT = {
                 workflowId,
                 success: workflowSuccess,
                 executionTime: workflowExecutionTime,
@@ -118,6 +119,13 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 terminatedEarly: branchResult.terminatedEarly,
                 terminationReason: branchResult.terminationReason
             };
+
+            result.metrics = MetricsAggregator.extractWorkflowMetrics(result);
+            
+            const allResponses = phaseResults.flatMap(phase => phase.responses);
+            result.requestGroupMetrics = MetricsAggregator.extractRequestGroupMetrics(allResponses);
+
+            return result;
         }
 
 
@@ -167,6 +175,11 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 terminatedEarly: nonLinearResult.terminatedEarly,
                 terminationReason: nonLinearResult.terminationReason
             };
+
+            result.metrics = MetricsAggregator.extractWorkflowMetrics(result);
+            
+            const allResponses = phaseResults.flatMap(phase => phase.responses);
+            result.requestGroupMetrics = MetricsAggregator.extractRequestGroupMetrics(allResponses);
 
             if (logPhaseResults) {
                 console.info(
@@ -449,6 +462,11 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
             executionHistory: []
         };
 
+        result.metrics = MetricsAggregator.extractWorkflowMetrics(result);
+        
+        const allResponses = phaseResults.flatMap(phase => phase.responses);
+        result.requestGroupMetrics = MetricsAggregator.extractRequestGroupMetrics(allResponses);
+
         if (logPhaseResults) {
             console.info(
                 `\nstable-request: [Workflow: ${workflowId}] Completed:`,
@@ -470,7 +488,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
             );
         }
 
-        return {
+        const errorResult: STABLE_WORKFLOW_RESULT = {
             workflowId,
             success: false,
             executionTime: workflowExecutionTime,
@@ -484,5 +502,9 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
             executionHistory: [],
             error: workflowError.message
         };
+
+        errorResult.metrics = MetricsAggregator.extractWorkflowMetrics(errorResult);
+
+        return errorResult;
     }
 }

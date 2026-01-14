@@ -102,6 +102,12 @@
                     <h3>Type Safety</h3>
                     <p>Full TypeScript support with 50+ exported types ensuring compile-time safety and excellent IDE autocomplete.</p>
                 </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📈</div>
+                    <h3>Real-Time Metrics</h3>
+                    <p>Extract comprehensive metrics at every level - request, phase, branch, workflow, and infrastructure - with automated performance analysis and alerting.</p>
+                </div>
             </div>
         </div>
     </section>
@@ -366,6 +372,50 @@ console.log(`Success: ${result.success}`);</code></pre>
 });</code></pre>
                 </div>
             </div>
+
+            <div class="feature-detail">
+                <div class="feature-detail-content">
+                    <h3>📈 Comprehensive Metrics & Performance Analysis</h3>
+                    <p>Extract, analyze, and monitor metrics at every level of execution with the built-in MetricsAggregator:</p>
+                    <ul>
+                        <li><strong>Request-Level Metrics:</strong> Attempts, execution time, success rates, retry patterns</li>
+                        <li><strong>Phase-Level Metrics:</strong> Throughput, completion rates, request distribution</li>
+                        <li><strong>Branch-Level Metrics:</strong> Parallel execution performance, branch success rates</li>
+                        <li><strong>Workflow-Level Metrics:</strong> End-to-end performance, phase completion, total throughput</li>
+                        <li><strong>Infrastructure Metrics:</strong> Circuit breaker health, cache efficiency, rate limiter utilization</li>
+                        <li><strong>Real-Time Monitoring:</strong> Automated alerts, SLA compliance tracking, bottleneck detection</li>
+                        <li><strong>Health Scoring:</strong> Automated 0-100 system health score with actionable recommendations</li>
+                    </ul>
+                    <pre><code class="language-typescript">import { MetricsAggregator, stableWorkflow } from '@emmvish/stable-request';
+
+const result = await stableWorkflow(phases, options);
+
+// Extract comprehensive metrics at all levels
+const systemMetrics = MetricsAggregator.aggregateSystemMetrics(
+  result,
+  circuitBreaker,
+  cache,
+  rateLimiter,
+  concurrencyLimiter
+);
+
+// Workflow-level insights
+console.log('Throughput:', systemMetrics.workflow.throughput, 'req/s');
+console.log('Success Rate:', systemMetrics.workflow.requestSuccessRate, '%');
+
+// Phase-level analysis
+systemMetrics.phases.forEach(phase => {
+  console.log(`Phase ${phase.phaseId}:`, {
+    executionTime: phase.executionTime,
+    successRate: phase.requestSuccessRate
+  });
+});
+
+// Infrastructure health
+console.log('Cache Hit Rate:', systemMetrics.cache.hitRate, '%');
+console.log('Circuit Breaker State:', systemMetrics.circuitBreaker.state);</code></pre>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -402,6 +452,16 @@ console.log(`Success: ${result.success}`);</code></pre>
                 <div class="use-case-card">
                     <h3>🔗 Service Orchestration</h3>
                     <p>Microservice coordination with proper dependencies and failure handling</p>
+                </div>
+                
+                <div class="use-case-card">
+                    <h3>📊 Performance Monitoring</h3>
+                    <p>Real-time metrics collection, SLA tracking, and automated alerting for production systems</p>
+                </div>
+                
+                <div class="use-case-card">
+                    <h3>🔄 ETL Pipelines</h3>
+                    <p>Data extraction, transformation, and loading with state persistence and recovery</p>
                 </div>
             </div>
         </div>

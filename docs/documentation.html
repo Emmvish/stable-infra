@@ -62,6 +62,7 @@
                     <li><a href="#pre-execution">Pre-Execution Hook</a></li>
                     <li><a href="#trial-mode">Trial Mode</a></li>
                     <li><a href="#state-persistence">State Persistence</a></li>
+                    <li><a href="#metrics">Metrics & Monitoring</a></li>
                     <li><a href="#best-practices">Best Practices</a></li>
                     <li><a href="https://github.com/Emmvish/stable-request/blob/main/docs/api-references.md" target="_blank">API Reference</a></li>
                 </ul>
@@ -1945,6 +1946,56 @@ await stableApiGateway(requests, {
   },
   commonAttempts: 3
 });</code></pre>
+
+                <h3>Using Global Circuit Breaker</h3>
+                <p>Access and monitor the global circuit breaker instance shared across all requests:</p>
+                <pre><code class="language-typescript">import { 
+  stableRequest, 
+  getGlobalCircuitBreaker, 
+  resetGlobalCircuitBreaker 
+} from '@emmvish/stable-request';
+
+// Execute requests - they use the global circuit breaker by default
+await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  resReq: true,
+  attempts: 3
+});
+
+// Check global circuit breaker state
+const breaker = getGlobalCircuitBreaker();
+const state = breaker.getState();
+
+console.log(`Circuit State: ${state.state}`);
+console.log(`Total Requests: ${state.totalRequests}`);
+console.log(`Failure Rate: ${state.failureRate}%`);
+
+// Reset global circuit breaker (clear all state)
+resetGlobalCircuitBreaker();</code></pre>
+
+                <h3>Circuit Breaker Instance Sharing</h3>
+                <p>Create a circuit breaker instance and share it across multiple workflows:</p>
+                <pre><code class="language-typescript">import { CircuitBreaker, stableWorkflow } from '@emmvish/stable-request';
+
+// Create shared circuit breaker instance
+const sharedBreaker = new CircuitBreaker({
+  failureThresholdPercentage: 50,
+  minimumRequests: 10,
+  recoveryTimeoutMs: 60000
+});
+
+// Use in multiple workflows
+await stableWorkflow(workflow1Phases, {
+  circuitBreaker: sharedBreaker  // Pass instance directly
+});
+
+await stableWorkflow(workflow2Phases, {
+  circuitBreaker: sharedBreaker  // Same instance, shared state
+});
+
+// Check state after both workflows
+const state = sharedBreaker.getState();
+console.log(`Total requests across workflows: ${state.totalRequests}`);</code></pre>
             </section>
 
             <section id="caching" class="doc-section">
@@ -2015,6 +2066,60 @@ await stableRequest({
     windowMs: 60000                                 // Per minute (rate limit)
   }
 });</code></pre>
+
+                <h3>Using Global Rate Limiter</h3>
+                <p>Access and monitor the global rate limiter instance:</p>
+                <pre><code class="language-typescript">import { 
+  stableRequest, 
+  getGlobalRateLimiter, 
+  resetGlobalRateLimiter 
+} from '@emmvish/stable-request';
+
+// Execute requests using global rate limiter
+await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  resReq: true,
+  rateLimit: {
+    maxRequests: 100,
+    windowMs: 60000
+  }
+});
+
+// Check global rate limiter state
+const limiter = getGlobalRateLimiter();
+const state = limiter.getState();
+
+console.log(`Requests in window: ${state.requestsInWindow}`);
+console.log(`Max requests: ${state.maxRequests}`);
+console.log(`Window duration: ${state.windowMs}ms`);
+
+// Reset global rate limiter (clear all state)
+resetGlobalRateLimiter();</code></pre>
+
+                <h3>Using Global Concurrency Limiter</h3>
+                <p>Access and monitor the global concurrency limiter instance:</p>
+                <pre><code class="language-typescript">import { 
+  stableApiGateway, 
+  getGlobalConcurrencyLimiter, 
+  resetGlobalConcurrencyLimiter 
+} from '@emmvish/stable-request';
+
+// Execute requests using global concurrency limiter
+await stableApiGateway(requests, {
+  concurrentExecution: true,
+  maxConcurrentRequests: 5
+});
+
+// Check global concurrency limiter state
+const limiter = getGlobalConcurrencyLimiter();
+const state = limiter.getState();
+
+console.log(`Active requests: ${state.activeRequests}`);
+console.log(`Max concurrent: ${state.maxConcurrent}`);
+console.log(`Queued requests: ${state.queuedRequests}`);
+
+// Reset global concurrency limiter (clear all state)
+resetGlobalConcurrencyLimiter();</code></pre>
             </section>
 
             <section id="workflow-patterns" class="doc-section">
@@ -2830,6 +2935,478 @@ const result = await stableWorkflow([], {
     console.error('Request error:', { request: executionContext.requestId, attempt });
   }
 });</code></pre>
+            </section>
+
+            <section id="metrics" class="doc-section">
+                <h2>Metrics & Performance Monitoring</h2>
+                <p>The <code>stable-request</code> library provides comprehensive metrics collection and analysis capabilities through the <code>MetricsAggregator</code> utility class. Extract performance insights at every level of execution - from individual requests to complete workflows.</p>
+
+                <h3>MetricsAggregator Class</h3>
+                <p>Utility class for extracting and computing metrics from workflow results, phases, branches, and infrastructure components.</p>
+
+                <h4>Import and Usage</h4>
+                <pre><code class="language-typescript">import { MetricsAggregator, stableWorkflow } from '@emmvish/stable-request';
+
+// Execute your workflow
+const result = await stableWorkflow(phases, options);
+
+// Extract metrics at different levels
+const workflowMetrics = MetricsAggregator.extractWorkflowMetrics(result);
+const systemMetrics = MetricsAggregator.aggregateSystemMetrics(
+  result,
+  circuitBreaker,
+  cache,
+  rateLimiter,
+  concurrencyLimiter
+);</code></pre>
+
+                <h3>Available Metrics Methods</h3>
+
+                <h4>1. extractWorkflowMetrics()</h4>
+                <p>Extract comprehensive metrics from a workflow result.</p>
+                <pre><code class="language-typescript">const workflowMetrics = MetricsAggregator.extractWorkflowMetrics(result);
+
+// Returns: WorkflowMetrics
+console.log({
+  workflowId: workflowMetrics.workflowId,
+  success: workflowMetrics.success,
+  executionTime: workflowMetrics.executionTime,        // Total time in ms
+  throughput: workflowMetrics.throughput,              // Requests per second
+  
+  // Phase statistics
+  totalPhases: workflowMetrics.totalPhases,
+  completedPhases: workflowMetrics.completedPhases,
+  phaseCompletionRate: workflowMetrics.phaseCompletionRate,  // Percentage
+  averagePhaseExecutionTime: workflowMetrics.averagePhaseExecutionTime,
+  
+  // Request statistics
+  totalRequests: workflowMetrics.totalRequests,
+  successfulRequests: workflowMetrics.successfulRequests,
+  failedRequests: workflowMetrics.failedRequests,
+  requestSuccessRate: workflowMetrics.requestSuccessRate,    // Percentage
+  
+  // Branch statistics (if applicable)
+  totalBranches: workflowMetrics.totalBranches,
+  completedBranches: workflowMetrics.completedBranches,
+  branchSuccessRate: workflowMetrics.branchSuccessRate,
+  
+  // Execution control
+  terminatedEarly: workflowMetrics.terminatedEarly,
+  terminationReason: workflowMetrics.terminationReason
+});</code></pre>
+
+                <h4>2. extractPhaseMetrics()</h4>
+                <p>Extract metrics from a single phase execution.</p>
+                <pre><code class="language-typescript">result.phases.forEach(phase => {
+  const phaseMetrics = MetricsAggregator.extractPhaseMetrics(phase);
+  
+  console.log({
+    phaseId: phaseMetrics.phaseId,
+    executionTime: phaseMetrics.executionTime,
+    totalRequests: phaseMetrics.totalRequests,
+    successfulRequests: phaseMetrics.successfulRequests,
+    requestSuccessRate: phaseMetrics.requestSuccessRate,  // Percentage
+    
+    // Decision tracking
+    hasDecision: phaseMetrics.hasDecision,
+    decisionAction: phaseMetrics.decisionAction,          // JUMP, SKIP, REPLAY, etc.
+    targetPhaseId: phaseMetrics.targetPhaseId,
+    replayCount: phaseMetrics.replayCount
+  });
+});</code></pre>
+
+                <h4>3. extractBranchMetrics()</h4>
+                <p>Extract metrics from a branch execution result.</p>
+                <pre><code class="language-typescript">result.branches?.forEach(branch => {
+  const branchMetrics = MetricsAggregator.extractBranchMetrics(branch);
+  
+  console.log({
+    branchId: branchMetrics.branchId,
+    executionTime: branchMetrics.executionTime,
+    totalPhases: branchMetrics.totalPhases,
+    completedPhases: branchMetrics.completedPhases,
+    phaseCompletionRate: branchMetrics.phaseCompletionRate,
+    
+    totalRequests: branchMetrics.totalRequests,
+    requestSuccessRate: branchMetrics.requestSuccessRate
+  });
+});</code></pre>
+
+                <h4>4. extractRequestGroupMetrics()</h4>
+                <p>Extract metrics for each request group from API gateway responses.</p>
+                <pre><code class="language-typescript">const responses = result.phases.flatMap(p => p.responses);
+const groupMetrics = MetricsAggregator.extractRequestGroupMetrics(responses);
+
+groupMetrics.forEach(group => {
+  console.log({
+    groupId: group.groupId,
+    totalRequests: group.totalRequests,
+    successfulRequests: group.successfulRequests,
+    failedRequests: group.failedRequests,
+    successRate: group.successRate,              // Percentage
+    requestIds: group.requestIds                 // Array of request IDs
+  });
+});</code></pre>
+
+                <h4>5. extractCircuitBreakerMetrics()</h4>
+                <p>Extract comprehensive metrics from a circuit breaker instance.</p>
+                <pre><code class="language-typescript">import { CircuitBreaker } from '@emmvish/stable-request';
+
+const breaker = new CircuitBreaker(config);
+// ... use breaker in requests ...
+
+const cbMetrics = MetricsAggregator.extractCircuitBreakerMetrics(breaker);
+
+console.log({
+  state: cbMetrics.state,                       // CLOSED, OPEN, or HALF_OPEN
+  isHealthy: cbMetrics.isHealthy,
+  totalRequests: cbMetrics.totalRequests,
+  failurePercentage: cbMetrics.failurePercentage,
+  
+  // State transitions
+  stateTransitions: cbMetrics.stateTransitions,
+  openCount: cbMetrics.openCount,
+  averageOpenDuration: cbMetrics.averageOpenDuration,
+  
+  // Recovery tracking
+  recoveryAttempts: cbMetrics.recoveryAttempts,
+  successfulRecoveries: cbMetrics.successfulRecoveries,
+  recoverySuccessRate: cbMetrics.recoverySuccessRate
+});</code></pre>
+
+                <h4>6. extractCacheMetrics()</h4>
+                <p>Extract comprehensive metrics from a cache manager instance.</p>
+                <pre><code class="language-typescript">import { CacheManager } from '@emmvish/stable-request';
+
+const cache = new CacheManager(config);
+// ... use cache in requests ...
+
+const cacheMetrics = MetricsAggregator.extractCacheMetrics(cache);
+
+console.log({
+  currentSize: cacheMetrics.currentSize,
+  maxSize: cacheMetrics.maxSize,
+  utilizationPercentage: cacheMetrics.utilizationPercentage,
+  
+  // Performance
+  hits: cacheMetrics.hits,
+  misses: cacheMetrics.misses,
+  hitRate: cacheMetrics.hitRate,               // Percentage
+  
+  // Efficiency
+  networkRequestsSaved: cacheMetrics.networkRequestsSaved,
+  cacheEfficiency: cacheMetrics.cacheEfficiency,
+  
+  // Timing
+  averageGetTime: cacheMetrics.averageGetTime,
+  averageCacheAge: cacheMetrics.averageCacheAge
+});</code></pre>
+
+                <h4>7. extractRateLimiterMetrics()</h4>
+                <p>Extract comprehensive metrics from a rate limiter instance.</p>
+                <pre><code class="language-typescript">import { RateLimiter } from '@emmvish/stable-request';
+
+const limiter = new RateLimiter(maxRequests, windowMs);
+// ... use limiter in requests ...
+
+const rlMetrics = MetricsAggregator.extractRateLimiterMetrics(limiter);
+
+console.log({
+  maxRequests: rlMetrics.maxRequests,
+  availableTokens: rlMetrics.availableTokens,
+  queueLength: rlMetrics.queueLength,
+  
+  // Throttling stats
+  throttledRequests: rlMetrics.throttledRequests,
+  throttleRate: rlMetrics.throttleRate,        // Percentage
+  
+  // Rate analysis
+  currentRequestRate: rlMetrics.currentRequestRate,
+  peakRequestRate: rlMetrics.peakRequestRate,
+  utilizationPercentage: rlMetrics.utilizationPercentage
+});</code></pre>
+
+                <h4>8. extractConcurrencyLimiterMetrics()</h4>
+                <p>Extract comprehensive metrics from a concurrency limiter instance.</p>
+                <pre><code class="language-typescript">import { ConcurrencyLimiter } from '@emmvish/stable-request';
+
+const limiter = new ConcurrencyLimiter(limit);
+// ... use limiter in requests ...
+
+const clMetrics = MetricsAggregator.extractConcurrencyLimiterMetrics(limiter);
+
+console.log({
+  limit: clMetrics.limit,
+  running: clMetrics.running,
+  queueLength: clMetrics.queueLength,
+  utilizationPercentage: clMetrics.utilizationPercentage,
+  
+  // Performance
+  peakConcurrency: clMetrics.peakConcurrency,
+  averageConcurrency: clMetrics.averageConcurrency,
+  averageQueueWaitTime: clMetrics.averageQueueWaitTime,
+  averageExecutionTime: clMetrics.averageExecutionTime,
+  
+  // Status
+  isAtCapacity: clMetrics.isAtCapacity,
+  successRate: clMetrics.successRate
+});</code></pre>
+
+                <h4>9. aggregateSystemMetrics()</h4>
+                <p>Aggregate all metrics from a workflow and its infrastructure components into a single comprehensive view.</p>
+                <pre><code class="language-typescript">const systemMetrics = MetricsAggregator.aggregateSystemMetrics(
+  result,                  // Workflow result
+  circuitBreaker,          // Optional: CircuitBreaker instance
+  cache,                   // Optional: CacheManager instance
+  rateLimiter,             // Optional: RateLimiter instance
+  concurrencyLimiter       // Optional: ConcurrencyLimiter instance
+);
+
+// Returns: SystemMetrics containing all metrics in one object
+console.log({
+  workflow: systemMetrics.workflow,              // WorkflowMetrics
+  branches: systemMetrics.branches,              // BranchMetrics[]
+  phases: systemMetrics.phases,                  // PhaseMetrics[]
+  requestGroups: systemMetrics.requestGroups,    // RequestGroupMetrics[]
+  requests: systemMetrics.requests,              // RequestMetrics[]
+  
+  // Infrastructure (if provided)
+  circuitBreaker: systemMetrics.circuitBreaker,  // CircuitBreakerDashboardMetrics
+  cache: systemMetrics.cache,                    // CacheDashboardMetrics
+  rateLimiter: systemMetrics.rateLimiter,        // RateLimiterDashboardMetrics
+  concurrencyLimiter: systemMetrics.concurrencyLimiter  // ConcurrencyLimiterDashboardMetrics
+});</code></pre>
+
+                <h3>Metrics Types</h3>
+                <p>All metrics objects are fully typed with TypeScript interfaces:</p>
+
+                <h4>WorkflowMetrics Interface</h4>
+                <pre><code class="language-typescript">interface WorkflowMetrics {
+  workflowId: string;
+  success: boolean;
+  executionTime: number;                         // Total execution time in ms
+  timestamp: string;                             // ISO timestamp
+  
+  // Phase statistics
+  totalPhases: number;
+  completedPhases: number;
+  skippedPhases: number;
+  failedPhases: number;
+  phaseCompletionRate: number;                   // Percentage (0-100)
+  averagePhaseExecutionTime: number;             // Average time per phase
+  
+  // Request statistics
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  requestSuccessRate: number;                    // Percentage (0-100)
+  requestFailureRate: number;                    // Percentage (0-100)
+  throughput: number;                            // Requests per second
+  
+  // Non-linear execution tracking
+  totalPhaseReplays: number;
+  totalPhaseSkips: number;
+  terminatedEarly: boolean;
+  terminationReason?: string;
+  
+  // Branch statistics (if applicable)
+  totalBranches?: number;
+  completedBranches?: number;
+  failedBranches?: number;
+  branchSuccessRate?: number;                    // Percentage (0-100)
+}</code></pre>
+
+                <h4>PhaseMetrics Interface</h4>
+                <pre><code class="language-typescript">interface PhaseMetrics {
+  phaseId: string;
+  phaseIndex: number;
+  workflowId: string;
+  branchId?: string;
+  executionNumber: number;                       // Execution count (for replays)
+  
+  success: boolean;
+  skipped: boolean;
+  executionTime: number;
+  timestamp: string;
+  
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  requestSuccessRate: number;
+  requestFailureRate: number;
+  
+  // Decision tracking
+  hasDecision: boolean;
+  decisionAction?: string;                       // CONTINUE, JUMP, SKIP, REPLAY, TERMINATE
+  targetPhaseId?: string;
+  replayCount?: number;
+  error?: string;
+}</code></pre>
+
+                <h4>Infrastructure Metrics Interfaces</h4>
+                <pre><code class="language-typescript">// Circuit Breaker Metrics
+interface CircuitBreakerDashboardMetrics {
+  state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+  isHealthy: boolean;
+  totalRequests: number;
+  failurePercentage: number;
+  stateTransitions: number;
+  openCount: number;
+  recoverySuccessRate: number;
+  config: CircuitBreakerConfig;
+}
+
+// Cache Metrics
+interface CacheDashboardMetrics {
+  isEnabled: boolean;
+  currentSize: number;
+  hitRate: number;                               // Percentage (0-100)
+  missRate: number;                              // Percentage (0-100)
+  networkRequestsSaved: number;
+  cacheEfficiency: number;                       // Percentage (0-100)
+  averageGetTime: number;
+  averageCacheAge: number;
+}
+
+// Rate Limiter Metrics
+interface RateLimiterDashboardMetrics {
+  maxRequests: number;
+  availableTokens: number;
+  queueLength: number;
+  throttleRate: number;                          // Percentage (0-100)
+  currentRequestRate: number;
+  peakRequestRate: number;
+  utilizationPercentage: number;
+}
+
+// Concurrency Limiter Metrics
+interface ConcurrencyLimiterDashboardMetrics {
+  limit: number;
+  running: number;
+  utilizationPercentage: number;
+  peakConcurrency: number;
+  averageQueueWaitTime: number;
+  averageExecutionTime: number;
+  isAtCapacity: boolean;
+  successRate: number;
+}</code></pre>
+
+                <h3>Real-Time Monitoring Example</h3>
+                <p>Complete example of metrics collection, analysis, and automated alerting:</p>
+                <pre><code class="language-typescript">import { 
+  stableWorkflow, 
+  MetricsAggregator,
+  CircuitBreaker,
+  CacheManager,
+  RateLimiter,
+  ConcurrencyLimiter
+} from '@emmvish/stable-request';
+
+// Set up infrastructure components
+const circuitBreaker = new CircuitBreaker({
+  failureThresholdPercentage: 50,
+  minimumRequests: 5,
+  recoveryTimeoutMs: 10000
+});
+
+const cache = new CacheManager({
+  enabled: true,
+  ttl: 30000,
+  maxSize: 100
+});
+
+const rateLimiter = new RateLimiter(50, 10000);
+const concurrencyLimiter = new ConcurrencyLimiter(10);
+
+// Execute workflow
+const result = await stableWorkflow(phases, {
+  workflowId: 'metrics-demo',
+  enableBranchExecution: true,
+  branches: [...],
+  circuitBreaker: { /* config */ },
+  rateLimit: { maxRequests: 50, windowMs: 10000 },
+  maxConcurrentRequests: 10,
+  commonCache: { enabled: true, ttl: 30000 }
+});
+
+// Extract comprehensive metrics
+const systemMetrics = MetricsAggregator.aggregateSystemMetrics(
+  result,
+  circuitBreaker,
+  cache,
+  rateLimiter,
+  concurrencyLimiter
+);
+
+// Analyze workflow performance
+console.log('=== WORKFLOW METRICS ===');
+console.log(`Throughput: ${systemMetrics.workflow.throughput.toFixed(2)} req/s`);
+console.log(`Success Rate: ${systemMetrics.workflow.requestSuccessRate.toFixed(2)}%`);
+console.log(`Execution Time: ${systemMetrics.workflow.executionTime}ms`);
+
+// Analyze phase performance
+console.log('\n=== PHASE METRICS ===');
+systemMetrics.phases.forEach(phase => {
+  console.log(`Phase ${phase.phaseId}:`);
+  console.log(`  Execution Time: ${phase.executionTime}ms`);
+  console.log(`  Success Rate: ${phase.requestSuccessRate.toFixed(2)}%`);
+  
+  if (phase.hasDecision) {
+    console.log(`  Decision: ${phase.decisionAction}`);
+  }
+});
+
+// Analyze infrastructure health
+console.log('\n=== INFRASTRUCTURE METRICS ===');
+
+if (systemMetrics.circuitBreaker) {
+  console.log(`Circuit Breaker: ${systemMetrics.circuitBreaker.state}`);
+  console.log(`  Failure Rate: ${systemMetrics.circuitBreaker.failurePercentage.toFixed(2)}%`);
+}
+
+if (systemMetrics.cache) {
+  console.log(`Cache Hit Rate: ${systemMetrics.cache.hitRate.toFixed(2)}%`);
+  console.log(`  Network Requests Saved: ${systemMetrics.cache.networkRequestsSaved}`);
+}
+
+if (systemMetrics.rateLimiter) {
+  console.log(`Rate Limiter Throttle Rate: ${systemMetrics.rateLimiter.throttleRate.toFixed(2)}%`);
+}
+
+if (systemMetrics.concurrencyLimiter) {
+  console.log(`Concurrency Utilization: ${systemMetrics.concurrencyLimiter.utilizationPercentage.toFixed(2)}%`);
+}
+
+// Automated alerting based on SLA thresholds
+const SLA_THRESHOLDS = {
+  maxExecutionTime: 15000,    // 15 seconds
+  minSuccessRate: 95,          // 95%
+  maxThroughput: 50            // 50 req/s target
+};
+
+if (systemMetrics.workflow.executionTime > SLA_THRESHOLDS.maxExecutionTime) {
+  console.warn('⚠️  ALERT: Workflow execution time exceeded SLA threshold');
+}
+
+if (systemMetrics.workflow.requestSuccessRate < SLA_THRESHOLDS.minSuccessRate) {
+  console.error('🔴 CRITICAL: Request success rate below acceptable threshold');
+}
+
+if (systemMetrics.workflow.throughput < SLA_THRESHOLDS.maxThroughput) {
+  console.warn('⚠️  WARNING: Throughput below target - consider increasing concurrency');
+}</code></pre>
+
+                <h3>Production Monitoring Best Practices</h3>
+                <ul>
+                    <li><strong>Extract metrics after every workflow execution</strong> to track performance trends over time</li>
+                    <li><strong>Set up automated alerting</strong> based on SLA thresholds for execution time, success rates, and throughput</li>
+                    <li><strong>Monitor infrastructure health</strong> (circuit breaker state, cache hit rates) to identify bottlenecks</li>
+                    <li><strong>Track phase-level metrics</strong> to identify slow or failing phases in complex workflows</li>
+                    <li><strong>Analyze request group metrics</strong> to optimize retry strategies and resource allocation by priority</li>
+                    <li><strong>Log metrics to monitoring systems</strong> (Prometheus, Datadog, CloudWatch) for historical analysis</li>
+                    <li><strong>Use metrics to guide optimization</strong> - increase concurrency limits, adjust cache TTL, tune circuit breaker thresholds</li>
+                    <li><strong>Calculate health scores</strong> to provide at-a-glance system status (e.g., 0-100 scale based on multiple metrics)</li>
+                </ul>
             </section>
         </main>
     </div>

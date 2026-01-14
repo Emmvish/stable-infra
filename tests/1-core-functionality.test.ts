@@ -34,7 +34,9 @@ describe('stableRequest - Core Functionality', () => {
       resReq: true
     });
 
-    expect(result).toEqual(mockData);
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual(mockData);
+    expect(result.metrics).toBeDefined();
     expect(mockedAxios.request).toHaveBeenCalledTimes(1);
   });
 
@@ -55,7 +57,8 @@ describe('stableRequest - Core Functionality', () => {
       resReq: false
     });
 
-    expect(result).toBe(true);
+    expect(result.success).toBe(true);
+    expect(result.data).toBe(true);
   });
 
   it('should retry on transient failures and eventually succeed', async () => {
@@ -90,7 +93,8 @@ describe('stableRequest - Core Functionality', () => {
       retryStrategy: RETRY_STRATEGIES.FIXED
     });
 
-    expect(result).toEqual(mockData);
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual(mockData);
     expect(mockedAxios.request).toHaveBeenCalledTimes(3);
   });
 
@@ -168,7 +172,8 @@ describe('stableRequest - Core Functionality', () => {
       }
     });
 
-    expect(result).toEqual(validData);
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual(validData);
     expect(mockedAxios.request).toHaveBeenCalledTimes(2);
   });
 
@@ -239,7 +244,8 @@ describe('stableRequest - Core Functionality', () => {
       }
     });
 
-    expect(result).toBe(false);
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
   });
 
   it('should apply different retry strategies correctly', async () => {

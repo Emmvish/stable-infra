@@ -5,7 +5,14 @@ import { CachedResponse, CacheConfig } from '../types/index.js';
 export class CacheManager {
     private cache: Map<string, CachedResponse>;
     private config: Required<Omit<CacheConfig, 'keyGenerator'>> & { keyGenerator?: CacheConfig['keyGenerator'] };
-    private accessOrder: string[] = []; 
+    private accessOrder: string[] = [];
+    private hits: number = 0;
+    private misses: number = 0;
+    private sets: number = 0;
+    private evictions: number = 0;
+    private expirations: number = 0;
+    private totalGetTime: number = 0;
+    private totalSetTime: number = 0; 
 
     constructor(config: CacheConfig) {
         this.cache = new Map();
@@ -67,7 +74,6 @@ export class CacheManager {
             }
         }
 
-        // Check Expires header if no cache-control max-age was found
         const expires = headers['expires'] || headers['Expires'];
         if (expires) {
             const expiresDate = new Date(expires);
@@ -80,6 +86,8 @@ export class CacheManager {
     }
 
     get<T = any>(reqConfig: AxiosRequestConfig): CachedResponse<T> | null {
+        const startTime = Date.now();
+        
         if (!this.config.enabled) {
             return null;
         }
@@ -92,6 +100,8 @@ export class CacheManager {
         const cached = this.cache.get(key);
 
         if (!cached) {
+            this.misses++;
+            this.totalGetTime += (Date.now() - startTime);
             return null;
         }
 
@@ -100,11 +110,16 @@ export class CacheManager {
         if (now > cached.expiresAt) {
             this.cache.delete(key);
             this.accessOrder = this.accessOrder.filter(k => k !== key);
+            this.expirations++;
+            this.misses++;
+            this.totalGetTime += (Date.now() - startTime);
             return null;
         }
 
         this.accessOrder = this.accessOrder.filter(k => k !== key);
         this.accessOrder.push(key);
+        this.hits++;
+        this.totalGetTime += (Date.now() - startTime);
 
         return cached as CachedResponse<T>;
     }
@@ -116,6 +131,8 @@ export class CacheManager {
         statusText: string,
         headers: Record<string, any>
     ): void {
+        const startTime = Date.now();
+        
         if (!this.config.enabled) {
             return;
         }
@@ -154,11 +171,14 @@ export class CacheManager {
             const oldestKey = this.accessOrder.shift();
             if (oldestKey) {
                 this.cache.delete(oldestKey);
+                this.evictions++;
             }
         }
 
         this.cache.set(key, cached);
         this.accessOrder.push(key);
+        this.sets++;
+        this.totalSetTime += (Date.now() - startTime);
     }
 
     clear(): void {
@@ -176,6 +196,12 @@ export class CacheManager {
         const now = Date.now();
         const entries = Array.from(this.cache.entries());
         const validEntries = entries.filter(([_, cached]) => now <= cached.expiresAt);
+        const totalRequests = this.hits + this.misses;
+        const hitRate = totalRequests > 0 ? (this.hits / totalRequests) * 100 : 0;
+        const missRate = totalRequests > 0 ? (this.misses / totalRequests) * 100 : 0;
+        const averageAge = validEntries.length > 0
+            ? validEntries.reduce((sum, [_, cached]) => sum + (now - cached.timestamp), 0) / validEntries.length
+            : 0;
 
         return {
             size: this.cache.size,
@@ -187,7 +213,19 @@ export class CacheManager {
                 : null,
             newestEntry: entries.length > 0
                 ? Math.max(...entries.map(([_, cached]) => cached.timestamp))
-                : null
+                : null,
+            hits: this.hits,
+            misses: this.misses,
+            sets: this.sets,
+            evictions: this.evictions,
+            expirations: this.expirations,
+            totalRequests: totalRequests,
+            hitRate: hitRate,
+            missRate: missRate,
+            averageCacheAge: averageAge,
+            averageGetTime: totalRequests > 0 ? this.totalGetTime / totalRequests : 0,
+            averageSetTime: this.sets > 0 ? this.totalSetTime / this.sets : 0,
+            utilizationPercentage: (this.cache.size / this.config.maxSize) * 100
         };
     }
 

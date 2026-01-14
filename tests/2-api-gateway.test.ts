@@ -202,7 +202,9 @@ describe('stableApiGateway - Batch Processing', () => {
       commonRequestData: { hostname: 'api.example.com' }
     });
 
-    expect(results).toEqual([]);
+    expect(results.length).toBe(0);
+    expect(results.metrics).toBeDefined();
+    expect(results.metrics?.totalRequests).toBe(0);
     expect(mockedAxios.request).not.toHaveBeenCalled();
   });
 

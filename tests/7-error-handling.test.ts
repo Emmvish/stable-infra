@@ -99,7 +99,7 @@ describe('Error Handling', () => {
       finalErrorAnalyzer: async () => true
     });
 
-    expect(result).toBe(false);
+    expect(result.success).toBe(false);
   });
 
   it('should throw error when finalErrorAnalyzer returns false', async () => {
@@ -159,6 +159,7 @@ describe('Error Handling', () => {
 
     // Should retry when analyzer throws
     expect(mockedAxios.request).toHaveBeenCalledTimes(2);
-    expect(result).toEqual({ value: 'success' });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ value: 'success' });
   });
 });

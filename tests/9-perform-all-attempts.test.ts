@@ -56,7 +56,8 @@ describe('PerformAllAttempts Mode', () => {
       performAllAttempts: true
     });
 
-    expect(result).toEqual({ attempt: 3 });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ attempt: 3 });
     expect(mockedAxios.request).toHaveBeenCalledTimes(3);
   });
 
@@ -110,7 +111,8 @@ describe('PerformAllAttempts Mode', () => {
       performAllAttempts: true
     });
 
-    expect(result).toBe(true);
+    expect(result.success).toBe(true);
+    expect(result.data).toBe(true);
     expect(mockedAxios.request).toHaveBeenCalledTimes(3);
   });
 });

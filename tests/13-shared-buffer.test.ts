@@ -45,7 +45,8 @@ describe('Buffer options: commonBuffer (stableRequest) and sharedBuffer (stableA
       responseAnalyzer
     });
 
-    expect(result).toEqual({ state: 'ready' });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ state: 'ready' });
     expect(responseAnalyzer).toHaveBeenCalledTimes(1);
     expect(commonBuffer).toEqual(
       expect.objectContaining({ traceId: 'trace-123', setAt: 'preExecution' })

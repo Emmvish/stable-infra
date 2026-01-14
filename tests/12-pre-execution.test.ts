@@ -39,7 +39,8 @@ describe('stableRequest - preExecution option (stableRequest)', () => {
 
     expect(preExecutionHook).toHaveBeenCalledTimes(1);
     expect(mockedAxios.request).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({ ok: true });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ ok: true });
   });
 
   it('applies returned overrides when applyPreExecutionConfigOverride=true (e.g., override attempts)', async () => {
@@ -70,7 +71,8 @@ describe('stableRequest - preExecution option (stableRequest)', () => {
     });
 
     expect(mockedAxios.request).toHaveBeenCalledTimes(3);
-    expect(result).toEqual({ ok: true });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ ok: true });
   });
 
   it('does NOT apply returned overrides when applyPreExecutionConfigOverride=false', async () => {
@@ -179,7 +181,8 @@ describe('stableRequest - preExecution option (stableRequest)', () => {
     });
 
     expect(mockedAxios.request).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({ ok: true });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ ok: true });
   });
 
   it('can override hooks (example: override responseAnalyzer) via preExecution when applyPreExecutionConfigOverride=true', async () => {
@@ -216,7 +219,8 @@ describe('stableRequest - preExecution option (stableRequest)', () => {
     });
 
     expect(mockedAxios.request).toHaveBeenCalledTimes(2);
-    expect(result).toEqual({ state: 'ready' });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ state: 'ready' });
   });
 
   it('records output in common buffer and it is visible during request execution', async () => {
@@ -261,7 +265,8 @@ describe('stableRequest - preExecution option (stableRequest)', () => {
       commonBuffer: buffer
     });
 
-    expect(result).toEqual({ ok: true, url: '/needs-token' });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ ok: true, url: '/needs-token' });
     expect(buffer.token).toBe('tok_123');
   });
 

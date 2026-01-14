@@ -19,6 +19,7 @@ export type {
     API_GATEWAY_REQUEST,
     API_GATEWAY_REQUEST_OPTIONS_TYPE,
     API_GATEWAY_RESPONSE,
+    API_GATEWAY_RESULT,
     BranchDecisionHookOptions,
     BranchExecutionDecision,
     BranchExecutionRecord,
@@ -55,6 +56,7 @@ export type {
     RETRY_STRATEGY_TYPES,
     SEQUENTIAL_REQUEST_EXECUTION_OPTIONS,
     STABLE_REQUEST,
+    STABLE_REQUEST_RESULT,
     STABLE_WORKFLOW_BRANCH,
     STABLE_WORKFLOW_PHASE,
     STABLE_WORKFLOW_OPTIONS,
@@ -65,7 +67,17 @@ export type {
     SUCCESSFUL_ATTEMPT_DATA,
     VALID_REQUEST_PROTOCOL_TYPES,
     WorkflowHookParams,
-    TRIAL_MODE_OPTIONS
+    TRIAL_MODE_OPTIONS,
+    WorkflowMetrics,
+    BranchMetrics,
+    PhaseMetrics,
+    RequestGroupMetrics,
+    RequestMetrics,
+    CircuitBreakerDashboardMetrics,
+    CacheDashboardMetrics,
+    RateLimiterDashboardMetrics,
+    ConcurrencyLimiterDashboardMetrics,
+    SystemMetrics
 } from './types/index.js';
 
 export {
@@ -74,7 +86,11 @@ export {
     resetGlobalCacheManager,
     CircuitBreaker,
     CircuitBreakerOpenError,
+    getGlobalCircuitBreaker,
+    resetGlobalCircuitBreaker,
     ConcurrencyLimiter,
+    getGlobalConcurrencyLimiter,
+    resetGlobalConcurrencyLimiter,
     delay,
     executeBranchWorkflow,
     executeConcurrently,
@@ -87,11 +103,17 @@ export {
     generateAxiosRequestConfig,
     getNewDelayTime,
     isRetryableError,
+    MetricsAggregator,
     prepareApiRequestData,
     prepareApiRequestOptions,
     RateLimiter,
+    getGlobalRateLimiter,
+    resetGlobalRateLimiter,
     reqFn,
     safelyExecuteUnknownFunction,
     safelyStringify,
     validateTrialModeProbabilities
+} from './utilities/index.js';
+
+export type {
 } from './utilities/index.js';

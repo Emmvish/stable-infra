@@ -17,6 +17,16 @@ export class CircuitBreaker {
     private halfOpenRequests: number = 0;
     private halfOpenSuccesses: number = 0;
     private halfOpenFailures: number = 0;
+    
+    private stateTransitions: number = 0;
+    private lastStateChangeTime: number = Date.now();
+    private openCount: number = 0;
+    private halfOpenCount: number = 0;
+    private totalOpenDuration: number = 0;
+    private lastOpenTime: number = 0;
+    private recoveryAttempts: number = 0;
+    private successfulRecoveries: number = 0;
+    private failedRecoveries: number = 0;
 
     constructor(config: CircuitBreakerConfig) {
         this.config = {
@@ -142,18 +152,43 @@ export class CircuitBreaker {
     }
 
     private transitionToClosed(): void {
+        const now = Date.now();
+        if (this.state === CircuitBreakerState.HALF_OPEN) {
+            this.successfulRecoveries++;
+        }
+        if (this.state === CircuitBreakerState.OPEN && this.lastOpenTime > 0) {
+            this.totalOpenDuration += (now - this.lastOpenTime);
+        }
         this.state = CircuitBreakerState.CLOSED;
+        this.lastStateChangeTime = now;
+        this.stateTransitions++;
         this.resetCounters();
         this.resetHalfOpenCounters();
     }
 
     private transitionToOpen(): void {
+        const now = Date.now();
+        if (this.state === CircuitBreakerState.HALF_OPEN) {
+            this.failedRecoveries++;
+        }
         this.state = CircuitBreakerState.OPEN;
+        this.lastStateChangeTime = now;
+        this.lastOpenTime = now;
+        this.stateTransitions++;
+        this.openCount++;
         this.resetHalfOpenCounters();
     }
 
     private transitionToHalfOpen(): void {
+        const now = Date.now();
+        if (this.state === CircuitBreakerState.OPEN && this.lastOpenTime > 0) {
+            this.totalOpenDuration += (now - this.lastOpenTime);
+        }
         this.state = CircuitBreakerState.HALF_OPEN;
+        this.lastStateChangeTime = now;
+        this.stateTransitions++;
+        this.halfOpenCount++;
+        this.recoveryAttempts++;
         this.resetHalfOpenCounters();
     }
 
@@ -190,7 +225,23 @@ export class CircuitBreaker {
         successfulAttempts: number;
         attemptFailurePercentage: number;
         config: Required<CircuitBreakerConfig>;
+        stateTransitions: number;
+        lastStateChangeTime: number;
+        openCount: number;
+        halfOpenCount: number;
+        totalOpenDuration: number;
+        averageOpenDuration: number;
+        recoveryAttempts: number;
+        successfulRecoveries: number;
+        failedRecoveries: number;
+        recoverySuccessRate: number;
+        openUntil: number | null;
     } {
+        const now = Date.now();
+        const openUntil = this.state === CircuitBreakerState.OPEN 
+            ? this.lastFailureTime + this.config.recoveryTimeoutMs
+            : null;
+        
         return {
             state: this.state,
             totalRequests: this.totalRequests,
@@ -205,7 +256,20 @@ export class CircuitBreaker {
             attemptFailurePercentage: this.totalAttempts > 0
                 ? (this.failedAttempts / this.totalAttempts) * 100
                 : 0,
-            config: this.config
+            config: this.config,
+            stateTransitions: this.stateTransitions,
+            lastStateChangeTime: this.lastStateChangeTime,
+            openCount: this.openCount,
+            halfOpenCount: this.halfOpenCount,
+            totalOpenDuration: this.totalOpenDuration,
+            averageOpenDuration: this.openCount > 0 ? this.totalOpenDuration / this.openCount : 0,
+            recoveryAttempts: this.recoveryAttempts,
+            successfulRecoveries: this.successfulRecoveries,
+            failedRecoveries: this.failedRecoveries,
+            recoverySuccessRate: this.recoveryAttempts > 0 
+                ? (this.successfulRecoveries / this.recoveryAttempts) * 100 
+                : 0,
+            openUntil: openUntil
         };
     }
 
@@ -241,4 +305,20 @@ export class CircuitBreakerOpenError extends Error {
         super(message);
         this.name = 'CircuitBreakerOpenError';
     }
+}
+
+let globalCircuitBreaker: CircuitBreaker | null = null;
+
+export function getGlobalCircuitBreaker(config?: CircuitBreakerConfig): CircuitBreaker {
+    if (!globalCircuitBreaker && config) {
+        globalCircuitBreaker = new CircuitBreaker(config);
+    }
+    return globalCircuitBreaker!;
+}
+
+export function resetGlobalCircuitBreaker(): void {
+    if (globalCircuitBreaker) {
+        globalCircuitBreaker.reset();
+    }
+    globalCircuitBreaker = null;
 }

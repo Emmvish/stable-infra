@@ -12,6 +12,7 @@ Complete API documentation for `@emmvish/stable-request` `v1.7.3`
   - [CircuitBreaker](#circuitbreaker)
   - [RateLimiter](#ratelimiter)
   - [ConcurrencyLimiter](#concurrencylimiter)
+  - [MetricsAggregator](#metricsaggregator)
   - [CacheManager](#cachemanager)
 - [Type Definitions](#type-definitions)
   - [REQUEST_DATA](#request_data)
@@ -19,6 +20,7 @@ Complete API documentation for `@emmvish/stable-request` `v1.7.3`
   - [API_GATEWAY_OPTIONS](#api_gateway_options)
   - [API_GATEWAY_REQUEST](#api_gateway_request)
   - [API_GATEWAY_RESPONSE](#api_gateway_response)
+  - [API_GATEWAY_RESULT](#api_gateway_result)
   - [STABLE_WORKFLOW_OPTIONS](#stable_workflow_options)
   - [STABLE_WORKFLOW_PHASE](#stable_workflow_phase)
   - [STABLE_WORKFLOW_BRANCH](#stable_workflow_branch)
@@ -27,6 +29,10 @@ Complete API documentation for `@emmvish/stable-request` `v1.7.3`
   - [State Persistence Types](#state-persistence-types)
   - [Hook Option Types](#hook-option-types)
   - [Decision Types](#decision-types)
+- [Metrics and Observability Types](#metrics-and-observability-types)
+  - [STABLE_REQUEST_RESULT](#stable_request_result)
+  - [WorkflowMetrics](#workflowmetrics)
+  - [Infrastructure Metrics](#infrastructure-metrics)
 - [Enums](#enums)
   - [REQUEST_METHODS](#request_methods)
   - [RETRY_STRATEGIES](#retry_strategies)
@@ -47,7 +53,7 @@ Execute a single HTTP request with built-in retry logic, circuit breaker, cachin
 ```typescript
 function stableRequest<RequestDataType = any, ResponseDataType = any>(
   options: STABLE_REQUEST<RequestDataType, ResponseDataType>
-): Promise<ResponseDataType | false>
+): Promise<STABLE_REQUEST_RESULT<ResponseDataType>>
 ```
 
 #### Parameters
@@ -82,10 +88,31 @@ function stableRequest<RequestDataType = any, ResponseDataType = any>(
 
 #### Returns
 
-- **`Promise<ResponseDataType>`** - If `resReq: true`, returns the response data
-- **`Promise<false>`** - If `resReq: false` and request fails, returns `false`
-- **`Promise<true>`** - If `resReq: false` and request succeeds, returns `true`
-- **Throws** - If all retry attempts fail and `finalErrorAnalyzer` doesn't suppress the error
+**`Promise<STABLE_REQUEST_RESULT<ResponseDataType>>`**
+
+Returns a comprehensive result object containing:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `success` | `boolean` | `true` if request succeeded, `false` if failed |
+| `data` | `ResponseDataType` | Response data (when `resReq: true` and successful) |
+| `error` | `string` | Error message (when request failed) |
+| `errorLogs` | `ERROR_LOG[]` | Array of all failed attempt details |
+| `successfulAttempts` | `SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>[]` | Array of all successful attempt details |
+| `metrics` | `object` | Computed execution metrics (see below) |
+
+**Metrics Object Structure:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `totalAttempts` | `number` | Total number of attempts made |
+| `successfulAttempts` | `number` | Number of successful attempts |
+| `failedAttempts` | `number` | Number of failed attempts |
+| `totalExecutionTime` | `number` | Total execution time in milliseconds |
+| `averageAttemptTime` | `number` | Average time per attempt in milliseconds |
+| `infrastructureMetrics` | `object` | Circuit breaker and cache metrics (if used) |
+
+**Note:** The function no longer throws errors by default. Check `result.success` to determine if the request succeeded. Use `finalErrorAnalyzer` to customize error handling behavior.
 
 #### Example
 
@@ -167,9 +194,40 @@ Array of request objects to execute. See [API_GATEWAY_REQUEST](#api_gateway_requ
 
 #### Returns
 
-**`Promise<API_GATEWAY_RESPONSE<ResponseDataType>[]>`**
+**`Promise<API_GATEWAY_RESULT<ResponseDataType>>`**
 
-Array of response objects, one per request. See [API_GATEWAY_RESPONSE](#api_gateway_response).
+An array of response objects (extends `API_GATEWAY_RESPONSE<ResponseDataType>[]`) with an attached `metrics` property containing:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `totalRequests` | `number` | Total number of requests executed |
+| `successfulRequests` | `number` | Number of successful requests |
+| `failedRequests` | `number` | Number of failed requests |
+| `successRate` | `number` | Success rate as percentage (0-100) |
+| `failureRate` | `number` | Failure rate as percentage (0-100) |
+| `requestGroups` | `RequestGroupMetrics[]` | Metrics for each request group |
+| `infrastructureMetrics` | `object` | Circuit breaker, cache, rate limiter, and concurrency limiter metrics (when used) |
+
+**Request Group Metrics:**
+
+Each group contains:
+- `groupId`: Group identifier
+- `totalRequests`: Requests in this group
+- `successfulRequests`: Successful requests in group
+- `failedRequests`: Failed requests in group
+- `successRate`: Group success rate (%)
+- `failureRate`: Group failure rate (%)
+- `requestIds`: Array of request IDs in this group
+
+**Infrastructure Metrics:**
+
+When circuit breaker, cache, rate limiter, or concurrency limiter are used, detailed metrics are included:
+- `circuitBreaker`: State, failure percentage, recovery attempts, etc.
+- `cache`: Hit rate, cache size, network requests saved, etc.
+- `rateLimiter`: Throttled requests, peak request rate, etc.
+- `concurrencyLimiter`: Peak concurrency, queue metrics, etc.
+
+See [API_GATEWAY_RESULT](#api_gateway_result) for complete structure.
 
 #### Example
 
@@ -550,14 +608,236 @@ await stableWorkflow(phases, {
 });
 
 // Or use standalone
-const limiter = new ConcurrencyLimiter(3);
 const results = await limiter.executeAll([
-  () => fetchData(1),
-  () => fetchData(2),
-  () => fetchData(3),
-  () => fetchData(4),
-  () => fetchData(5)
+  () => fetchUser(1),
+  () => fetchUser(2),
+  () => fetchUser(3),
+  () => fetchUser(4),
+  () => fetchUser(5),
+  () => fetchUser(6) // Will wait for one of above to complete
 ]);
+```
+
+---
+
+### MetricsAggregator
+
+Utility class for extracting and computing metrics from workflow results, phases, branches, and infrastructure components.
+
+```typescript
+class MetricsAggregator {
+  static extractWorkflowMetrics<T>(result: STABLE_WORKFLOW_RESULT<T>): WorkflowMetrics
+  static extractBranchMetrics<T>(branch: BranchExecutionResult<T>): BranchMetrics
+  static extractPhaseMetrics<T>(phase: STABLE_WORKFLOW_PHASE_RESULT<T>): PhaseMetrics
+  static extractRequestGroupMetrics<T>(responses: API_GATEWAY_RESPONSE<T>[]): RequestGroupMetrics[]
+  static extractRequestMetrics<T>(responses: API_GATEWAY_RESPONSE<T>[]): RequestMetrics[]
+  static extractCircuitBreakerMetrics(circuitBreaker: CircuitBreaker): CircuitBreakerDashboardMetrics
+  static extractCacheMetrics(cache: CacheManager): CacheDashboardMetrics
+  static extractRateLimiterMetrics(rateLimiter: RateLimiter): RateLimiterDashboardMetrics
+  static extractConcurrencyLimiterMetrics(limiter: ConcurrencyLimiter): ConcurrencyLimiterDashboardMetrics
+  static aggregateSystemMetrics<T>(
+    workflowResult: STABLE_WORKFLOW_RESULT<T>,
+    circuitBreaker?: CircuitBreaker,
+    cache?: CacheManager,
+    rateLimiter?: RateLimiter,
+    concurrencyLimiter?: ConcurrencyLimiter
+  ): SystemMetrics
+}
+```
+
+#### Methods
+
+##### `extractWorkflowMetrics(result)`
+
+Extracts comprehensive metrics from a workflow result.
+
+**Parameters:**
+- `result`: `STABLE_WORKFLOW_RESULT<T>` - Workflow execution result
+
+**Returns:** `WorkflowMetrics` with:
+- `workflowId`, `success`, `executionTime`, `timestamp`
+- `totalPhases`, `completedPhases`, `skippedPhases`, `failedPhases`, `phaseCompletionRate`
+- `totalRequests`, `successfulRequests`, `failedRequests`, `requestSuccessRate`, `requestFailureRate`
+- `throughput` (requests/second), `averagePhaseExecutionTime`
+- `totalPhaseReplays`, `totalPhaseSkips`, `terminatedEarly`, `terminationReason`
+- `totalBranches`, `completedBranches`, `failedBranches`, `branchSuccessRate` (if applicable)
+
+##### `extractBranchMetrics(branch)`
+
+Extracts metrics from a branch execution result.
+
+**Parameters:**
+- `branch`: `BranchExecutionResult<T>` - Branch execution result
+
+**Returns:** `BranchMetrics` with:
+- `branchId`, `branchIndex`, `executionNumber`, `success`, `executionTime`, `skipped`
+- `totalPhases`, `completedPhases`, `failedPhases`, `phaseCompletionRate`
+- `totalRequests`, `successfulRequests`, `failedRequests`, `requestSuccessRate`
+- `hasDecision`, `decisionAction`, `error`
+
+##### `extractPhaseMetrics(phase)`
+
+Extracts metrics from a phase execution result.
+
+**Parameters:**
+- `phase`: `STABLE_WORKFLOW_PHASE_RESULT<T>` - Phase execution result
+
+**Returns:** `PhaseMetrics` with:
+- `phaseId`, `phaseIndex`, `workflowId`, `branchId`, `executionNumber`
+- `success`, `skipped`, `executionTime`, `timestamp`
+- `totalRequests`, `successfulRequests`, `failedRequests`, `requestSuccessRate`, `requestFailureRate`
+- `hasDecision`, `decisionAction`, `targetPhaseId`, `replayCount`, `error`
+
+##### `extractRequestGroupMetrics(responses)`
+
+Extracts metrics for each request group from API gateway responses.
+
+**Parameters:**
+- `responses`: `API_GATEWAY_RESPONSE<T>[]` - Array of API responses
+
+**Returns:** `RequestGroupMetrics[]` - Array of metrics per group, each containing:
+- `groupId`: Group identifier
+- `totalRequests`, `successfulRequests`, `failedRequests`
+- `successRate`, `failureRate` (percentages)
+- `requestIds`: Array of request IDs in this group
+
+##### `extractRequestMetrics(responses)`
+
+Extracts individual metrics for each request.
+
+**Parameters:**
+- `responses`: `API_GATEWAY_RESPONSE<T>[]` - Array of API responses
+
+**Returns:** `RequestMetrics[]` - Array of metrics per request, each containing:
+- `requestId`: Request identifier
+- `groupId`: Group identifier (if assigned)
+- `success`: Success status
+- `hasError`: Whether request had an error
+- `errorMessage`: Error message (if failed)
+
+##### `extractCircuitBreakerMetrics(circuitBreaker)`
+
+Extracts comprehensive metrics from a circuit breaker instance.
+
+**Parameters:**
+- `circuitBreaker`: `CircuitBreaker` - Circuit breaker instance
+
+**Returns:** `CircuitBreakerDashboardMetrics` with:
+- `state`: Current state (CLOSED | OPEN | HALF_OPEN)
+- `isHealthy`, `isCurrentlyOpen`
+- `totalRequests`, `successfulRequests`, `failedRequests`, `failurePercentage`
+- `stateTransitions`, `openCount`, `totalOpenDuration`, `averageOpenDuration`
+- `lastStateChangeTime`, `timeSinceLastStateChange`
+- `openUntil`, `timeUntilRecovery`
+- `recoveryAttempts`, `successfulRecoveries`, `failedRecoveries`, `recoverySuccessRate`
+- `config`: Circuit breaker configuration
+
+##### `extractCacheMetrics(cache)`
+
+Extracts comprehensive metrics from a cache manager instance.
+
+**Parameters:**
+- `cache`: `CacheManager` - Cache manager instance
+
+**Returns:** `CacheDashboardMetrics` with:
+- `isEnabled`, `currentSize`, `maxSize`, `validEntries`, `expiredEntries`, `utilizationPercentage`
+- `totalRequests`, `hits`, `misses`, `hitRate`, `missRate`
+- `sets`, `evictions`, `expirations`
+- `averageGetTime`, `averageSetTime`
+- `averageCacheAge`, `oldestEntryAge`, `newestEntryAge`
+- `networkRequestsSaved`, `cacheEfficiency`
+
+##### `extractRateLimiterMetrics(rateLimiter)`
+
+Extracts comprehensive metrics from a rate limiter instance.
+
+**Parameters:**
+- `rateLimiter`: `RateLimiter` - Rate limiter instance
+
+**Returns:** `RateLimiterDashboardMetrics` with:
+- `maxRequests`, `windowMs`
+- `availableTokens`, `queueLength`, `requestsInCurrentWindow`
+- `totalRequests`, `completedRequests`, `throttledRequests`, `throttleRate`
+- `currentRequestRate`, `peakRequestRate`, `averageRequestRate`
+- `peakQueueLength`, `averageQueueWaitTime`
+- `isThrottling`, `utilizationPercentage`
+
+##### `extractConcurrencyLimiterMetrics(limiter)`
+
+Extracts comprehensive metrics from a concurrency limiter instance.
+
+**Parameters:**
+- `limiter`: `ConcurrencyLimiter` - Concurrency limiter instance
+
+**Returns:** `ConcurrencyLimiterDashboardMetrics` with:
+- `limit`, `running`, `queueLength`, `utilizationPercentage`
+- `totalRequests`, `completedRequests`, `failedRequests`, `queuedRequests`, `successRate`
+- `peakConcurrency`, `averageConcurrency`, `concurrencyUtilization`
+- `peakQueueLength`, `averageQueueWaitTime`, `averageExecutionTime`
+- `isAtCapacity`, `hasQueuedRequests`
+
+##### `aggregateSystemMetrics(workflowResult, ...)`
+
+Aggregates all metrics from a workflow and its infrastructure components into a single comprehensive view.
+
+**Parameters:**
+- `workflowResult`: `STABLE_WORKFLOW_RESULT<T>` - Workflow execution result
+- `circuitBreaker`: `CircuitBreaker` (optional) - Circuit breaker instance
+- `cache`: `CacheManager` (optional) - Cache manager instance
+- `rateLimiter`: `RateLimiter` (optional) - Rate limiter instance
+- `concurrencyLimiter`: `ConcurrencyLimiter` (optional) - Concurrency limiter instance
+
+**Returns:** `SystemMetrics` containing:
+- `workflow`: WorkflowMetrics
+- `branches`: BranchMetrics[]
+- `phases`: PhaseMetrics[]
+- `requestGroups`: RequestGroupMetrics[]
+- `requests`: RequestMetrics[]
+- `circuitBreaker`: CircuitBreakerDashboardMetrics (if provided)
+- `cache`: CacheDashboardMetrics (if provided)
+- `rateLimiter`: RateLimiterDashboardMetrics (if provided)
+- `concurrencyLimiter`: ConcurrencyLimiterDashboardMetrics (if provided)
+
+#### Example
+
+```typescript
+import { MetricsAggregator, stableWorkflow } from '@emmvish/stable-request';
+
+// Execute workflow
+const result = await stableWorkflow(phases, options);
+
+// Extract metrics at different levels
+const workflowMetrics = MetricsAggregator.extractWorkflowMetrics(result);
+console.log('Throughput:', workflowMetrics.throughput, 'req/s');
+console.log('Success Rate:', workflowMetrics.requestSuccessRate, '%');
+
+// Extract per-phase metrics
+result.phases.forEach(phase => {
+  const metrics = MetricsAggregator.extractPhaseMetrics(phase);
+  console.log(`Phase ${metrics.phaseId}:`, {
+    executionTime: metrics.executionTime,
+    successRate: metrics.requestSuccessRate
+  });
+});
+
+// Extract request group metrics
+const requestGroups = MetricsAggregator.extractRequestGroupMetrics(
+  result.phases.flatMap(p => p.responses)
+);
+requestGroups.forEach(group => {
+  console.log(`Group ${group.groupId}: ${group.successRate}% success`);
+});
+
+// Get complete system view
+const systemMetrics = MetricsAggregator.aggregateSystemMetrics(
+  result,
+  circuitBreaker,
+  cache,
+  rateLimiter,
+  concurrencyLimiter
+);
+
+console.log('Complete System Metrics:', JSON.stringify(systemMetrics, null, 2));
 ```
 
 ---
@@ -671,7 +951,13 @@ await stableRequest({
 
 ## Type Definitions
 
-### REQUEST_DATA
+Complete type definitions for all configuration options, request/response structures, and workflow components.
+
+---
+
+### Core Request/Response Types
+
+#### REQUEST_DATA
 
 Configuration for a single HTTP request.
 
@@ -707,19 +993,84 @@ interface REQUEST_DATA<RequestDataType = any> {
 
 ---
 
-### STABLE_REQUEST
+#### STABLE_REQUEST
 
-Complete options for `stableRequest` function. See [stableRequest](#stablerequest) for detailed property descriptions.
+Complete configuration options for the `stableRequest` function.
+
+```typescript
+interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
+  reqData: REQUEST_DATA<RequestDataType>;
+  resReq?: boolean;
+  attempts?: number;
+  wait?: number;
+  maxAllowedWait?: number;
+  retryStrategy?: RETRY_STRATEGY_TYPES;
+  jitter?: number;
+  performAllAttempts?: boolean;
+  logAllErrors?: boolean;
+  logAllSuccessfulAttempts?: boolean;
+  maxSerializableChars?: number;
+  trialMode?: TRIAL_MODE_OPTIONS;
+  responseAnalyzer?: (options: ResponseAnalysisHookOptions) => boolean | Promise<boolean>;
+  handleErrors?: (options: HandleErrorHookOptions) => any | Promise<any>;
+  handleSuccessfulAttemptData?: (options: HandleSuccessfulAttemptDataHookOptions) => any | Promise<any>;
+  finalErrorAnalyzer?: (options: FinalErrorAnalysisHookOptions) => boolean | Promise<boolean>;
+  hookParams?: HookParams;
+  preExecution?: RequestPreExecutionOptions;
+  commonBuffer?: Record<string, any>;
+  cache?: CacheConfig;
+  circuitBreaker?: CircuitBreakerConfig | CircuitBreaker;
+  statePersistence?: StatePersistenceConfig;
+  executionContext?: ExecutionContext;
+}
+```
+
+See [stableRequest](#stablerequest) for detailed property descriptions.
 
 ---
 
-### API_GATEWAY_OPTIONS
+#### API_GATEWAY_OPTIONS
 
-Complete options for `stableApiGateway` function. See [stableApiGateway](#stableapigateway) for detailed property descriptions.
+Complete configuration options for the `stableApiGateway` function, including all common request settings and execution control.
+
+```typescript
+interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any> {
+  concurrentExecution?: boolean;
+  stopOnFirstError?: boolean;
+  commonRequestData?: Partial<REQUEST_DATA<RequestDataType>>;
+  commonAttempts?: number;
+  commonWait?: number;
+  commonMaxAllowedWait?: number;
+  commonRetryStrategy?: RETRY_STRATEGY_TYPES;
+  commonJitter?: number;
+  commonResReq?: boolean;
+  commonLogAllErrors?: boolean;
+  commonLogAllSuccessfulAttempts?: boolean;
+  commonMaxSerializableChars?: number;
+  commonPerformAllAttempts?: boolean;
+  commonTrialMode?: TRIAL_MODE_OPTIONS;
+  commonResponseAnalyzer?: (options: ResponseAnalysisHookOptions) => boolean | Promise<boolean>;
+  commonFinalErrorAnalyzer?: (options: FinalErrorAnalysisHookOptions) => boolean | Promise<boolean>;
+  commonHandleErrors?: (options: HandleErrorHookOptions) => any | Promise<any>;
+  commonHandleSuccessfulAttemptData?: (options: HandleSuccessfulAttemptDataHookOptions) => any | Promise<any>;
+  commonPreExecution?: RequestPreExecutionOptions;
+  commonCache?: CacheConfig;
+  commonStatePersistence?: StatePersistenceConfig;
+  commonHookParams?: HookParams;
+  requestGroups?: RequestGroup[];
+  sharedBuffer?: Record<string, any>;
+  maxConcurrentRequests?: number;
+  rateLimit?: RateLimitConfig;
+  circuitBreaker?: CircuitBreakerConfig;
+  executionContext?: Partial<ExecutionContext>;
+}
+```
+
+See [stableApiGateway](#stableapigateway) for detailed property descriptions.
 
 ---
 
-### API_GATEWAY_REQUEST
+#### API_GATEWAY_REQUEST
 
 Individual request configuration for API Gateway.
 
@@ -767,13 +1118,81 @@ interface API_GATEWAY_RESPONSE<ResponseDataType = any> {
 
 ---
 
-### STABLE_WORKFLOW_OPTIONS
+### API_GATEWAY_RESULT
 
-Complete options for `stableWorkflow` function. See [stableWorkflow](#stableworkflow) for detailed property descriptions.
+Extended response array returned by `stableApiGateway` with attached metrics property.
+
+```typescript
+interface API_GATEWAY_RESULT<ResponseDataType = any> extends Array<API_GATEWAY_RESPONSE<ResponseDataType>> {
+  metrics?: {
+    totalRequests: number;
+    successfulRequests: number;
+    failedRequests: number;
+    successRate: number;
+    failureRate: number;
+    requestGroups?: RequestGroupMetrics[];
+    infrastructureMetrics?: {
+      circuitBreaker?: CircuitBreakerDashboardMetrics;
+      cache?: CacheDashboardMetrics;
+      rateLimiter?: RateLimiterDashboardMetrics;
+      concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
+    };
+  };
+}
+```
+
+#### Properties
+
+The result extends `Array<API_GATEWAY_RESPONSE>`, so it includes all array methods and individual response objects. Additionally:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `metrics` | `object` | Computed API gateway execution metrics. |
+| `metrics.totalRequests` | `number` | Total number of requests executed. |
+| `metrics.successfulRequests` | `number` | Number of successful requests. |
+| `metrics.failedRequests` | `number` | Number of failed requests. |
+| `metrics.successRate` | `number` | Success rate as percentage (0-100). |
+| `metrics.failureRate` | `number` | Failure rate as percentage (0-100). |
+| `metrics.requestGroups` | `RequestGroupMetrics[]` | Per-group metrics (if request groups used). |
+| `metrics.infrastructureMetrics` | `object` | Infrastructure metrics (if components used). |
 
 ---
 
-### STABLE_WORKFLOW_PHASE
+### Workflow Types
+
+#### STABLE_WORKFLOW_OPTIONS
+
+Complete configuration options for the `stableWorkflow` function, extending `API_GATEWAY_OPTIONS` with workflow-specific settings.
+
+```typescript
+interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType = any> 
+  extends Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, 
+    'concurrentExecution' | 'stopOnFirstError'> {
+  workflowId?: string;
+  concurrentPhaseExecution?: boolean;
+  stopOnFirstPhaseError?: boolean;
+  logPhaseResults?: boolean;
+  enableMixedExecution?: boolean;
+  enableNonLinearExecution?: boolean;
+  enableBranchExecution?: boolean;
+  branches?: STABLE_WORKFLOW_BRANCH[];
+  maxWorkflowIterations?: number;
+  handlePhaseCompletion?: (options: HandlePhaseCompletionHookOptions) => any | Promise<any>;
+  handlePhaseError?: (options: HandlePhaseErrorHookOptions) => any | Promise<any>;
+  handlePhaseDecision?: (options: HandlePhaseDecisionHookOptions) => any | Promise<any>;
+  handleBranchCompletion?: (options: HandleBranchCompletionHookOptions) => any | Promise<any>;
+  handleBranchDecision?: (decision: BranchExecutionDecision, branchResult: BranchExecutionResult, maxSerializableChars?: number) => any | Promise<any>;
+  maxSerializableChars?: number;
+  workflowHookParams?: WorkflowHookParams;
+  statePersistence?: StatePersistenceConfig;
+}
+```
+
+See [stableWorkflow](#stableworkflow) for detailed property descriptions.
+
+---
+
+#### STABLE_WORKFLOW_PHASE
 
 Configuration for a single workflow phase.
 
@@ -875,6 +1294,14 @@ interface STABLE_WORKFLOW_RESULT<ResponseDataType = any> {
   terminatedEarly?: boolean;
   terminationReason?: string;
   error?: string;
+  metrics?: WorkflowMetrics;
+  requestGroupMetrics?: RequestGroupMetrics[];
+  infrastructureMetrics?: {
+    circuitBreaker?: CircuitBreakerDashboardMetrics;
+    cache?: CacheDashboardMetrics;
+    rateLimiter?: RateLimiterDashboardMetrics;
+    concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
+  };
 }
 ```
 
@@ -898,6 +1325,168 @@ interface STABLE_WORKFLOW_RESULT<ResponseDataType = any> {
 | `terminatedEarly` | `boolean` | `true` if workflow terminated early. |
 | `terminationReason` | `string` | Reason for early termination. |
 | `error` | `string` | Error message if workflow failed. |
+| `metrics` | `WorkflowMetrics` | Computed workflow-level metrics. |
+| `requestGroupMetrics` | `RequestGroupMetrics[]` | Metrics for each request group. |
+| `infrastructureMetrics` | `object` | Infrastructure component metrics (circuit breaker, cache, etc.). |
+
+---
+
+### Result Types
+
+Types representing the results returned by workflow execution functions.
+
+#### STABLE_WORKFLOW_PHASE_RESULT
+
+Detailed result for a single phase execution within a workflow.
+
+```typescript
+interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any> {
+  workflowId: string;
+  branchId?: string;
+  phaseId: string;
+  phaseIndex: number;
+  success: boolean;
+  executionTime: number;
+  timestamp: string;
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  responses: API_GATEWAY_RESPONSE<ResponseDataType>[];
+  executionNumber?: number;
+  skipped?: boolean;
+  decision?: PhaseExecutionDecision;
+  error?: string;
+  metrics?: PhaseMetrics;
+  infrastructureMetrics?: {
+    circuitBreaker?: CircuitBreakerDashboardMetrics;
+    cache?: CacheDashboardMetrics;
+    rateLimiter?: RateLimiterDashboardMetrics;
+    concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
+  };
+}
+```
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `workflowId` | `string` | Parent workflow identifier. |
+| `branchId` | `string` | Parent branch identifier (if phase executed within a branch). |
+| `phaseId` | `string` | Unique phase identifier. |
+| `phaseIndex` | `number` | Zero-based index of this phase in the workflow. |
+| `success` | `boolean` | Whether all requests in the phase succeeded. |
+| `executionTime` | `number` | Total phase execution time in milliseconds. |
+| `timestamp` | `string` | ISO timestamp when phase started. |
+| `totalRequests` | `number` | Total number of requests in this phase. |
+| `successfulRequests` | `number` | Number of successful requests. |
+| `failedRequests` | `number` | Number of failed requests. |
+| `responses` | `API_GATEWAY_RESPONSE[]` | Array of individual request responses. |
+| `executionNumber` | `number` | Execution count (increments with each replay). |
+| `skipped` | `boolean` | Whether this phase was skipped. |
+| `decision` | `PhaseExecutionDecision` | Decision made by phase (for non-linear workflows). |
+| `error` | `string` | Error message if phase failed. |
+| `metrics` | `PhaseMetrics` | Computed phase-level metrics. |
+| `infrastructureMetrics` | `object` | Infrastructure component metrics. |
+
+---
+
+#### PhaseExecutionRecord
+
+Execution history record for phase tracking in non-linear workflows.
+
+```typescript
+interface PhaseExecutionRecord {
+  phaseId: string;
+  phaseIndex: number;
+  executionNumber: number;
+  timestamp: string;
+  success: boolean;
+  executionTime: number;
+  decision?: PhaseExecutionDecision;
+}
+```
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `phaseId` | `string` | Phase identifier. |
+| `phaseIndex` | `number` | Zero-based phase index. |
+| `executionNumber` | `number` | Execution count (for phase replays). |
+| `timestamp` | `string` | ISO timestamp of execution. |
+| `success` | `boolean` | Execution success status. |
+| `executionTime` | `number` | Execution time in milliseconds. |
+| `decision` | `PhaseExecutionDecision` | Decision made during this execution. |
+
+---
+
+#### BranchExecutionResult
+
+Complete result for a branch execution in branch-based workflows.
+
+```typescript
+interface BranchExecutionResult<ResponseDataType = any> {
+  workflowId: string;
+  branchId: string;
+  branchIndex: number;
+  success: boolean;
+  executionTime: number;
+  completedPhases: number;
+  phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
+  decision?: BranchExecutionDecision;
+  executionNumber: number;
+  skipped?: boolean;
+  error?: string;
+  metrics?: BranchMetrics;
+}
+```
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `workflowId` | `string` | Parent workflow identifier. |
+| `branchId` | `string` | Unique branch identifier. |
+| `branchIndex` | `number` | Zero-based branch index. |
+| `success` | `boolean` | Whether all phases in branch succeeded. |
+| `executionTime` | `number` | Total branch execution time in milliseconds. |
+| `completedPhases` | `number` | Number of phases completed in this branch. |
+| `phaseResults` | `STABLE_WORKFLOW_PHASE_RESULT[]` | Results for each phase in the branch. |
+| `decision` | `BranchExecutionDecision` | Decision made by branch. |
+| `executionNumber` | `number` | Execution count (for branch replays). |
+| `skipped` | `boolean` | Whether this branch was skipped. |
+| `error` | `string` | Error message if branch failed. |
+| `metrics` | `BranchMetrics` | Computed branch-level metrics. |
+
+---
+
+#### BranchExecutionRecord
+
+Execution history record for branch tracking.
+
+```typescript
+interface BranchExecutionRecord {
+  branchId: string;
+  branchIndex: number;
+  executionNumber: number;
+  timestamp: string;
+  success: boolean;
+  executionTime: number;
+  decision?: BranchExecutionDecision;
+}
+```
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `branchId` | `string` | Branch identifier. |
+| `branchIndex` | `number` | Zero-based branch index. |
+| `executionNumber` | `number` | Execution count (for branch replays). |
+| `timestamp` | `string` | ISO timestamp of execution. |
+| `success` | `boolean` | Execution success status. |
+| `executionTime` | `number` | Execution time in milliseconds. |
+| `decision` | `BranchExecutionDecision` | Decision made during this execution. |
 
 ---
 
@@ -953,6 +1542,26 @@ interface ExecutionContext {
 ```
 
 Execution context information passed through the request chain. Used for logging and traceability. All fields are optional and populated based on execution level.
+
+#### `RequestPreExecutionOptions`
+
+Configuration for pre-execution hooks that run before request execution.
+
+```typescript
+interface RequestPreExecutionOptions {
+  preExecutionHook: (options: PreExecutionHookOptions) => any | Promise<any>;
+  preExecutionHookParams?: any;
+  applyPreExecutionConfigOverride?: boolean;
+  continueOnPreExecutionHookFailure?: boolean;
+}
+```
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `preExecutionHook` | `(options: PreExecutionHookOptions) => any \| Promise<any>` | Yes | - | Hook function executed before the request. Can modify request configuration dynamically. |
+| `preExecutionHookParams` | `any` | No | `undefined` | Custom parameters passed to the pre-execution hook. |
+| `applyPreExecutionConfigOverride` | `boolean` | No | `false` | If `true`, applies configuration returned by hook to override request settings. |
+| `continueOnPreExecutionHookFailure` | `boolean` | No | `false` | If `true`, continues execution even if pre-execution hook fails. |
 
 ---
 
@@ -1340,6 +1949,48 @@ interface BranchDecisionHookOptions<ResponseDataType = any> {
 }
 ```
 
+#### `HookParams`
+
+Custom parameters passed to request-level hook functions.
+
+```typescript
+interface HookParams {
+  responseAnalyzerParams?: any;
+  handleSuccessfulAttemptDataParams?: any;
+  handleErrorsParams?: any;
+  finalErrorAnalyzerParams?: any;
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `responseAnalyzerParams` | `any` | Custom parameters passed to `responseAnalyzer` hook. |
+| `handleSuccessfulAttemptDataParams` | `any` | Custom parameters passed to `handleSuccessfulAttemptData` hook. |
+| `handleErrorsParams` | `any` | Custom parameters passed to `handleErrors` hook. |
+| `finalErrorAnalyzerParams` | `any` | Custom parameters passed to `finalErrorAnalyzer` hook. |
+
+#### `WorkflowHookParams`
+
+Custom parameters passed to workflow-level hook functions.
+
+```typescript
+interface WorkflowHookParams {
+  handlePhaseCompletionParams?: any;
+  handlePhaseErrorParams?: any;
+  handlePhaseDecisionParams?: any;
+  handleBranchDecisionParams?: any;
+  statePersistence?: StatePersistenceConfig;
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `handlePhaseCompletionParams` | `any` | Custom parameters passed to `handlePhaseCompletion` hook. |
+| `handlePhaseErrorParams` | `any` | Custom parameters passed to `handlePhaseError` hook. |
+| `handlePhaseDecisionParams` | `any` | Custom parameters passed to `handlePhaseDecision` hook. |
+| `handleBranchDecisionParams` | `any` | Custom parameters passed to `handleBranchDecision` hook. |
+| `statePersistence` | `StatePersistenceConfig` | State persistence configuration for workflow hooks. |
+
 ---
 
 ### Decision Types
@@ -1460,9 +2111,148 @@ Resets the global cache manager by creating a new instance, clearing all cached 
 
 ---
 
-## Additional Types
+### Global Circuit Breaker Management
+
+```typescript
+import { 
+  getGlobalCircuitBreaker, 
+  resetGlobalCircuitBreaker 
+} from '@emmvish/stable-request';
+
+// Get the global circuit breaker instance
+const circuitBreaker = getGlobalCircuitBreaker();
+
+// Check circuit breaker state
+const state = circuitBreaker.getState();
+console.log(`Circuit state: ${state.state}`);
+console.log(`Failure rate: ${state.failureRate}%`);
+
+// Reset the global circuit breaker (creates new instance with default config)
+resetGlobalCircuitBreaker();
+```
+
+**`getGlobalCircuitBreaker()`**
+
+Returns the global `CircuitBreaker` instance shared across all `stableRequest` calls when no specific circuit breaker is configured.
+
+**`resetGlobalCircuitBreaker()`**
+
+Resets the global circuit breaker by creating a new instance with default configuration, clearing all state and statistics.
+
+---
+
+### Global Rate Limiter Management
+
+```typescript
+import { 
+  getGlobalRateLimiter, 
+  resetGlobalRateLimiter 
+} from '@emmvish/stable-request';
+
+// Get the global rate limiter instance
+const rateLimiter = getGlobalRateLimiter();
+
+// Check rate limiter state
+const state = rateLimiter.getState();
+console.log(`Available tokens: ${state.availableTokens}`);
+console.log(`Queue length: ${state.queueLength}`);
+
+// Reset the global rate limiter (creates new instance with default config)
+resetGlobalRateLimiter();
+```
+
+**`getGlobalRateLimiter()`**
+
+Returns the global `RateLimiter` instance shared across all `stableApiGateway` and `stableWorkflow` calls when no specific rate limiter is configured.
+
+**`resetGlobalRateLimiter()`**
+
+Resets the global rate limiter by creating a new instance with default configuration, clearing all queues and state.
+
+---
+
+### Global Concurrency Limiter Management
+
+```typescript
+import { 
+  getGlobalConcurrencyLimiter, 
+  resetGlobalConcurrencyLimiter 
+} from '@emmvish/stable-request';
+
+// Get the global concurrency limiter instance
+const concurrencyLimiter = getGlobalConcurrencyLimiter();
+
+// Check how many operations are currently running
+const running = concurrencyLimiter.running;
+const limit = concurrencyLimiter.limit;
+console.log(`Running: ${running}/${limit}`);
+
+// Reset the global concurrency limiter (creates new instance with default config)
+resetGlobalConcurrencyLimiter();
+```
+
+**`getGlobalConcurrencyLimiter()`**
+
+Returns the global `ConcurrencyLimiter` instance shared across all `stableApiGateway` and `stableWorkflow` calls when no specific concurrency limiter is configured.
+
+**`resetGlobalConcurrencyLimiter()`**
+
+Resets the global concurrency limiter by creating a new instance with default configuration, clearing all queues and state.
+
+---
+
+## Metrics and Observability Types
+
+Comprehensive type definitions for metrics collected at all execution levels, from individual requests to complete workflows.
+
+---
+
+### Request-Level Metrics
+
+#### `STABLE_REQUEST_RESULT`
+
+Result object returned by `stableRequest` with comprehensive metrics.
+
+```typescript
+interface STABLE_REQUEST_RESULT<ResponseDataType = any> {
+  success: boolean;
+  data?: ResponseDataType;
+  error?: string;
+  errorLogs?: ERROR_LOG[];
+  successfulAttempts?: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>[];
+  metrics?: {
+    totalAttempts: number;
+    successfulAttempts: number;
+    failedAttempts: number;
+    totalExecutionTime: number;
+    averageAttemptTime: number;
+    infrastructureMetrics?: {
+      circuitBreaker?: CircuitBreakerDashboardMetrics;
+      cache?: CacheDashboardMetrics;
+    };
+  };
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `success` | `boolean` | `true` if request succeeded, `false` if failed. |
+| `data` | `ResponseDataType` | Response data (when `resReq: true` and successful). |
+| `error` | `string` | Error message (when request failed). |
+| `errorLogs` | `ERROR_LOG[]` | Array of all failed attempt details. |
+| `successfulAttempts` | `SUCCESSFUL_ATTEMPT_DATA[]` | Array of all successful attempt details. |
+| `metrics.totalAttempts` | `number` | Total number of attempts made. |
+| `metrics.successfulAttempts` | `number` | Number of successful attempts. |
+| `metrics.failedAttempts` | `number` | Number of failed attempts. |
+| `metrics.totalExecutionTime` | `number` | Total execution time in milliseconds. |
+| `metrics.averageAttemptTime` | `number` | Average time per attempt in milliseconds. |
+| `metrics.infrastructureMetrics` | `object` | Circuit breaker and cache metrics (if used). |
+
+---
 
 ### `ERROR_LOG`
+
+Details about a failed attempt.
 
 ```typescript
 interface ERROR_LOG {
@@ -1471,12 +2261,26 @@ interface ERROR_LOG {
   statusCode: number;
   attempt: string;
   error: string;
-  type: 'HTTP_ERROR' | 'INVALID_CONTENT';
+  type: RESPONSE_ERROR_TYPES;
   isRetryable: boolean;
 }
 ```
 
+| Property | Type | Description |
+|----------|------|-------------|
+| `timestamp` | `string` | ISO timestamp when error occurred. |
+| `executionTime` | `number` | Attempt execution time in milliseconds. |
+| `statusCode` | `number` | HTTP status code. |
+| `attempt` | `string` | Attempt identifier (e.g., "2/5"). |
+| `error` | `string` | Error message. |
+| `type` | `RESPONSE_ERROR_TYPES` | Error type: "HTTP_ERROR" or "INVALID_CONTENT". |
+| `isRetryable` | `boolean` | Whether the error is retryable. |
+
+---
+
 ### `SUCCESSFUL_ATTEMPT_DATA`
+
+Details about a successful attempt.
 
 ```typescript
 interface SUCCESSFUL_ATTEMPT_DATA<ResponseDataType = any> {
@@ -1488,107 +2292,414 @@ interface SUCCESSFUL_ATTEMPT_DATA<ResponseDataType = any> {
 }
 ```
 
-### `STABLE_WORKFLOW_PHASE_RESULT`
+| Property | Type | Description |
+|----------|------|-------------|
+| `attempt` | `string` | Attempt identifier (e.g., "3/5"). |
+| `timestamp` | `string` | ISO timestamp when attempt succeeded. |
+| `executionTime` | `number` | Attempt execution time in milliseconds. |
+| `data` | `ResponseDataType` | Response data. |
+| `statusCode` | `number` | HTTP status code. |
+
+---
+
+### Workflow-Level Metrics
+
+#### `WorkflowMetrics`
+
+Comprehensive metrics for complete workflow execution, including phase statistics, request aggregates, and performance indicators.
 
 ```typescript
-interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any> {
-  workflowId: string;     // Workflow identifier
-  branchId?: string;      // Branch identifier (if phase executed within a branch)
+interface WorkflowMetrics {
+  workflowId: string;
+  success: boolean;
+  executionTime: number;
+  timestamp: string;
+  totalPhases: number;
+  completedPhases: number;
+  skippedPhases: number;
+  failedPhases: number;
+  phaseCompletionRate: number;
+  averagePhaseExecutionTime: number;
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  requestSuccessRate: number;
+  requestFailureRate: number;
+  terminatedEarly: boolean;
+  terminationReason?: string;
+  totalPhaseReplays: number;
+  totalPhaseSkips: number;
+  totalBranches?: number;
+  completedBranches?: number;
+  failedBranches?: number;
+  branchSuccessRate?: number;
+  throughput: number;
+  averageRequestDuration?: number;
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `workflowId` | `string` | Workflow identifier. |
+| `success` | `boolean` | Whether workflow completed successfully. |
+| `executionTime` | `number` | Total execution time in milliseconds. |
+| `timestamp` | `string` | ISO timestamp when workflow started. |
+| `totalPhases` | `number` | Total number of phases. |
+| `completedPhases` | `number` | Number of completed phases. |
+| `skippedPhases` | `number` | Number of skipped phases. |
+| `failedPhases` | `number` | Number of failed phases. |
+| `phaseCompletionRate` | `number` | Percentage of phases completed (0-100). |
+| `averagePhaseExecutionTime` | `number` | Average phase execution time in milliseconds. |
+| `totalRequests` | `number` | Total number of requests. |
+| `successfulRequests` | `number` | Number of successful requests. |
+| `failedRequests` | `number` | Number of failed requests. |
+| `requestSuccessRate` | `number` | Request success rate percentage (0-100). |
+| `requestFailureRate` | `number` | Request failure rate percentage (0-100). |
+| `throughput` | `number` | Requests per second. |
+| `terminatedEarly` | `boolean` | Whether workflow terminated early. |
+| `terminationReason` | `string` | Reason for early termination (if applicable). |
+| `totalPhaseReplays` | `number` | Total number of phase replays. |
+| `totalPhaseSkips` | `number` | Total number of phase skips. |
+| `totalBranches` | `number` | Total branches (if branch execution enabled). |
+| `completedBranches` | `number` | Completed branches (if branch execution enabled). |
+| `failedBranches` | `number` | Failed branches (if branch execution enabled). |
+| `branchSuccessRate` | `number` | Branch success rate percentage (if applicable). |
+| `averageRequestDuration` | `number` | Average request duration in milliseconds. |
+
+---
+
+### `BranchMetrics`
+
+Metrics for individual branch execution.
+
+```typescript
+interface BranchMetrics {
+  branchId: string;
+  branchIndex: number;
+  executionNumber: number;
+  success: boolean;
+  executionTime: number;
+  skipped: boolean;
+  totalPhases: number;
+  completedPhases: number;
+  failedPhases: number;
+  phaseCompletionRate: number;
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  requestSuccessRate: number;
+  hasDecision: boolean;
+  decisionAction?: string;
+  error?: string;
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `branchId` | `string` | Branch identifier. |
+| `branchIndex` | `number` | Zero-based branch index. |
+| `executionNumber` | `number` | Execution number (for replays). |
+| `success` | `boolean` | Whether branch completed successfully. |
+| `executionTime` | `number` | Branch execution time in milliseconds. |
+| `skipped` | `boolean` | Whether branch was skipped. |
+| `totalPhases` | `number` | Total phases in branch. |
+| `completedPhases` | `number` | Completed phases in branch. |
+| `failedPhases` | `number` | Failed phases in branch. |
+| `phaseCompletionRate` | `number` | Phase completion rate percentage (0-100). |
+| `totalRequests` | `number` | Total requests in branch. |
+| `successfulRequests` | `number` | Successful requests in branch. |
+| `failedRequests` | `number` | Failed requests in branch. |
+| `requestSuccessRate` | `number` | Request success rate percentage (0-100). |
+| `hasDecision` | `boolean` | Whether branch made a decision. |
+| `decisionAction` | `string` | Decision action taken (if any). |
+| `error` | `string` | Error message (if branch failed). |
+
+---
+
+### `PhaseMetrics`
+
+Metrics for individual phase execution.
+
+```typescript
+interface PhaseMetrics {
   phaseId: string;
   phaseIndex: number;
+  workflowId: string;
+  branchId?: string;
+  executionNumber: number;
   success: boolean;
+  skipped: boolean;
   executionTime: number;
   timestamp: string;
   totalRequests: number;
   successfulRequests: number;
   failedRequests: number;
-  responses: API_GATEWAY_RESPONSE<ResponseDataType>[];
-  executionNumber?: number;
-  skipped?: boolean;
-  decision?: PhaseExecutionDecision;
+  requestSuccessRate: number;
+  requestFailureRate: number;
+  hasDecision: boolean;
+  decisionAction?: string;
+  targetPhaseId?: string;
+  replayCount?: number;
   error?: string;
 }
 ```
 
-### `PhaseExecutionRecord`
+| Property | Type | Description |
+|----------|------|-------------|
+| `phaseId` | `string` | Phase identifier. |
+| `phaseIndex` | `number` | Zero-based phase index. |
+| `workflowId` | `string` | Parent workflow identifier. |
+| `branchId` | `string` | Parent branch identifier (if applicable). |
+| `executionNumber` | `number` | Execution number (for replays). |
+| `success` | `boolean` | Whether phase completed successfully. |
+| `skipped` | `boolean` | Whether phase was skipped. |
+| `executionTime` | `number` | Phase execution time in milliseconds. |
+| `timestamp` | `string` | ISO timestamp when phase started. |
+| `totalRequests` | `number` | Total requests in phase. |
+| `successfulRequests` | `number` | Successful requests in phase. |
+| `failedRequests` | `number` | Failed requests in phase. |
+| `requestSuccessRate` | `number` | Request success rate percentage (0-100). |
+| `requestFailureRate` | `number` | Request failure rate percentage (0-100). |
+| `hasDecision` | `boolean` | Whether phase made a decision. |
+| `decisionAction` | `string` | Decision action taken (if any). |
+| `targetPhaseId` | `string` | Target phase ID (for JUMP/SKIP). |
+| `replayCount` | `number` | Number of times phase was replayed. |
+| `error` | `string` | Error message (if phase failed). |
+
+---
+
+### `RequestGroupMetrics`
+
+Metrics for a group of related requests.
 
 ```typescript
-interface PhaseExecutionRecord {
-  phaseId: string;
-  phaseIndex: number;
-  executionNumber: number;
-  timestamp: string;
+interface RequestGroupMetrics {
+  groupId: string;
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  successRate: number;
+  failureRate: number;
+  requestIds: string[];
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `groupId` | `string` | Group identifier. |
+| `totalRequests` | `number` | Total requests in group. |
+| `successfulRequests` | `number` | Successful requests in group. |
+| `failedRequests` | `number` | Failed requests in group. |
+| `successRate` | `number` | Success rate percentage (0-100). |
+| `failureRate` | `number` | Failure rate percentage (0-100). |
+| `requestIds` | `string[]` | Array of request IDs in this group. |
+
+---
+
+### `RequestMetrics`
+
+Metrics for an individual request.
+
+```typescript
+interface RequestMetrics {
+  requestId: string;
+  groupId?: string;
   success: boolean;
-  executionTime: number;
-  decision?: PhaseExecutionDecision;
+  hasError: boolean;
+  errorMessage?: string;
 }
 ```
 
-### `BranchExecutionResult`
+| Property | Type | Description |
+|----------|------|-------------|
+| `requestId` | `string` | Request identifier. |
+| `groupId` | `string` | Group identifier (if request belongs to a group). |
+| `success` | `boolean` | Whether request succeeded. |
+| `hasError` | `boolean` | Whether request encountered an error. |
+| `errorMessage` | `string` | Error message (if request failed). |
+
+---
+
+### Infrastructure Metrics
+
+Metrics for infrastructure components (circuit breakers, caches, rate limiters, concurrency limiters).
+
+#### `CircuitBreakerDashboardMetrics`
+
+Comprehensive circuit breaker statistics including state tracking, failure rates, and recovery metrics.
 
 ```typescript
-interface BranchExecutionResult<ResponseDataType = any> {
-  workflowId: string;     // Workflow identifier
-  branchId: string;
-  branchIndex: number;
-  success: boolean;
-  executionTime: number;
-  completedPhases: number;
-  phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
-  decision?: BranchExecutionDecision;
-  executionNumber: number;
-  skipped?: boolean;
-  error?: string;
+interface CircuitBreakerDashboardMetrics {
+  state: string;
+  isHealthy: boolean;
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  failurePercentage: number;
+  stateTransitions: number;
+  lastStateChangeTime: number;
+  timeSinceLastStateChange: number;
+  openCount: number;
+  totalOpenDuration: number;
+  averageOpenDuration: number;
+  isCurrentlyOpen: boolean;
+  openUntil: number | null;
+  timeUntilRecovery: number | null;
+  recoveryAttempts: number;
+  successfulRecoveries: number;
+  failedRecoveries: number;
+  recoverySuccessRate: number;
+  config: {
+    failureThresholdPercentage: number;
+    minimumRequests: number;
+    recoveryTimeoutMs: number;
+    successThresholdPercentage: number;
+    halfOpenMaxRequests: number;
+  };
 }
 ```
 
-### `BranchExecutionRecord`
+| Property | Type | Description |
+|----------|------|-------------|
+| `state` | `string` | Current circuit state: "CLOSED", "OPEN", or "HALF_OPEN". |
+| `isHealthy` | `boolean` | Whether circuit is in healthy state (CLOSED). |
+| `totalRequests` | `number` | Total requests processed. |
+| `successfulRequests` | `number` | Number of successful requests. |
+| `failedRequests` | `number` | Number of failed requests. |
+| `failurePercentage` | `number` | Current failure rate percentage (0-100). |
+| `stateTransitions` | `number` | Total number of state changes. |
+| `lastStateChangeTime` | `number` | Unix timestamp of last state change. |
+| `timeSinceLastStateChange` | `number` | Milliseconds since last state change. |
+| `openCount` | `number` | Number of times circuit has opened. |
+| `totalOpenDuration` | `number` | Total time spent in OPEN state (ms). |
+| `averageOpenDuration` | `number` | Average duration per OPEN state (ms). |
+| `isCurrentlyOpen` | `boolean` | Whether circuit is currently open. |
+| `openUntil` | `number \| null` | Unix timestamp when circuit will close, or null. |
+| `timeUntilRecovery` | `number \| null` | Milliseconds until recovery attempt, or null. |
+| `recoveryAttempts` | `number` | Total recovery attempts made. |
+| `successfulRecoveries` | `number` | Successful recoveries (OPEN → HALF_OPEN → CLOSED). |
+| `failedRecoveries` | `number` | Failed recovery attempts. |
+| `recoverySuccessRate` | `number` | Recovery success rate percentage (0-100). |
+| `config` | `object` | Circuit breaker configuration settings. |
+
+---
+
+### `CacheDashboardMetrics`
+
+Comprehensive cache statistics.
 
 ```typescript
-interface BranchExecutionRecord {
-  branchId: string;
-  branchIndex: number;
-  executionNumber: number;
-  timestamp: string;
-  success: boolean;
-  executionTime: number;
-  decision?: BranchExecutionDecision;
+interface CacheDashboardMetrics {
+  isEnabled: boolean;
+  currentSize: number;
+  maxSize: number;
+  validEntries: number;
+  expiredEntries: number;
+  utilizationPercentage: number;
+  totalRequests: number;
+  hits: number;
+  misses: number;
+  hitRate: number;
+  missRate: number;
+  sets: number;
+  evictions: number;
+  expirations: number;
+  averageGetTime: number;
+  averageSetTime: number;
+  averageCacheAge: number;
+  oldestEntryAge: number | null;
+  newestEntryAge: number | null;
+  networkRequestsSaved: number;
+  cacheEfficiency: number;
 }
 ```
 
-### `RequestPreExecutionOptions`
+---
+
+### `RateLimiterDashboardMetrics`
+
+Comprehensive rate limiter statistics.
 
 ```typescript
-interface RequestPreExecutionOptions {
-  preExecutionHook: (options: PreExecutionHookOptions) => any | Promise<any>;
-  preExecutionHookParams?: any;
-  applyPreExecutionConfigOverride?: boolean;
-  continueOnPreExecutionHookFailure?: boolean;
+interface RateLimiterDashboardMetrics {
+  maxRequests: number;
+  windowMs: number;
+  availableTokens: number;
+  queueLength: number;
+  requestsInCurrentWindow: number;
+  totalRequests: number;
+  completedRequests: number;
+  throttledRequests: number;
+  throttleRate: number;
+  currentRequestRate: number;
+  peakRequestRate: number;
+  averageRequestRate: number;
+  peakQueueLength: number;
+  averageQueueWaitTime: number;
+  isThrottling: boolean;
+  utilizationPercentage: number;
 }
 ```
 
-### `HookParams`
+---
+
+### `ConcurrencyLimiterDashboardMetrics`
+
+Comprehensive concurrency limiter statistics.
 
 ```typescript
-interface HookParams {
-  responseAnalyzerParams?: any;
-  handleSuccessfulAttemptDataParams?: any;
-  handleErrorsParams?: any;
-  finalErrorAnalyzerParams?: any;
+interface ConcurrencyLimiterDashboardMetrics {
+  limit: number;
+  running: number;
+  queueLength: number;
+  utilizationPercentage: number;
+  totalRequests: number;
+  completedRequests: number;
+  failedRequests: number;
+  queuedRequests: number;
+  successRate: number;
+  peakConcurrency: number;
+  averageConcurrency: number;
+  concurrencyUtilization: number;
+  peakQueueLength: number;
+  averageQueueWaitTime: number;
+  averageExecutionTime: number;
+  isAtCapacity: boolean;
+  hasQueuedRequests: boolean;
 }
 ```
 
-### `WorkflowHookParams`
+---
+
+### `SystemMetrics`
+
+Complete system-wide metrics aggregation.
 
 ```typescript
-interface WorkflowHookParams {
-  handlePhaseCompletionParams?: any;
-  handlePhaseErrorParams?: any;
-  handlePhaseDecisionParams?: any;
-  handleBranchDecisionParams?: any;
-  statePersistence?: StatePersistenceConfig;
+interface SystemMetrics {
+  workflow?: WorkflowMetrics;
+  branches: BranchMetrics[];
+  phases: PhaseMetrics[];
+  requestGroups: RequestGroupMetrics[];
+  requests: RequestMetrics[];
+  circuitBreaker?: CircuitBreakerDashboardMetrics;
+  cache?: CacheDashboardMetrics;
+  rateLimiter?: RateLimiterDashboardMetrics;
+  concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
 }
 ```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `workflow` | `WorkflowMetrics` | Workflow-level metrics (if applicable). |
+| `branches` | `BranchMetrics[]` | Metrics for all branches. |
+| `phases` | `PhaseMetrics[]` | Metrics for all phases. |
+| `requestGroups` | `RequestGroupMetrics[]` | Metrics for all request groups. |
+| `requests` | `RequestMetrics[]` | Metrics for all individual requests. |
+| `circuitBreaker` | `CircuitBreakerDashboardMetrics` | Circuit breaker metrics (if used). |
+| `cache` | `CacheDashboardMetrics` | Cache metrics (if used). |
+| `rateLimiter` | `RateLimiterDashboardMetrics` | Rate limiter metrics (if used). |
+| `concurrencyLimiter` | `ConcurrencyLimiterDashboardMetrics` | Concurrency limiter metrics (if used). |
 
 ---
 

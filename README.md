@@ -16,6 +16,11 @@ A production-grade HTTP Workflow Execution Engine for Node.js that transforms un
   - [Circuit Breaker Pattern](#circuit-breaker-pattern)
   - [Response Caching](#response-caching)
   - [Rate Limiting and Concurrency Control](#rate-limiting-and-concurrency-control)
+- [Metrics and Observability](#metrics-and-observability)
+  - [Request-Level Metrics](#request-level-metrics)
+  - [API Gateway Metrics](#api-gateway-metrics)
+  - [Workflow Metrics](#workflow-metrics)
+  - [MetricsAggregator Utility](#metricsaggregator-utility)
 - [Workflow Execution Patterns](#workflow-execution-patterns)
   - [Sequential and Concurrent Phases](#sequential-and-concurrent-phases)
   - [Mixed Execution Mode](#mixed-execution-mode)
@@ -382,6 +387,336 @@ const state = await limiter.getState();          // Get current state
 console.log(state);
 // { availableTokens: 1000, queueLength: 0, maxRequests: 1000, windowMs: 3600000 }
 ```
+
+## Metrics and Observability
+
+`@emmvish/stable-request` provides comprehensive metrics at every level of execution, from individual requests to complete workflows. All metrics are automatically computed and included in results.
+
+### Request-Level Metrics
+
+Every `stableRequest` call returns detailed metrics about the request execution:
+
+```typescript
+import { stableRequest } from '@emmvish/stable-request';
+
+const result = await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    path: '/users/123'
+  },
+  resReq: true,
+  attempts: 3,
+  wait: 1000,
+  logAllErrors: true
+});
+
+// Access request metrics
+console.log('Request Result:', {
+  success: result.success,              // true/false
+  data: result.data,                    // Response data
+  error: result.error,                  // Error message (if failed)
+  errorLogs: result.errorLogs,          // All failed attempts
+  successfulAttempts: result.successfulAttempts,  // All successful attempts
+  metrics: {
+    totalAttempts: result.metrics.totalAttempts,           // 3
+    successfulAttempts: result.metrics.successfulAttempts, // 1
+    failedAttempts: result.metrics.failedAttempts,         // 2
+    totalExecutionTime: result.metrics.totalExecutionTime, // ms
+    averageAttemptTime: result.metrics.averageAttemptTime, // ms
+    infrastructureMetrics: {
+      circuitBreaker: result.metrics.infrastructureMetrics?.circuitBreaker,
+      cache: result.metrics.infrastructureMetrics?.cache
+    }
+  }
+});
+
+// Error logs provide detailed attempt information
+result.errorLogs?.forEach(log => {
+  console.log({
+    attempt: log.attempt,              // "1/3"
+    timestamp: log.timestamp,
+    error: log.error,
+    statusCode: log.statusCode,
+    type: log.type,                    // "HTTP_ERROR" | "INVALID_CONTENT"
+    isRetryable: log.isRetryable,
+    executionTime: log.executionTime
+  });
+});
+
+// Successful attempts show what worked
+result.successfulAttempts?.forEach(attempt => {
+  console.log({
+    attempt: attempt.attempt,          // "3/3"
+    timestamp: attempt.timestamp,
+    executionTime: attempt.executionTime,
+    data: attempt.data,
+    statusCode: attempt.statusCode
+  });
+});
+```
+
+**STABLE_REQUEST_RESULT Structure:**
+- `success`: Boolean indicating if request succeeded
+- `data`: Response data (if `resReq: true`)
+- `error`: Error message (if request failed)
+- `errorLogs`: Array of all failed attempt details
+- `successfulAttempts`: Array of all successful attempt details
+- `metrics`: Computed execution metrics and infrastructure statistics
+
+### API Gateway Metrics
+
+`stableApiGateway` provides aggregated metrics for batch requests:
+
+```typescript
+import { stableApiGateway } from '@emmvish/stable-request';
+
+const requests = [
+  { id: 'user-1', groupId: 'users', requestOptions: { reqData: { path: '/users/1' }, resReq: true } },
+  { id: 'user-2', groupId: 'users', requestOptions: { reqData: { path: '/users/2' }, resReq: true } },
+  { id: 'order-1', groupId: 'orders', requestOptions: { reqData: { path: '/orders/1' }, resReq: true } },
+  { id: 'product-1', requestOptions: { reqData: { path: '/products/1' }, resReq: true } }
+];
+
+const results = await stableApiGateway(requests, {
+  concurrentExecution: true,
+  commonRequestData: { hostname: 'api.example.com' },
+  commonAttempts: 3,
+  circuitBreaker: { failureThresholdPercentage: 50, minimumRequests: 5 },
+  rateLimit: { maxRequests: 100, windowMs: 60000 },
+  maxConcurrentRequests: 5
+});
+
+// Gateway-level metrics
+console.log('Gateway Metrics:', {
+  totalRequests: results.metrics.totalRequests,           // 4
+  successfulRequests: results.metrics.successfulRequests, // 3
+  failedRequests: results.metrics.failedRequests,         // 1
+  successRate: results.metrics.successRate,               // 75%
+  failureRate: results.metrics.failureRate                // 25%
+});
+
+// Request group metrics
+results.metrics.requestGroups?.forEach(group => {
+  console.log(`Group ${group.groupId}:`, {
+    totalRequests: group.totalRequests,
+    successfulRequests: group.successfulRequests,
+    failedRequests: group.failedRequests,
+    successRate: group.successRate,                      // %
+    failureRate: group.failureRate,                      // %
+    requestIds: group.requestIds                         // Array of request IDs
+  });
+});
+
+// Infrastructure metrics (when utilities are used)
+if (results.metrics.infrastructureMetrics) {
+  const infra = results.metrics.infrastructureMetrics;
+  
+  // Circuit Breaker metrics
+  if (infra.circuitBreaker) {
+    console.log('Circuit Breaker:', {
+      state: infra.circuitBreaker.state,                 // CLOSED | OPEN | HALF_OPEN
+      isHealthy: infra.circuitBreaker.isHealthy,
+      totalRequests: infra.circuitBreaker.totalRequests,
+      failurePercentage: infra.circuitBreaker.failurePercentage,
+      openCount: infra.circuitBreaker.openCount,
+      recoveryAttempts: infra.circuitBreaker.recoveryAttempts
+    });
+  }
+  
+  // Cache metrics
+  if (infra.cache) {
+    console.log('Cache:', {
+      hitRate: infra.cache.hitRate,                      // %
+      currentSize: infra.cache.currentSize,
+      networkRequestsSaved: infra.cache.networkRequestsSaved,
+      cacheEfficiency: infra.cache.cacheEfficiency       // %
+    });
+  }
+  
+  // Rate Limiter metrics
+  if (infra.rateLimiter) {
+    console.log('Rate Limiter:', {
+      throttledRequests: infra.rateLimiter.throttledRequests,
+      throttleRate: infra.rateLimiter.throttleRate,      // %
+      peakRequestRate: infra.rateLimiter.peakRequestRate
+    });
+  }
+  
+  // Concurrency Limiter metrics
+  if (infra.concurrencyLimiter) {
+    console.log('Concurrency:', {
+      peakConcurrency: infra.concurrencyLimiter.peakConcurrency,
+      utilizationPercentage: infra.concurrencyLimiter.utilizationPercentage,
+      averageQueueWaitTime: infra.concurrencyLimiter.averageQueueWaitTime
+    });
+  }
+}
+```
+
+### Workflow Metrics
+
+`stableWorkflow` provides end-to-end metrics for complex orchestrations:
+
+```typescript
+import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
+
+const phases = [
+  {
+    id: 'fetch-users',
+    requests: [/* ... */]
+  },
+  {
+    id: 'process-data',
+    concurrent: true,
+    requests: [/* ... */]
+  },
+  {
+    id: 'store-results',
+    requests: [/* ... */]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'data-processing-pipeline',
+  enableMixedExecution: true,
+  commonRequestData: { hostname: 'api.example.com' },
+  logPhaseResults: true
+});
+
+// Workflow-level metrics
+console.log('Workflow Metrics:', {
+  workflowId: result.metrics.workflowId,
+  success: result.metrics.success,
+  executionTime: result.metrics.executionTime,           // Total time in ms
+  
+  // Phase statistics
+  totalPhases: result.metrics.totalPhases,
+  completedPhases: result.metrics.completedPhases,
+  skippedPhases: result.metrics.skippedPhases,
+  failedPhases: result.metrics.failedPhases,
+  phaseCompletionRate: result.metrics.phaseCompletionRate,  // %
+  averagePhaseExecutionTime: result.metrics.averagePhaseExecutionTime,  // ms
+  
+  // Request statistics
+  totalRequests: result.metrics.totalRequests,
+  successfulRequests: result.metrics.successfulRequests,
+  failedRequests: result.metrics.failedRequests,
+  requestSuccessRate: result.metrics.requestSuccessRate,    // %
+  requestFailureRate: result.metrics.requestFailureRate,    // %
+  
+  // Performance
+  throughput: result.metrics.throughput,                    // requests/second
+  totalPhaseReplays: result.metrics.totalPhaseReplays,
+  totalPhaseSkips: result.metrics.totalPhaseSkips,
+  
+  // Branch metrics (if using branch execution)
+  totalBranches: result.metrics.totalBranches,
+  completedBranches: result.metrics.completedBranches,
+  failedBranches: result.metrics.failedBranches,
+  branchSuccessRate: result.metrics.branchSuccessRate       // %
+});
+
+// Request group metrics aggregated across entire workflow
+result.requestGroupMetrics?.forEach(group => {
+  console.log(`Request Group ${group.groupId}:`, {
+    totalRequests: group.totalRequests,
+    successRate: group.successRate,                        // %
+    requestIds: group.requestIds
+  });
+});
+
+// Per-phase metrics
+result.phases.forEach(phase => {
+  console.log(`Phase ${phase.phaseId}:`, {
+    executionTime: phase.metrics?.executionTime,
+    totalRequests: phase.metrics?.totalRequests,
+    successfulRequests: phase.metrics?.successfulRequests,
+    requestSuccessRate: phase.metrics?.requestSuccessRate,  // %
+    hasDecision: phase.metrics?.hasDecision,
+    decisionAction: phase.metrics?.decisionAction          // CONTINUE | JUMP | REPLAY | etc.
+  });
+});
+
+// Branch metrics (for branched workflows)
+result.branches?.forEach(branch => {
+  console.log(`Branch ${branch.branchId}:`, {
+    success: branch.metrics?.success,
+    executionTime: branch.metrics?.executionTime,
+    totalPhases: branch.metrics?.totalPhases,
+    completedPhases: branch.metrics?.completedPhases,
+    totalRequests: branch.metrics?.totalRequests,
+    requestSuccessRate: branch.metrics?.requestSuccessRate  // %
+  });
+});
+```
+
+### MetricsAggregator Utility
+
+For custom metrics extraction and analysis:
+
+```typescript
+import { MetricsAggregator } from '@emmvish/stable-request';
+
+// Extract workflow metrics
+const workflowMetrics = MetricsAggregator.extractWorkflowMetrics(workflowResult);
+
+// Extract phase metrics
+const phaseMetrics = MetricsAggregator.extractPhaseMetrics(phaseResult);
+
+// Extract branch metrics
+const branchMetrics = MetricsAggregator.extractBranchMetrics(branchResult);
+
+// Extract request group metrics
+const requestGroups = MetricsAggregator.extractRequestGroupMetrics(responses);
+
+// Extract individual request metrics
+const requestMetrics = MetricsAggregator.extractRequestMetrics(responses);
+
+// Extract circuit breaker metrics
+const cbMetrics = MetricsAggregator.extractCircuitBreakerMetrics(circuitBreaker);
+
+// Extract cache metrics
+const cacheMetrics = MetricsAggregator.extractCacheMetrics(cacheManager);
+
+// Extract rate limiter metrics
+const rateLimiterMetrics = MetricsAggregator.extractRateLimiterMetrics(rateLimiter);
+
+// Extract concurrency limiter metrics
+const concurrencyMetrics = MetricsAggregator.extractConcurrencyLimiterMetrics(limiter);
+
+// Aggregate all system metrics
+const systemMetrics = MetricsAggregator.aggregateSystemMetrics(
+  workflowResult,
+  circuitBreaker,
+  cacheManager,
+  rateLimiter,
+  concurrencyLimiter
+);
+
+console.log('Complete System View:', {
+  workflow: systemMetrics.workflow,
+  phases: systemMetrics.phases,
+  branches: systemMetrics.branches,
+  requestGroups: systemMetrics.requestGroups,
+  requests: systemMetrics.requests,
+  circuitBreaker: systemMetrics.circuitBreaker,
+  cache: systemMetrics.cache,
+  rateLimiter: systemMetrics.rateLimiter,
+  concurrencyLimiter: systemMetrics.concurrencyLimiter
+});
+```
+
+**Available Metrics Types:**
+- `WorkflowMetrics`: Complete workflow statistics
+- `BranchMetrics`: Branch execution metrics
+- `PhaseMetrics`: Individual phase metrics
+- `RequestGroupMetrics`: Grouped request statistics
+- `RequestMetrics`: Individual request metrics
+- `CircuitBreakerDashboardMetrics`: Circuit breaker state and performance
+- `CacheDashboardMetrics`: Cache hit rates and efficiency
+- `RateLimiterDashboardMetrics`: Throttling and rate limit statistics
+- `ConcurrencyLimiterDashboardMetrics`: Concurrency and queue metrics
+- `SystemMetrics`: Complete system-wide aggregation
 
 ## Workflow Execution Patterns
 

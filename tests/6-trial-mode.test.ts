@@ -45,7 +45,8 @@ describe('Trial Mode - Failure Simulation', () => {
       }
     });
 
-    expect(result).toEqual({ trialMode: { enabled: true, reqFailureProbability: 0 } });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ trialMode: { enabled: true, reqFailureProbability: 0 } });
     expect(mockedAxios.request).not.toHaveBeenCalled();
   });
 
