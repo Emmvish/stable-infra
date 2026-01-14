@@ -41,6 +41,8 @@ export type {
     HandlePhaseErrorHookOptions,
     HandleSuccessfulAttemptDataHookOptions,
     HookParams,
+    PrePhaseExecutionHookOptions,
+    PreBranchExecutionHookOptions,
     PhaseExecutionDecision,
     PhaseDecisionHookOptions,
     PhaseExecutionRecord,
@@ -113,7 +115,4 @@ export {
     safelyExecuteUnknownFunction,
     safelyStringify,
     validateTrialModeProbabilities
-} from './utilities/index.js';
-
-export type {
 } from './utilities/index.js';

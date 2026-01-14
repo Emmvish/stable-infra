@@ -11,7 +11,8 @@ import {
   BranchExecutionDecision,
   BranchWorkflowContext,
   PhaseExecutionRecord,
-  BranchExecutionRecord
+  BranchExecutionRecord,
+  PreBranchExecutionHookOptions
 } from '../types/index.js';
 
 export async function executeBranchWorkflow<RequestDataType = any, ResponseDataType = any>(
@@ -27,6 +28,8 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     handlePhaseError = () => {},
     handleBranchCompletion,
     handleBranchDecision,
+    preBranchExecutionHook,
+    prePhaseExecutionHook,
     maxSerializableChars,
     workflowHookParams,
     sharedBuffer,
@@ -64,20 +67,55 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     executionNumber: number
   ) => {
     const branchStartTime = Date.now();
+    const branchId = branch.id || `branch-${branchIndex + 1}`;
+    
+    let modifiedBranch = branch;
+    if (preBranchExecutionHook) {
+      try {
+        const hookOptions: PreBranchExecutionHookOptions<RequestDataType, ResponseDataType> = {
+          workflowId,
+          branchId,
+          branchIndex,
+          branch: { ...branch },
+          sharedBuffer,
+          params: workflowHookParams?.preBranchExecutionHookParams
+        };
+        
+        const result = await executeWithPersistence<STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>>(
+          preBranchExecutionHook,
+          hookOptions,
+          branch.statePersistence,
+          { workflowId, branchId },
+          sharedBuffer || {}
+        );
+        if (result) {
+          modifiedBranch = result;
+          console.info(
+            `${formatLogContext({ workflowId, branchId })}stable-request: Branch configuration modified by preBranchExecutionHook`
+          );
+        }
+      } catch (error) {
+        console.error(
+          `${formatLogContext({ workflowId, branchId })}stable-request: Error in preBranchExecutionHook:`,
+          error
+        );
+      }
+    }
     
     try {
-      const branchConfig = mergeBranchConfig(branch);
+      const branchConfig = mergeBranchConfig(modifiedBranch);
       
       const result = await executeNonLinearWorkflow({
-        phases: branch.phases,
-        workflowId: `${workflowId}-branch-${branch.id}`,
-        branchId: branch.id,
+        phases: modifiedBranch.phases,
+        workflowId: `${workflowId}-branch-${branchId}`,
+        branchId,
         commonGatewayOptions: branchConfig,
         requestGroups,
         logPhaseResults,
         handlePhaseCompletion,
         handlePhaseError,
         handlePhaseDecision: workflowHookParams?.handlePhaseDecision,
+        prePhaseExecutionHook,
         maxSerializableChars,
         workflowHookParams,
         sharedBuffer,
@@ -89,7 +127,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
 
       const branchResult: BranchExecutionResult<ResponseDataType> = {
         workflowId,
-        branchId: branch.id,
+        branchId,
         branchIndex,
         success: result.failedRequests === 0,
         executionTime: branchExecutionTime,
@@ -110,13 +148,13 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       };
     } catch (error: any) {
       console.error(
-        `${formatLogContext({ workflowId })}stable-request: Branch ${branch.id} failed:`,
+        `${formatLogContext({ workflowId })}stable-request: Branch ${branchId} failed:`,
         error
       );
 
       const errorBranchResult: BranchExecutionResult<ResponseDataType> = {
         workflowId,
-        branchId: branch.id,
+        branchId,
         branchIndex,
         success: false,
         executionTime: Date.now() - branchStartTime,
@@ -362,6 +400,46 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
         }
       }
 
+      const lastBranchDecision = concurrentGroup[concurrentGroup.length - 1]?.branch.branchDecisionHook ? 
+        groupResults[groupResults.length - 1].branchResult.decision : undefined;
+      
+      if (lastBranchDecision) {
+        if (lastBranchDecision.addBranches && Array.isArray(lastBranchDecision.addBranches) && lastBranchDecision.addBranches.length > 0) {
+          if (logPhaseResults) {
+            console.info(
+              `${formatLogContext({ workflowId })}stable-request: Adding ${lastBranchDecision.addBranches.length} dynamic branch(es) after concurrent group`
+            );
+          }
+
+          lastBranchDecision.addBranches.forEach((newBranch, idx) => {
+            const newBranchId = newBranch.id || `dynamic-branch-${Date.now()}-${idx}`;
+            const newBranchWithId = { ...newBranch, id: newBranchId };
+            
+            branches.splice(j + idx, 0, newBranchWithId);
+            
+            if (logPhaseResults) {
+              console.info(
+                `${formatLogContext({ workflowId })}stable-request: Added dynamic branch '${newBranchId}' at index ${j + idx}`
+              );
+            }
+          });
+        }
+
+        if (lastBranchDecision.addPhases && Array.isArray(lastBranchDecision.addPhases) && lastBranchDecision.addPhases.length > 0) {
+          const lastBranch = concurrentGroup[concurrentGroup.length - 1].branch;
+          
+          if (logPhaseResults) {
+            console.info(
+              `${formatLogContext({ workflowId, branchId: lastBranch.id })}stable-request: Adding ${lastBranchDecision.addPhases.length} dynamic phase(s) to branch '${lastBranch.id}'`
+            );
+          }
+
+          lastBranchDecision.addPhases.forEach((newPhase) => {
+            lastBranch.phases.push(newPhase);
+          });
+        }
+      }
+
       if (shouldTerminate) {
         terminatedEarly = true;
         break;
@@ -522,6 +600,66 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
           );
           decision = { action: PHASE_DECISION_ACTIONS.CONTINUE };
         }
+      }
+
+      if (decision.addBranches && Array.isArray(decision.addBranches) && decision.addBranches.length > 0) {
+        if (logPhaseResults) {
+          console.info(
+            `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-request: Adding ${decision.addBranches.length} dynamic branch(es) after '${currentBranchId}'`
+          );
+        }
+
+        decision.addBranches.forEach((newBranch, idx) => {
+          const newBranchId = newBranch.id || `dynamic-branch-${Date.now()}-${idx}`;
+          const newBranchWithId = { ...newBranch, id: newBranchId };
+          
+          branches.splice(branchIndex + 1 + idx, 0, newBranchWithId);
+          
+          if (logPhaseResults) {
+            console.info(
+              `${formatLogContext({ workflowId })}stable-request: Added dynamic branch '${newBranchId}' at index ${branchIndex + 1 + idx}`
+            );
+          }
+        });
+      }
+
+      if (decision.addPhases && Array.isArray(decision.addPhases) && decision.addPhases.length > 0) {
+        if (logPhaseResults) {
+          console.info(
+            `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-request: Adding ${decision.addPhases.length} dynamic phase(s) to branch '${currentBranchId}' and re-executing`
+          );
+        }
+
+        decision.addPhases.forEach((newPhase) => {
+          currentBranch.phases.push(newPhase);
+        });
+
+        if (logPhaseResults) {
+          console.info(
+            `${formatLogContext({ workflowId })}\nstable-request: Re-executing branch: ${currentBranch.id} with ${decision.addPhases.length} additional phase(s) (execution #${executionNumber + 1})`
+          );
+        }
+
+        const reExecutionResult = await executeSingleBranch(currentBranch, branchIndex, executionNumber + 1);
+        
+        branchResults[branchResults.length - 1] = reExecutionResult.branchResult;
+        allPhaseResults.push(...reExecutionResult.phaseResults);
+        executionHistory.push(...reExecutionResult.executionHistory);
+        totalRequests += reExecutionResult.totalRequests;
+        successfulRequests += reExecutionResult.successfulRequests;
+        failedRequests += reExecutionResult.failedRequests;
+        
+        branchExecutionHistory.push({
+          branchId: currentBranchId,
+          branchIndex,
+          executionNumber: executionNumber + 1,
+          timestamp: new Date().toISOString(),
+          success: reExecutionResult.branchResult.success,
+          executionTime: reExecutionResult.branchResult.executionTime
+        });
+
+        result.branchResult = reExecutionResult.branchResult;
+        result.phaseResults = reExecutionResult.phaseResults;
       }
 
       switch (decision.action) {

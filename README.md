@@ -921,6 +921,85 @@ phaseDecisionHook: async ({
 }
 ```
 
+### Dynamic Phase and Branch Addition
+
+Dynamically add phases or branches during workflow execution based on runtime conditions:
+
+**Adding Phases Dynamically**:
+```typescript
+const phases = [
+  {
+    id: 'initial-phase',
+    requests: [...],
+    phaseDecisionHook: async ({ phaseResult }) => {
+      const needsExtraProcessing = phaseResult.responses[0]?.data?.requiresValidation;
+      
+      if (needsExtraProcessing) {
+        return {
+          action: PHASE_DECISION_ACTIONS.CONTINUE,
+          addPhases: [
+            {
+              id: 'validation-phase',
+              requests: [{ id: 'validate', requestOptions: { reqData: { path: '/validate' }, resReq: true } }]
+            }
+          ]
+        };
+      }
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    }
+  }
+];
+
+await stableWorkflow(phases, {
+  enableNonLinearExecution: true,
+  commonRequestData: { hostname: 'api.example.com' }
+});
+```
+
+**Adding Branches Dynamically**:
+```typescript
+const branches = [
+  {
+    id: 'main-branch',
+    phases: [...],
+    branchDecisionHook: async ({ branchResults }) => {
+      const requiresAudit = branchResults.some(p => p.responses[0]?.data?.flagged);
+      
+      if (requiresAudit) {
+        return {
+          action: PHASE_DECISION_ACTIONS.CONTINUE,
+          addBranches: [
+            {
+              id: 'audit-branch',
+              phases: [{ id: 'audit', requests: [...] }]
+            }
+          ]
+        };
+      }
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    }
+  }
+];
+
+await stableWorkflow([], {
+  enableBranchExecution: true,
+  branches,
+  commonRequestData: { hostname: 'api.example.com' }
+});
+```
+
+**Extending Current Branch**:
+```typescript
+branchDecisionHook: async ({ branchResults }) => {
+  return {
+    action: PHASE_DECISION_ACTIONS.CONTINUE,
+    addPhases: [
+      { id: 'extra-phase', requests: [...] }  // Branch re-executes with new phases
+    ]
+  };
+}
+```
+
 ### Branched Workflows
 
 Execute multiple independent workflow paths in parallel or sequentially:
@@ -1186,6 +1265,49 @@ console.log(sharedBuffer);                      // Updated with data from workfl
     continueOnPreExecutionHookFailure: true     // Continue even if hook fails
   }
 }
+```
+
+**Pre-Phase Execution Hooks**:
+
+Modify phase configuration before execution:
+
+```typescript
+const phases = [
+  {
+    id: 'data-phase',
+    requests: [...],
+    prePhaseExecutionHook: async ({ phase, sharedBuffer, params }) => {
+      // Dynamically modify phase based on shared state
+      if (sharedBuffer.environment === 'production') {
+        phase.commonConfig = { commonAttempts: 5, commonWait: 2000 };
+      }
+      return phase;
+    }
+  }
+];
+```
+
+**Pre-Branch Execution Hooks**:
+
+Modify branch configuration before execution:
+
+```typescript
+const branches = [
+  {
+    id: 'api-branch',
+    phases: [...],
+    preBranchExecutionHook: async ({ branch, sharedBuffer }) => {
+      // Add authentication header dynamically
+      branch.commonConfig = {
+        ...branch.commonConfig,
+        commonRequestData: {
+          headers: { 'Authorization': `Bearer ${sharedBuffer.token}` }
+        }
+      };
+      return branch;
+    }
+  }
+];
 ```
 
 ### State Persistence and Recovery

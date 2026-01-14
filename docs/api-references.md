@@ -1,6 +1,6 @@
 # API Reference
 
-Complete API documentation for `@emmvish/stable-request` `v1.8.0`
+Complete API documentation for `@emmvish/stable-request` `v1.8.1`
 
 ## Table of Contents
 
@@ -1232,6 +1232,7 @@ interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType = any> {
 | `allowReplay` | `boolean` | No | `false` | Allow this phase to be replayed via decision hook. |
 | `allowSkip` | `boolean` | No | `true` | Allow this phase to be skipped via decision hook. |
 | `phaseDecisionHook` | `(options: PhaseDecisionHookOptions) => PhaseExecutionDecision \| Promise<PhaseExecutionDecision>` | No | `undefined` | Decision hook for non-linear execution (JUMP, SKIP, REPLAY, TERMINATE). |
+| `prePhaseExecutionHook` | `(options: PrePhaseExecutionHookOptions) => Promise<STABLE_WORKFLOW_PHASE>` | No | `undefined` | Hook called before phase execution to modify phase configuration. |
 | `commonConfig` | `Partial<API_GATEWAY_OPTIONS>` | No | `{}` | Phase-level configuration overrides. |
 | `statePersistence` | `StatePersistenceConfig` | No | `undefined` | State persistence configuration for this phase. |
 | `branchId` | `string` | No | `undefined` | Branch identifier if this phase belongs to a branch. |
@@ -1267,6 +1268,7 @@ interface STABLE_WORKFLOW_BRANCH<RequestDataType = any, ResponseDataType = any> 
 | `maxReplayCount` | `number` | No | `0` | Maximum times this branch can be replayed. |
 | `allowSkip` | `boolean` | No | `true` | Allow this branch to be skipped. |
 | `branchDecisionHook` | `(options: BranchDecisionHookOptions) => BranchExecutionDecision \| Promise<BranchExecutionDecision>` | No | `undefined` | Decision hook for branch-level decisions. |
+| `preBranchExecutionHook` | `(options: PreBranchExecutionHookOptions) => Promise<STABLE_WORKFLOW_BRANCH>` | No | `undefined` | Hook called before branch execution to modify branch configuration. |
 | `statePersistence` | `StatePersistenceConfig` | No | `undefined` | State persistence configuration for this branch. |
 | `commonConfig` | `Partial<API_GATEWAY_OPTIONS>` | No | `{}` | Branch-level configuration overrides. |
 
@@ -1847,11 +1849,102 @@ interface HandleSuccessfulAttemptDataHookOptions<RequestDataType = any, Response
 
 #### `PreExecutionHookOptions`
 
+Options passed to request-level `preExecutionHook` for dynamic request modification before execution.
+
 ```typescript
 interface PreExecutionHookOptions<RequestDataType = any, ResponseDataType = any> {
   inputParams?: any;
   commonBuffer?: Record<string, any>;
   stableRequestOptions: STABLE_REQUEST<RequestDataType, ResponseDataType>;
+}
+```
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `inputParams` | `any` | Custom parameters from `preExecution.preExecutionHookParams`. |
+| `commonBuffer` | `Record<string, any>` | Shared buffer for state management across requests. |
+| `stableRequestOptions` | `STABLE_REQUEST<RequestDataType, ResponseDataType>` | Complete request configuration object. |
+
+#### `PrePhaseExecutionHookOptions`
+
+Options passed to `prePhaseExecutionHook` for modifying phase configuration before phase execution.
+
+```typescript
+interface PrePhaseExecutionHookOptions<RequestDataType = any, ResponseDataType = any> {
+  workflowId: string;
+  branchId?: string;
+  phaseId: string;
+  phaseIndex: number;
+  phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>;
+  params?: any;
+  sharedBuffer?: Record<string, any>;
+}
+```
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `workflowId` | `string` | Unique identifier of the workflow. |
+| `branchId` | `string` | Branch identifier (if phase is executing within a branch). |
+| `phaseId` | `string` | Unique identifier of the phase about to execute. |
+| `phaseIndex` | `number` | Index position of the phase in the workflow. |
+| `phase` | `STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>` | Complete phase configuration object that can be modified. |
+| `params` | `any` | Custom parameters from `workflowHookParams.prePhaseExecutionHookParams`. |
+| `sharedBuffer` | `Record<string, any>` | Shared buffer accessible across all phases and branches. |
+
+**Usage:**
+
+```typescript
+prePhaseExecutionHook: async ({ phase, sharedBuffer }) => {
+  // Modify phase configuration based on runtime conditions
+  if (sharedBuffer.environment === 'production') {
+    phase.commonConfig = { commonAttempts: 5, commonWait: 2000 };
+  }
+  return phase;  // Must return the modified phase
+}
+```
+
+#### `PreBranchExecutionHookOptions`
+
+Options passed to `preBranchExecutionHook` for modifying branch configuration before branch execution.
+
+```typescript
+interface PreBranchExecutionHookOptions<RequestDataType = any, ResponseDataType = any> {
+  workflowId: string;
+  branchId: string;
+  branchIndex: number;
+  branch: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>;
+  params?: any;
+  sharedBuffer?: Record<string, any>;
+}
+```
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `workflowId` | `string` | Unique identifier of the workflow. |
+| `branchId` | `string` | Unique identifier of the branch about to execute. |
+| `branchIndex` | `number` | Index position of the branch in the workflow. |
+| `branch` | `STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>` | Complete branch configuration object that can be modified. |
+| `params` | `any` | Custom parameters from `workflowHookParams.preBranchExecutionHookParams`. |
+| `sharedBuffer` | `Record<string, any>` | Shared buffer accessible across all phases and branches. |
+
+**Usage:**
+
+```typescript
+preBranchExecutionHook: async ({ branch, sharedBuffer }) => {
+  // Inject authentication dynamically
+  branch.commonConfig = {
+    ...branch.commonConfig,
+    commonRequestData: {
+      headers: { 'Authorization': `Bearer ${sharedBuffer.token}` }
+    }
+  };
+  return branch;  // Must return the modified branch
 }
 ```
 
@@ -1979,6 +2072,8 @@ interface WorkflowHookParams {
   handlePhaseErrorParams?: any;
   handlePhaseDecisionParams?: any;
   handleBranchDecisionParams?: any;
+  prePhaseExecutionHookParams?: any;
+  preBranchExecutionHookParams?: any;
   statePersistence?: StatePersistenceConfig;
 }
 ```
@@ -1989,6 +2084,8 @@ interface WorkflowHookParams {
 | `handlePhaseErrorParams` | `any` | Custom parameters passed to `handlePhaseError` hook. |
 | `handlePhaseDecisionParams` | `any` | Custom parameters passed to `handlePhaseDecision` hook. |
 | `handleBranchDecisionParams` | `any` | Custom parameters passed to `handleBranchDecision` hook. |
+| `prePhaseExecutionHookParams` | `any` | Custom parameters passed to `prePhaseExecutionHook`. |
+| `preBranchExecutionHookParams` | `any` | Custom parameters passed to `preBranchExecutionHook`. |
 | `statePersistence` | `StatePersistenceConfig` | State persistence configuration for workflow hooks. |
 
 ---
@@ -2002,7 +2099,21 @@ interface PhaseExecutionDecision {
   action: PHASE_DECISION_ACTIONS;
   targetPhaseId?: string;      // Required for JUMP and SKIP actions
   replayCount?: number;
+  addPhases?: STABLE_WORKFLOW_PHASE[];  // Dynamically add phases after current phase
   metadata?: Record<string, any>;
+}
+```
+
+**Dynamic Phase Addition**: Phase decision hooks can return `addPhases` to insert new phases after the current phase:
+
+```typescript
+phaseDecisionHook: async ({ phaseResult }) => {
+  return {
+    action: PHASE_DECISION_ACTIONS.CONTINUE,
+    addPhases: [
+      { id: 'dynamic-phase', requests: [...] }
+    ]
+  };
 }
 ```
 
@@ -2012,7 +2123,21 @@ interface PhaseExecutionDecision {
 interface BranchExecutionDecision {
   action: PHASE_DECISION_ACTIONS;
   targetBranchId?: string;     // Required for JUMP action
+  addBranches?: STABLE_WORKFLOW_BRANCH[];  // Dynamically add new branches
+  addPhases?: STABLE_WORKFLOW_PHASE[];     // Extend current branch with phases
   metadata?: Record<string, any>;
+}
+```
+
+**Dynamic Branch Addition**: Branch decision hooks can return `addBranches` to insert new branches or `addPhases` to extend the current branch:
+
+```typescript
+branchDecisionHook: async ({ branchResults }) => {
+  return {
+    action: PHASE_DECISION_ACTIONS.CONTINUE,
+    addBranches: [{ id: 'new-branch', phases: [...] }],  // Add new branch
+    addPhases: [{ id: 'extra-phase', requests: [...] }]  // Extend current branch (re-executes)
+  };
 }
 ```
 

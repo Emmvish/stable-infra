@@ -2,7 +2,8 @@ import { stableApiGateway } from '../core/index.js';
 import { executeWithPersistence } from './execute-with-persistence.js';
 import { formatLogContext } from './format-log-context';
 import { MetricsAggregator } from './metrics-aggregator.js';
-import { STABLE_WORKFLOW_PHASE, STABLE_WORKFLOW_PHASE_RESULT } from '../types/index.js';
+import { safelyExecuteUnknownFunction } from './safely-execute-unknown-function.js';
+import { STABLE_WORKFLOW_PHASE, STABLE_WORKFLOW_PHASE_RESULT, PrePhaseExecutionHookOptions } from '../types/index.js';
 
 export async function executePhase<RequestDataType = any, ResponseDataType = any>(
     phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>,
@@ -15,16 +16,52 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
     maxSerializableChars: number,
     workflowHookParams: any,
     sharedBuffer?: Record<string, any>,
-    branchId?: string
+    branchId?: string,
+    prePhaseExecutionHook?: Function
 ) {
     const phaseId = phase.id || `phase-${phaseIndex + 1}`;
+    
+    let modifiedPhase = phase;
+    if (prePhaseExecutionHook) {
+        try {
+            const hookOptions: PrePhaseExecutionHookOptions<RequestDataType, ResponseDataType> = {
+                workflowId,
+                ...(branchId && { branchId }),
+                phaseId,
+                phaseIndex,
+                phase: { ...phase },
+                sharedBuffer,
+                params: workflowHookParams?.prePhaseExecutionHookParams
+            };
+            
+            const result = await executeWithPersistence<STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>>(
+                prePhaseExecutionHook,
+                hookOptions,
+                phase.statePersistence,
+                { workflowId, branchId, phaseId },
+                sharedBuffer || {}
+            );
+            if (result) {
+                modifiedPhase = result;
+                console.info(
+                    `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Phase configuration modified by prePhaseExecutionHook`
+                );
+            }
+        } catch (error) {
+            console.error(
+                `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Error in prePhaseExecutionHook:`,
+                error
+            );
+        }
+    }
+    
     const phaseStartTime = Date.now();
 
     const phaseGatewayOptions = {
         ...commonGatewayOptions,
-        ...(phase.commonConfig || {}),
-        concurrentExecution: phase.concurrentExecution ?? true,
-        stopOnFirstError: phase.stopOnFirstError ?? false,
+        ...(modifiedPhase.commonConfig || {}),
+        concurrentExecution: modifiedPhase.concurrentExecution ?? true,
+        stopOnFirstError: modifiedPhase.stopOnFirstError ?? false,
         requestGroups,
         sharedBuffer,
         executionContext: {
@@ -34,20 +71,20 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
         }
     };
 
-    if (phase.maxConcurrentRequests !== undefined) {
-        phaseGatewayOptions.maxConcurrentRequests = phase.maxConcurrentRequests;
+    if (modifiedPhase.maxConcurrentRequests !== undefined) {
+        phaseGatewayOptions.maxConcurrentRequests = modifiedPhase.maxConcurrentRequests;
     }
 
-    if (phase.rateLimit !== undefined) {
-        phaseGatewayOptions.rateLimit = phase.rateLimit;
+    if (modifiedPhase.rateLimit !== undefined) {
+        phaseGatewayOptions.rateLimit = modifiedPhase.rateLimit;
     }
 
-    if (phase.circuitBreaker !== undefined) {
-        phaseGatewayOptions.circuitBreaker = phase.circuitBreaker;
+    if (modifiedPhase.circuitBreaker !== undefined) {
+        phaseGatewayOptions.circuitBreaker = modifiedPhase.circuitBreaker;
     }
 
     const phaseResponses = await stableApiGateway<RequestDataType, ResponseDataType>(
-        phase.requests,
+        modifiedPhase.requests,
         phaseGatewayOptions
     );
 
@@ -96,7 +133,7 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
                     params: workflowHookParams?.handlePhaseCompletionParams,
                     sharedBuffer
                 },
-                phase.statePersistence,
+                modifiedPhase.statePersistence,
                 { workflowId, branchId, phaseId },
                 sharedBuffer || {}
             );

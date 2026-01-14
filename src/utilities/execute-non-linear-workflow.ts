@@ -24,6 +24,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
     handlePhaseCompletion,
     handlePhaseError,
     handlePhaseDecision,
+    prePhaseExecutionHook,
     maxSerializableChars,
     workflowHookParams,
     sharedBuffer,
@@ -102,7 +103,8 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
           maxSerializableChars,
           workflowHookParams,
           sharedBuffer,
-          branchId
+          branchId,
+          prePhaseExecutionHook
         ).then(result => ({
           ...result,
           executionNumber,
@@ -212,6 +214,38 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
             decisionError
           );
           decision = { action: PHASE_DECISION_ACTIONS.CONTINUE };
+        }
+      }
+
+      if (decision.addPhases && Array.isArray(decision.addPhases) && decision.addPhases.length > 0) {
+        if (logPhaseResults) {
+          console.info(
+            `${formatLogContext({ workflowId, branchId })}stable-request: Adding ${decision.addPhases.length} dynamic phase(s) after concurrent group`
+          );
+        }
+
+        decision.addPhases.forEach((newPhase, idx) => {
+          const newPhaseId = newPhase.id || `dynamic-phase-${Date.now()}-${idx}`;
+          const newPhaseWithId = { ...newPhase, id: newPhaseId };
+          
+          const insertIndex = j + idx;
+          phases.splice(insertIndex, 0, newPhaseWithId);
+          
+          phaseMap.set(newPhaseId, { phase: newPhaseWithId, index: insertIndex });
+          
+          if (logPhaseResults) {
+            console.info(
+              `${formatLogContext({ workflowId, branchId })}stable-request: Added dynamic phase '${newPhaseId}' at index ${insertIndex}`
+            );
+          }
+        });
+
+        for (let i = j + decision.addPhases.length; i < phases.length; i++) {
+          const phId = phases[i].id || `phase-${i + 1}`;
+          const existingData = phaseMap.get(phId);
+          if (existingData) {
+            phaseMap.set(phId, { phase: existingData.phase, index: i });
+          }
         }
       }
 
@@ -335,7 +369,8 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
         maxSerializableChars,
         workflowHookParams,
         sharedBuffer,
-        branchId
+        branchId,
+        prePhaseExecutionHook
       );
 
       phaseResult.executionNumber = executionNumber;
@@ -416,6 +451,38 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
       }
 
       executionHistory.push(historyRecord);
+
+      if (decision.addPhases && Array.isArray(decision.addPhases) && decision.addPhases.length > 0) {
+        if (logPhaseResults) {
+          console.info(
+            `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Adding ${decision.addPhases.length} dynamic phase(s) after '${phaseId}'`
+          );
+        }
+
+        decision.addPhases.forEach((newPhase, idx) => {
+          const newPhaseId = newPhase.id || `dynamic-phase-${Date.now()}-${idx}`;
+          const newPhaseWithId = { ...newPhase, id: newPhaseId };
+          
+          const insertIndex = phaseIndex + 1 + idx;
+          phases.splice(insertIndex, 0, newPhaseWithId);
+          
+          phaseMap.set(newPhaseId, { phase: newPhaseWithId, index: insertIndex });
+          
+          if (logPhaseResults) {
+            console.info(
+              `${formatLogContext({ workflowId, branchId })}stable-request: Added dynamic phase '${newPhaseId}' at index ${insertIndex}`
+            );
+          }
+        });
+
+        for (let i = phaseIndex + 1 + decision.addPhases.length; i < phases.length; i++) {
+          const phId = phases[i].id || `phase-${i + 1}`;
+          const existingData = phaseMap.get(phId);
+          if (existingData) {
+            phaseMap.set(phId, { phase: existingData.phase, index: i });
+          }
+        }
+      }
 
       if (phaseResult.failedRequests > 0 && stopOnFirstPhaseError) {
         if (logPhaseResults) {

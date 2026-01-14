@@ -87,6 +87,8 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 handlePhaseError,
                 handleBranchCompletion,
                 handleBranchDecision,
+                preBranchExecutionHook: options.preBranchExecutionHook,
+                prePhaseExecutionHook: options.prePhaseExecutionHook,
                 maxSerializableChars,
                 workflowHookParams,
                 sharedBuffer: options.sharedBuffer,
@@ -145,6 +147,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 handlePhaseCompletion,
                 handlePhaseError,
                 handlePhaseDecision,
+                prePhaseExecutionHook: options.prePhaseExecutionHook,
                 maxSerializableChars,
                 workflowHookParams,
                 sharedBuffer: options.sharedBuffer,
@@ -289,7 +292,9 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                             handlePhaseCompletion,
                             maxSerializableChars,
                             workflowHookParams,
-                            options.sharedBuffer
+                            options.sharedBuffer,
+                            undefined,
+                            options.prePhaseExecutionHook
                         )
                     );
 
@@ -377,7 +382,9 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                     handlePhaseCompletion,
                     maxSerializableChars,
                     workflowHookParams,
-                    options.sharedBuffer
+                    options.sharedBuffer,
+                    undefined,
+                    options.prePhaseExecutionHook
                 )
             );
 
@@ -416,15 +423,17 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                         handlePhaseCompletion,
                         maxSerializableChars,
                         workflowHookParams,
-                        options.sharedBuffer
+                        options.sharedBuffer,
+                        undefined,
+                        options.prePhaseExecutionHook
                     );
 
                     processPhaseResult(phaseResult);
 
-                    if (phaseResult.failedRequests > 0 && stopOnFirstPhaseError) {
+                    if (!phaseResult.success && stopOnFirstPhaseError) {
                         if (logPhaseResults) {
                             console.error(
-                                `stable-request: [Workflow: ${workflowId}] Stopping workflow due to phase failure`
+                                `stable-request: [Workflow: ${workflowId}] Stopping workflow due to phase error`
                             );
                         }
                         break;

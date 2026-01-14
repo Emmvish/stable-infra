@@ -202,6 +202,25 @@ export interface PreExecutionHookOptions<RequestDataType = any, ResponseDataType
   stableRequestOptions: STABLE_REQUEST<RequestDataType, ResponseDataType>;
 }
 
+interface WorkflowPreExecutionHookOptions {
+  params?: any;
+  sharedBuffer?: Record<string, any>;
+  workflowId: string;
+  branchId?: string;
+}
+
+export interface PrePhaseExecutionHookOptions<RequestDataType = any, ResponseDataType = any> extends WorkflowPreExecutionHookOptions {
+  phaseId: string;
+  phaseIndex: number;
+  phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>;
+}
+
+export interface PreBranchExecutionHookOptions<RequestDataType = any, ResponseDataType = any> extends Omit<WorkflowPreExecutionHookOptions, 'branchId'> {
+  branchId: string;
+  branchIndex: number;
+  branch: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>;
+}
+
 export interface RequestPreExecutionOptions<RequestDataType = any, ResponseDataType = any> {
   preExecutionHook: (options: PreExecutionHookOptions<RequestDataType, ResponseDataType>) => any | Promise<any>;
   preExecutionHookParams?: any;
@@ -340,6 +359,12 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
     branchResult: BranchExecutionResult<ResponseDataType>,
     maxSerializableChars?: number
   ) => any | Promise<any>;
+  prePhaseExecutionHook?: (
+    options: PrePhaseExecutionHookOptions<RequestDataType, ResponseDataType>
+  ) => STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType> | Promise<STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>>;
+  preBranchExecutionHook?: (
+    options: PreBranchExecutionHookOptions<RequestDataType, ResponseDataType>
+  ) => STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType> | Promise<STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>>;
   maxSerializableChars?: number;
   workflowHookParams?: WorkflowHookParams;
 }
@@ -401,6 +426,8 @@ export interface WorkflowHookParams {
   handlePhaseErrorParams?: any;
   handlePhaseDecisionParams?: any;
   handleBranchDecisionParams?: any;
+  prePhaseExecutionHookParams?: any;
+  preBranchExecutionHookParams?: any;
   statePersistence?: StatePersistenceConfig;
 }
 
@@ -460,6 +487,7 @@ export interface PhaseExecutionDecision {
   targetPhaseId?: string;
   replayCount?: number;
   metadata?: Record<string, any>;
+  addPhases?: STABLE_WORKFLOW_PHASE<any, any>[];
 }
 
 export interface PhaseDecisionHookOptions<ResponseDataType = any> {
@@ -500,6 +528,9 @@ export interface NonLinearWorkflowContext<RequestDataType, ResponseDataType> {
   handlePhaseDecision?: (
     options: HandlePhaseDecisionHookOptions<ResponseDataType>
   ) => any | Promise<any>;
+  prePhaseExecutionHook?: (
+    options: PrePhaseExecutionHookOptions<RequestDataType, ResponseDataType>
+  ) => STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType> | Promise<STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>>;
   maxSerializableChars: number;
   workflowHookParams: any;
   sharedBuffer?: Record<string, any>;
@@ -549,6 +580,8 @@ export interface BranchExecutionDecision {
   action: PHASE_DECISION_ACTIONS;
   targetBranchId?: string;
   metadata?: Record<string, any>;
+  addPhases?: STABLE_WORKFLOW_PHASE<any, any>[];
+  addBranches?: STABLE_WORKFLOW_BRANCH<any, any>[];
 }
 
 export interface BranchExecutionResult<ResponseDataType = any> {
@@ -604,6 +637,12 @@ export interface BranchWorkflowContext<RequestDataType = any, ResponseDataType =
     branchResult: BranchExecutionResult<ResponseDataType>,
     maxSerializableChars?: number
   ) => any | Promise<any>;
+  preBranchExecutionHook?: (
+    options: PreBranchExecutionHookOptions<RequestDataType, ResponseDataType>
+  ) => STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType> | Promise<STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>>;
+  prePhaseExecutionHook?: (
+    options: PrePhaseExecutionHookOptions<RequestDataType, ResponseDataType>
+  ) => STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType> | Promise<STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>>;
   maxSerializableChars: number;
   workflowHookParams: any;
   sharedBuffer?: Record<string, any>;

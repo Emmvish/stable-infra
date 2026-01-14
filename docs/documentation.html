@@ -59,7 +59,7 @@
                         </ul>
                     </li>
                     <li><a href="#observability">Observability</a></li>
-                    <li><a href="#pre-execution">Pre-Execution Hook</a></li>
+                    <li><a href="#pre-execution">Pre-Execution Hooks</a></li>
                     <li><a href="#trial-mode">Trial Mode</a></li>
                     <li><a href="#state-persistence">State Persistence</a></li>
                     <li><a href="#metrics">Metrics & Performance Tracking</a></li>
@@ -2364,22 +2364,230 @@ const result = await stableWorkflow([], {
             </section>
 
             <section id="pre-execution" class="doc-section">
-                <h2>Pre-Execution Hook</h2>
-                <p>Dynamically modify requests before they are executed. The pre-execution hook allows you to inspect and transform request data based on the current execution state, making it ideal for adding dynamic headers, authentication, or conditional request modifications.</p>
+                <h2>Pre-Execution Hooks</h2>
+                <p>Dynamically modify requests, phases, or branches before they are executed. Pre-execution hooks allow you to inspect and transform configurations based on the current execution state, making them ideal for adding dynamic headers, authentication, conditional modifications, or adaptive configuration based on runtime conditions.</p>
 
-                <h3>Usage</h3>
+                <h3>preExecutionHook (Request-Level)</h3>
+                <p>Modifies individual request configuration before execution. Available in <code>stableRequest()</code> and can be applied at gateway or workflow level.</p>
+
+                <h4>Configuration</h4>
+                <pre><code class="language-typescript">interface PreExecutionHookOptions&lt;RequestDataType, ResponseDataType&gt; {
+  inputParams?: any;                                // Custom parameters passed to the hook
+  commonBuffer?: Record&lt;string, any&gt;;              // Shared buffer for data access
+  stableRequestOptions: STABLE_REQUEST&lt;RequestDataType, ResponseDataType&gt;; // Full request config
+}</code></pre>
+
+                <h4>Usage Example</h4>
                 <pre><code class="language-typescript">await stableRequest({
   reqData: { hostname: 'api.example.com', path: '/data' },
   resReq: true,
   preExecution: {
-    preExecutionHook: async ({ inputParams, commonBuffer }) => {
-      // Modify request data based on buffer state
-      const reqData = { ...inputParams.reqData, hostname: commonBuffer.hostname };
-      return { reqData };                           // Return modified request data
-    }
+    preExecutionHook: async ({ inputParams, commonBuffer, stableRequestOptions }) => {
+      // Modify request data dynamically
+      return {
+        reqData: {
+          ...stableRequestOptions.reqData,
+          hostname: commonBuffer.hostname,
+          headers: {
+            ...stableRequestOptions.reqData.headers,
+            'X-Auth-Token': commonBuffer.authToken
+          }
+        }
+      };
+    },
+    preExecutionHookParams: { userId: '123' },
+    applyPreExecutionConfigOverride: true           // Apply returned config
   },
-  commonBuffer: { hostname: 'abc.com' }             // Initial buffer state
+  commonBuffer: { hostname: 'api.prod.com', authToken: 'token123' }
 });</code></pre>
+
+                <h3>prePhaseExecutionHook (Phase-Level)</h3>
+                <p>Modifies phase configuration before phase execution in workflows. Enables dynamic adjustment of phase settings like rate limits, circuit breakers, and concurrency based on workflow state.</p>
+
+                <h4>Configuration</h4>
+                <pre><code class="language-typescript">interface PrePhaseExecutionHookOptions&lt;RequestDataType, ResponseDataType&gt; {
+  workflowId: string;                              // Current workflow identifier
+  branchId?: string;                               // Current branch ID (if in branch)
+  phaseId: string;                                 // Current phase identifier
+  phaseIndex: number;                              // Index of phase in workflow
+  phase: STABLE_WORKFLOW_PHASE&lt;RequestDataType, ResponseDataType&gt;; // Full phase config
+  sharedBuffer?: Record&lt;string, any&gt;;             // Shared buffer across workflow
+  params?: any;                                    // Custom parameters
+}</code></pre>
+
+                <h4>Usage Example</h4>
+                <pre><code class="language-typescript">const phases = [
+  {
+    id: 'data-fetch',
+    requests: [
+      { id: 'req-1', requestOptions: { reqData: { path: '/users' }, resReq: true } }
+    ]
+  },
+  {
+    id: 'processing',
+    requests: [
+      { id: 'req-2', requestOptions: { reqData: { path: '/process' }, resReq: true } }
+    ]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'adaptive-workflow',
+  sharedBuffer: { environment: 'production', loadLevel: 'high' },
+  
+  // Modify phase configuration before execution
+  prePhaseExecutionHook: async (options) => {
+    const { phase, sharedBuffer, phaseIndex } = options;
+    
+    // Adjust configuration based on environment and load
+    if (sharedBuffer.loadLevel === 'high') {
+      return {
+        ...phase,
+        rateLimit: {
+          maxRequests: 10,          // Stricter rate limit under high load
+          windowMs: 1000
+        },
+        maxConcurrentRequests: 5,   // Limit concurrency
+        circuitBreaker: {
+          failureThresholdPercentage: 30,
+          minimumRequests: 5,
+          recoveryTimeoutMs: 30000
+        }
+      };
+    }
+    
+    return phase; // No modification
+  },
+  
+  workflowHookParams: {
+    prePhaseExecutionHookParams: { customParam: 'value' }
+  }
+});</code></pre>
+
+                <h3>preBranchExecutionHook (Branch-Level)</h3>
+                <p>Modifies branch configuration before branch execution in branched workflows. Allows dynamic branch configuration based on workflow conditions, perfect for adaptive routing and resource allocation.</p>
+
+                <h4>Configuration</h4>
+                <pre><code class="language-typescript">interface PreBranchExecutionHookOptions&lt;RequestDataType, ResponseDataType&gt; {
+  workflowId: string;                              // Current workflow identifier
+  branchId: string;                                // Current branch identifier
+  branchIndex: number;                             // Index of branch in workflow
+  branch: STABLE_WORKFLOW_BRANCH&lt;RequestDataType, ResponseDataType&gt;; // Full branch config
+  sharedBuffer?: Record&lt;string, any&gt;;             // Shared buffer across workflow
+  params?: any;                                    // Custom parameters
+}</code></pre>
+
+                <h4>Usage Example</h4>
+                <pre><code class="language-typescript">const branches = [
+  {
+    id: 'payment-branch',
+    phases: [
+      {
+        id: 'validate-payment',
+        requests: [{ id: 'validate', requestOptions: { reqData: { path: '/validate' }, resReq: true } }]
+      },
+      {
+        id: 'process-payment',
+        requests: [{ id: 'process', requestOptions: { reqData: { path: '/process' }, resReq: true } }]
+      }
+    ]
+  },
+  {
+    id: 'notification-branch',
+    phases: [
+      {
+        id: 'send-email',
+        requests: [{ id: 'email', requestOptions: { reqData: { path: '/email' }, resReq: true } }]
+      }
+    ]
+  }
+];
+
+const result = await stableWorkflow([], {
+  workflowId: 'payment-workflow',
+  enableBranchExecution: true,
+  branches,
+  sharedBuffer: { userTier: 'premium', region: 'us-east' },
+  
+  // Modify branch configuration before execution
+  preBranchExecutionHook: async (options) => {
+    const { branch, branchId, sharedBuffer } = options;
+    
+    // Apply tier-based configuration
+    if (branchId === 'payment-branch' && sharedBuffer.userTier === 'premium') {
+      return {
+        ...branch,
+        commonConfig: {
+          ...branch.commonConfig,
+          commonAttempts: 5,           // More retry attempts for premium users
+          commonWait: 500,
+          commonRetryStrategy: 'EXPONENTIAL'
+        },
+        // Add circuit breaker for critical payment branch
+        phases: branch.phases.map(phase => ({
+          ...phase,
+          circuitBreaker: {
+            failureThresholdPercentage: 25,
+            minimumRequests: 3,
+            recoveryTimeoutMs: 20000
+          }
+        }))
+      };
+    }
+    
+    return branch; // No modification for other branches
+  },
+  
+  workflowHookParams: {
+    preBranchExecutionHookParams: { requestSource: 'web-app' }
+  }
+});</code></pre>
+
+                <h3>Combined Usage with State Persistence</h3>
+                <p>Pre-execution hooks work seamlessly with state persistence, enabling stateful dynamic configuration:</p>
+                <pre><code class="language-typescript">const phases = [
+  {
+    id: 'api-call',
+    statePersistence: {
+      persistenceFunction: async ({ executionContext, buffer }) => {
+        // Load or store state
+        if (Object.keys(buffer).length === 0) {
+          return await loadState(executionContext.phaseId);
+        } else {
+          await saveState(executionContext.phaseId, buffer);
+          return buffer;
+        }
+      },
+      loadBeforeHooks: true,       // Load state before prePhaseExecutionHook
+      storeAfterHooks: true        // Store state after prePhaseExecutionHook
+    },
+    requests: [{ id: 'req', requestOptions: { reqData: { path: '/data' }, resReq: true } }]
+  }
+];
+
+await stableWorkflow(phases, {
+  workflowId: 'stateful-workflow',
+  prePhaseExecutionHook: async ({ phase, sharedBuffer }) => {
+    // Hook receives loaded state in sharedBuffer
+    const loadedConfig = sharedBuffer.phaseConfig || {};
+    
+    return {
+      ...phase,
+      rateLimit: loadedConfig.rateLimit || { maxRequests: 100, windowMs: 60000 }
+    };
+  }
+});</code></pre>
+
+                <h3>Hook Execution Order</h3>
+                <p>When multiple pre-execution hooks and state persistence are configured, they execute in this order:</p>
+                <ol>
+                    <li><strong>State Persistence LOAD</strong> (if <code>loadBeforeHooks: true</code>)</li>
+                    <li><strong>preBranchExecutionHook</strong> (in branched workflows)</li>
+                    <li><strong>prePhaseExecutionHook</strong> (in workflows)</li>
+                    <li><strong>preExecutionHook</strong> (for each request)</li>
+                    <li><strong>Request Execution</strong></li>
+                    <li><strong>State Persistence STORE</strong> (if <code>storeAfterHooks: true</code>)</li>
+                </ol>
             </section>
 
             <section id="trial-mode" class="doc-section">
