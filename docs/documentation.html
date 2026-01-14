@@ -755,7 +755,7 @@ console.log(`Execution time: ${result.executionTime}ms`);</code></pre>
                                 <td><code>(options: PhaseDecisionHookOptions) =&gt; PhaseExecutionDecision | Promise&lt;PhaseExecutionDecision&gt;</code></td>
                                 <td><code>undefined</code></td>
                                 <td>No</td>
-                                <td>Hook function to determine what action to take after this phase completes. Used for non-linear workflows. Returns decision with action: CONTINUE, SKIP, JUMP, REPLAY, or TERMINATE</td>
+                                <td>Hook function to determine what action to take after this phase completes. Used for non-linear workflows. Returns PhaseExecutionDecision object with properties: <code>action</code> (CONTINUE, SKIP, JUMP, REPLAY, TERMINATE), <code>targetPhaseId</code> (for JUMP), <code>replayCount</code> (for REPLAY), <code>metadata</code> (custom data), and <code>addPhases</code> (array of new phases to insert after current phase for dynamic workflow expansion)</td>
                             </tr>
                             <tr>
                                 <td><code>commonConfig</code></td>
@@ -836,7 +836,7 @@ console.log(`Execution time: ${result.executionTime}ms`);</code></pre>
                                 <td><code>STABLE_WORKFLOW_BRANCH&lt;RequestDataType, ResponseDataType&gt;[]</code></td>
                                 <td><code>[]</code></td>
                                 <td>No</td>
-                                <td>Array of workflow branches (when enableBranchExecution is true)</td>
+                                <td>Array of workflow branches (when enableBranchExecution is true). Each branch contains: <code>id</code> (unique identifier), <code>phases</code> (array of phases), <code>markConcurrentBranch</code> (execute concurrently), <code>allowReplay</code>/<code>maxReplayCount</code> (replay control), <code>allowSkip</code> (skip control), <code>branchDecisionHook</code> (returns BranchExecutionDecision with <code>action</code>, <code>targetBranchId</code>, <code>metadata</code>, <code>addPhases</code> for inserting new phases, and <code>addBranches</code> for inserting new branches dynamically), <code>statePersistence</code> (state management), and <code>commonConfig</code> (branch-level configuration)</td>
                             </tr>
                             <tr>
                                 <td><code>enableMixedExecution</code></td>
@@ -900,6 +900,20 @@ console.log(`Execution time: ${result.executionTime}ms`);</code></pre>
                                 <td><code>() => {}</code></td>
                                 <td>No</td>
                                 <td>Hook called when a branch makes a decision</td>
+                            </tr>
+                            <tr>
+                                <td><code>prePhaseExecutionHook</code></td>
+                                <td><code>(options: PrePhaseExecutionHookOptions&lt;RequestDataType, ResponseDataType&gt;) =&gt; STABLE_WORKFLOW_PHASE&lt;RequestDataType, ResponseDataType&gt; | Promise&lt;STABLE_WORKFLOW_PHASE&lt;RequestDataType, ResponseDataType&gt;&gt;</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Hook called before each phase execution. Can modify phase configuration dynamically or perform setup tasks. Receives phaseId, phaseIndex, phase, workflowId, branchId, sharedBuffer, and params. Must return the (potentially modified) phase object. Supports state persistence via phase.statePersistence</td>
+                            </tr>
+                            <tr>
+                                <td><code>preBranchExecutionHook</code></td>
+                                <td><code>(options: PreBranchExecutionHookOptions&lt;RequestDataType, ResponseDataType&gt;) =&gt; STABLE_WORKFLOW_BRANCH&lt;RequestDataType, ResponseDataType&gt; | Promise&lt;STABLE_WORKFLOW_BRANCH&lt;RequestDataType, ResponseDataType&gt;&gt;</code></td>
+                                <td><code>undefined</code></td>
+                                <td>No</td>
+                                <td>Hook called before each branch execution in branched workflows. Can modify branch configuration dynamically or perform initialization. Receives branchId, branchIndex, branch, workflowId, sharedBuffer, and params. Must return the (potentially modified) branch object. Supports state persistence via branch.statePersistence</td>
                             </tr>
                             <tr>
                                 <td><code>maxSerializableChars</code></td>
