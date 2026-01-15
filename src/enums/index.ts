@@ -1,7 +1,7 @@
 export enum CircuitBreakerState {
-    CLOSED = 'CLOSED',
-    OPEN = 'OPEN',
-    HALF_OPEN = 'HALF_OPEN'
+  CLOSED = 'CLOSED',
+  OPEN = 'OPEN',
+  HALF_OPEN = 'HALF_OPEN'
 }
 
 export enum PHASE_DECISION_ACTIONS {
@@ -42,4 +42,19 @@ export enum RETRY_STRATEGIES {
 export enum VALID_REQUEST_PROTOCOLS {
   HTTP = 'http',
   HTTPS = 'https',
+}
+
+export enum WorkflowNodeTypes {
+  PHASE = 'phase',
+  BRANCH = 'branch',
+  CONDITIONAL = 'conditional',
+  PARALLEL_GROUP = 'parallel-group',
+  MERGE_POINT = 'merge-point'
+}
+
+export enum WorkflowEdgeConditionTypes {
+  SUCCESS = 'success',
+  FAILURE = 'failure',
+  CUSTOM = 'custom',
+  ALWAYS = 'always'
 }

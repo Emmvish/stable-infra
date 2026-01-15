@@ -21,3 +21,6 @@ export { reqFn } from './req-fn.js';
 export { safelyExecuteUnknownFunction } from './safely-execute-unknown-function.js';
 export { safelyStringify } from './safely-stringify.js';
 export { validateTrialModeProbabilities } from './validate-trial-mode-probabilities.js';
+export { WorkflowGraphBuilder, createLinearWorkflowGraph } from './workflow-graph-builder.js';
+export { validateWorkflowGraph, detectCycles, detectUnreachableNodes, detectOrphanNodes, calculateGraphDepth } from './validate-workflow-graph.js';
+export { executeWorkflowGraph } from './execute-workflow-graph.js';

@@ -5,7 +5,9 @@ import {
   REQUEST_METHODS,
   RESPONSE_ERRORS, 
   RETRY_STRATEGIES,
-  VALID_REQUEST_PROTOCOLS
+  VALID_REQUEST_PROTOCOLS,
+  WorkflowEdgeConditionTypes,
+  WorkflowNodeTypes
 } from '../enums/index.js';
 
 import { CircuitBreaker } from '../utilities/index.js'
@@ -852,4 +854,83 @@ export interface SystemMetrics {
   cache?: CacheDashboardMetrics;
   rateLimiter?: RateLimiterDashboardMetrics;
   concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
+}
+
+export type WorkflowNodeType = WorkflowNodeTypes.PHASE | WorkflowNodeTypes.BRANCH | WorkflowNodeTypes.CONDITIONAL | WorkflowNodeTypes.PARALLEL_GROUP | WorkflowNodeTypes.MERGE_POINT
+
+export interface WorkflowGraph<RequestDataType = any, ResponseDataType = any> {
+  nodes: Map<string, WorkflowNode<RequestDataType, ResponseDataType>>;
+  edges: Map<string, WorkflowEdge[]>;
+  entryPoint: string;
+  exitPoints?: string[];
+  metadata?: Record<string, any>;
+}
+
+export interface WorkflowNode<RequestDataType = any, ResponseDataType = any> {
+  id: string;
+  type: WorkflowNodeType;
+  phase?: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>;
+  branch?: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>;
+  condition?: ConditionalNode<ResponseDataType>;
+  parallelNodes?: string[];
+  waitForNodes?: string[];
+  metadata?: Record<string, any>;
+}
+
+export interface WorkflowEdge {
+  from: string;
+  to: string;
+  condition?: EdgeCondition;
+  weight?: number;
+  label?: string;
+  metadata?: Record<string, any>;
+}
+
+export type EdgeConditionType = WorkflowEdgeConditionTypes.SUCCESS | WorkflowEdgeConditionTypes.FAILURE | WorkflowEdgeConditionTypes.CUSTOM | WorkflowEdgeConditionTypes.ALWAYS
+
+export interface EdgeCondition {
+  type: EdgeConditionType;
+  evaluate?: (context: EdgeEvaluationContext) => boolean | Promise<boolean>;
+}
+
+export interface EdgeEvaluationContext {
+  results: Map<string, STABLE_WORKFLOW_PHASE_RESULT<any>>;
+  sharedBuffer?: Record<string, any>;
+  executionHistory: PhaseExecutionRecord[];
+  currentNodeId: string;
+}
+
+export interface ConditionalNode<ResponseDataType = any> {
+  evaluate: (context: ConditionalEvaluationContext<ResponseDataType>) => string | Promise<string>;
+}
+
+export interface ConditionalEvaluationContext<ResponseDataType = any> {
+  results: Map<string, STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>>;
+  sharedBuffer?: Record<string, any>;
+  executionHistory: PhaseExecutionRecord[];
+  currentNodeId: string;
+  phaseResult?: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>;
+}
+
+export interface WorkflowGraphOptions<RequestDataType = any, ResponseDataType = any> 
+  extends Omit<STABLE_WORKFLOW_OPTIONS<RequestDataType, ResponseDataType>, 'branches' | 'enableBranchExecution' | 'concurrentPhaseExecution' | 'enableMixedExecution' | 'enableNonLinearExecution'> {
+  validateGraph?: boolean;
+  optimizeExecution?: boolean;
+  maxGraphDepth?: number;
+}
+
+export interface WorkflowGraphValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  cycles?: string[][];
+  unreachableNodes?: string[];
+  orphanNodes?: string[];
+}
+
+export interface WorkflowGraphExecutionPlan {
+  orderedNodes: string[];
+  parallelGroups: string[][];
+  dependencies: Map<string, string[]>;
+  estimatedDepth: number;
 }

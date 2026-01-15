@@ -200,6 +200,78 @@ console.log(`Failed: ${result.failedRequests}`);
 console.log(`Execution time: ${result.executionTime}ms`);
 ```
 
+### Graph-Based Workflow
+
+Build sophisticated workflows with explicit graph structures, conditional routing, and parallel execution:
+
+```typescript
+import { stableWorkflowGraph, WorkflowGraphBuilder, WorkflowEdgeConditionTypes, REQUEST_METHODS } from '@emmvish/stable-request';
+
+const graph = new WorkflowGraphBuilder()
+  // Add validation phase
+  .addPhase('validate-order', {
+    requests: [{
+      id: 'validate-req',
+      requestOptions: {
+        reqData: { hostname: 'api.example.com', path: '/validate', method: REQUEST_METHODS.POST },
+        resReq: true,
+        logAllSuccessfulAttempts: true
+      }
+    }]
+  })
+  
+  // Add conditional routing
+  .addConditional('check-validation', async ({ sharedBuffer }) => {
+    return sharedBuffer.valid ? 'process-order' : 'reject-order';
+  })
+  
+  // Add parallel processing group
+  .addParallelGroup('process-order', ['check-inventory', 'process-payment'])
+  
+  .addPhase('check-inventory', {
+    requests: [{ id: 'inventory', requestOptions: { reqData: { path: '/inventory' }, resReq: true } }]
+  })
+  
+  .addPhase('process-payment', {
+    requests: [{ id: 'payment', requestOptions: { reqData: { path: '/payment' }, resReq: true } }]
+  })
+  
+  // Add merge point to synchronize parallel paths
+  .addMergePoint('processing-complete', ['check-inventory', 'process-payment'])
+  
+  .addPhase('fulfill-order', {
+    requests: [{ id: 'fulfill', requestOptions: { reqData: { path: '/fulfill' }, resReq: true } }]
+  })
+  
+  .addPhase('reject-order', {
+    requests: [{ id: 'reject', requestOptions: { reqData: { path: '/reject' }, resReq: true } }]
+  })
+  
+  // Connect nodes with edge conditions
+  .connect('validate-order', 'check-validation', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('check-validation', 'process-order', { condition: { type: WorkflowEdgeConditionTypes.SUCCESS } })
+  .connect('check-validation', 'reject-order', { condition: { type: WorkflowEdgeConditionTypes.FAILURE } })
+  .connect('process-order', 'check-inventory', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('process-order', 'process-payment', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('check-inventory', 'processing-complete', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('process-payment', 'processing-complete', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('processing-complete', 'fulfill-order', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  
+  .setEntryPoint('validate-order')
+  .build();
+
+const result = await stableWorkflowGraph(graph, {
+  workflowId: 'order-processing',
+  sharedBuffer: {},
+  validateGraph: true,                           // Enforce DAG constraints
+  logPhaseResults: true
+});
+
+console.log(`Graph workflow completed: ${result.success}`);
+console.log(`Phases executed: ${result.completedPhases}/${result.totalPhases}`);
+console.log(`Execution path:`, result.executionHistory.map(h => h.phaseId));
+```
+
 ## Core Features
 
 ### Intelligent Retry Strategies

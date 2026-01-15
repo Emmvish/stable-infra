@@ -14,12 +14,13 @@ import {
     executeConcurrently,
     executeSequentially,
     extractCommonRequestConfigOptions as extractCommonOptions,
-    MetricsAggregator
+    MetricsAggregator,
+    CircuitBreaker, 
+    getGlobalCircuitBreaker,
+    getGlobalCacheManager,
+    getGlobalRateLimiter,
+    getGlobalConcurrencyLimiter
 } from '../utilities/index.js';
-import { CircuitBreaker, getGlobalCircuitBreaker } from '../utilities/circuit-breaker.js';
-import { CacheManager, getGlobalCacheManager } from '../utilities/cache-manager.js';
-import { RateLimiter, getGlobalRateLimiter } from '../utilities/rate-limiter.js';
-import { ConcurrencyLimiter, getGlobalConcurrencyLimiter } from '../utilities/concurrency-limiter.js';
 
 export async function stableApiGateway<RequestDataType = any, ResponseDataType = any>(
     requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] = [],

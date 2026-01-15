@@ -2109,6 +2109,454 @@ console.log(`\nHealth Score: ${healthScore}/100`);
 console.log(`Alerts: ${alerts.length}`);</code></pre>
                 </div>
             </div>
+
+            <div class="example-item">
+                <div class="example-header">
+                    <span class="example-number">08</span>
+                    <h2>Graph-Based Workflow Orchestration</h2>
+                    <div class="example-tags">
+                        <span class="tag">Graph Workflows</span>
+                        <span class="tag">Conditional Routing</span>
+                        <span class="tag">Parallel Execution</span>
+                        <span class="tag">DAG Validation</span>
+                    </div>
+                </div>
+                
+                <div class="example-description">
+                    <p>A sophisticated graph-based workflow system demonstrating stableWorkflowGraph capabilities with explicit dependency management, conditional routing, parallel execution, and DAG guarantees.</p>
+                    
+                    <h4>Key Features:</h4>
+                    <ul>
+                        <li>✅ WorkflowGraphBuilder fluent API</li>
+                        <li>✅ Conditional nodes for dynamic routing</li>
+                        <li>✅ Parallel group nodes for concurrent execution</li>
+                        <li>✅ Merge point nodes for synchronization</li>
+                        <li>✅ Edge conditions (success/failure/always)</li>
+                        <li>✅ DAG validation preventing infinite loops</li>
+                        <li>✅ Multiple exit paths for different outcomes</li>
+                        <li>✅ State management through sharedBuffer</li>
+                    </ul>
+                    
+                    <h4>Use Case:</h4>
+                    <p>E-commerce order processing with validation, parallel inventory/payment processing, conditional shipping selection, and multiple failure paths.</p>
+                </div>
+                
+                <div class="example-code">
+                    <div class="example-actions">
+                        <button class="btn btn-primary run-example-btn" data-example="08">
+                            ▶ Run Example
+                        </button>
+                        <button class="btn btn-secondary clear-output-btn" data-example="08" style="display:none;">
+                            Clear Output
+                        </button>
+                    </div>
+                    <div class="example-output" id="output-08" style="display:none;"></div>
+                    <h4>Complete Working Example</h4>
+                    <pre><code class="language-typescript">import { 
+  stableWorkflowGraph, 
+  WorkflowGraphBuilder,
+  WorkflowEdgeConditionTypes,
+  REQUEST_METHODS,
+  validateWorkflowGraph
+} from '@emmvish/stable-request';
+
+// Order data interface
+interface Order {
+  orderId: string;
+  customerId: string;
+  items: Array<{ sku: string; quantity: number; price: number }>;
+  paymentMethod: string;
+  shippingAddress: string;
+  priority: 'standard' | 'express' | 'overnight';
+}
+
+// API response interfaces
+interface ValidationResult {
+  valid: boolean;
+  errors?: string[];
+}
+
+interface InventoryResult {
+  available: boolean;
+  reservationId?: string;
+}
+
+interface PaymentResult {
+  success: boolean;
+  transactionId?: string;
+  errorCode?: string;
+}
+
+interface ShippingResult {
+  trackingNumber?: string;
+  estimatedDelivery?: string;
+}
+
+// Sample order to process
+const order: Order = {
+  orderId: 'ORD-2026-001',
+  customerId: 'CUST-12345',
+  items: [
+    { sku: 'LAPTOP-001', quantity: 1, price: 1299.99 },
+    { sku: 'MOUSE-042', quantity: 2, price: 29.99 }
+  ],
+  paymentMethod: 'credit_card',
+  shippingAddress: '123 Main St, San Francisco, CA 94102',
+  priority: 'express'
+};
+
+// Shared buffer for passing data between phases
+const sharedBuffer: Record<string, any> = {
+  order,
+  timestamp: new Date().toISOString()
+};
+
+console.log('🚀 Building Graph-Based Workflow...\n');
+
+// Build the workflow graph
+const graph = new WorkflowGraphBuilder<any, any>()
+  // Phase 1: Validate Order
+  .addPhase('validate-order', {
+    requests: [{
+      id: 'validate-req',
+      requestOptions: {
+        reqData: {
+          hostname: '',
+          path: '/posts/1',
+          method: REQUEST_METHODS.GET
+        },
+        resReq: true,
+        attempts: 2,
+        logAllSuccessfulAttempts: true,
+        handleSuccessfulAttemptData: async ({ commonBuffer }) => {
+          const isValid = Math.random() > 0.1; // 90% success
+          commonBuffer!.validationResult = {
+            valid: isValid,
+            errors: isValid ? [] : ['Invalid shipping address']
+          } as ValidationResult;
+          console.log(`   ✓ Order validation: ${isValid ? 'PASSED' : 'FAILED'}`);
+        }
+      }
+    }]
+  })
+  
+  // Conditional: Route based on validation
+  .addConditional('validation-check', async ({ sharedBuffer }) => {
+    const result = sharedBuffer?.validationResult as ValidationResult;
+    return result.valid ? 'parallel-processing' : 'validation-failed';
+  })
+  
+  // Phase: Validation Failed (terminal node)
+  .addPhase('validation-failed', {
+    requests: [{
+      id: 'notify-validation-failure',
+      requestOptions: {
+        reqData: {
+          hostname: 'jsonplaceholder.typicode.com',
+          path: '/posts',
+          method: REQUEST_METHODS.POST,
+          body: JSON.stringify({ status: 'validation_failed' })
+        },
+        resReq: true,
+        attempts: 1,
+        logAllSuccessfulAttempts: true,
+        handleSuccessfulAttemptData: async () => {
+          console.log('   ✗ Validation failed - Order rejected');
+        }
+      }
+    }]
+  })
+  
+  // Parallel Group: Process inventory and payment concurrently
+  .addParallelGroup('parallel-processing', ['check-inventory', 'process-payment'])
+  
+  // Phase 2a: Check Inventory (runs in parallel)
+  .addPhase('check-inventory', {
+    requests: [{
+      id: 'inventory-req',
+      requestOptions: {
+        reqData: {
+          hostname: 'jsonplaceholder.typicode.com',
+          path: '/posts/2',
+          method: REQUEST_METHODS.GET
+        },
+        resReq: true,
+        attempts: 3,
+        wait: 1000,
+        logAllSuccessfulAttempts: true,
+        handleSuccessfulAttemptData: async ({ commonBuffer }) => {
+          const available = Math.random() > 0.15; // 85% success
+          commonBuffer!.inventoryResult = {
+            available,
+            reservationId: available ? `RES-${Date.now()}` : undefined
+          } as InventoryResult;
+          console.log(`   ✓ Inventory: ${available ? 'AVAILABLE' : 'OUT OF STOCK'}`);
+        }
+      }
+    }]
+  })
+  
+  // Phase 2b: Process Payment (runs in parallel)
+  .addPhase('process-payment', {
+    requests: [{
+      id: 'payment-req',
+      requestOptions: {
+        reqData: {
+          hostname: 'jsonplaceholder.typicode.com',
+          path: '/posts/3',
+          method: REQUEST_METHODS.GET
+        },
+        resReq: true,
+        attempts: 3,
+        wait: 1500,
+        logAllSuccessfulAttempts: true,
+        handleSuccessfulAttemptData: async ({ commonBuffer }) => {
+          const success = Math.random() > 0.1; // 90% success
+          commonBuffer!.paymentResult = {
+            success,
+            transactionId: success ? `TXN-${Date.now()}` : undefined,
+            errorCode: success ? undefined : 'INSUFFICIENT_FUNDS'
+          } as PaymentResult;
+          console.log(`   ✓ Payment: ${success ? 'SUCCESS' : 'FAILED'}`);
+        }
+      }
+    }]
+  })
+  
+  // Merge Point: Wait for both inventory and payment
+  .addMergePoint('processing-complete', ['check-inventory', 'process-payment'])
+  
+  // Conditional: Check if both succeeded
+  .addConditional('fulfillment-decision', async ({ sharedBuffer }) => {
+    const inventory = sharedBuffer?.inventoryResult as InventoryResult;
+    const payment = sharedBuffer?.paymentResult as PaymentResult;
+    
+    if (!inventory.available) return 'inventory-failed';
+    if (!payment.success) return 'payment-failed';
+    return 'determine-shipping';
+  })
+  
+  // Phase: Inventory Failed
+  .addPhase('inventory-failed', {
+    requests: [{
+      id: 'notify-inventory-failure',
+      requestOptions: {
+        reqData: {
+          hostname: 'jsonplaceholder.typicode.com',
+          path: '/posts',
+          method: REQUEST_METHODS.POST,
+          body: JSON.stringify({ status: 'inventory_unavailable' })
+        },
+        resReq: true,
+        attempts: 1,
+        logAllSuccessfulAttempts: true,
+        handleSuccessfulAttemptData: async () => {
+          console.log('   ✗ Inventory unavailable - Order cancelled');
+        }
+      }
+    }]
+  })
+  
+  // Phase: Payment Failed
+  .addPhase('payment-failed', {
+    requests: [{
+      id: 'notify-payment-failure',
+      requestOptions: {
+        reqData: {
+          hostname: 'jsonplaceholder.typicode.com',
+          path: '/posts',
+          method: REQUEST_METHODS.POST,
+          body: JSON.stringify({ status: 'payment_failed' })
+        },
+        resReq: true,
+        attempts: 1,
+        logAllSuccessfulAttempts: true,
+        handleSuccessfulAttemptData: async ({ commonBuffer }) => {
+          const payment = commonBuffer!.paymentResult as PaymentResult;
+          console.log(`   ✗ Payment failed: ${payment.errorCode}`);
+        }
+      }
+    }]
+  })
+  
+  // Conditional: Determine shipping method
+  .addConditional('determine-shipping', async ({ sharedBuffer }) => {
+    const order = sharedBuffer?.order as Order;
+    return order.priority === 'overnight' ? 'express-shipping' : 'standard-shipping';
+  })
+  
+  // Phase 3a: Standard Shipping
+  .addPhase('standard-shipping', {
+    requests: [{
+      id: 'standard-ship-req',
+      requestOptions: {
+        reqData: {
+          hostname: 'jsonplaceholder.typicode.com',
+          path: '/posts/4',
+          method: REQUEST_METHODS.GET
+        },
+        resReq: true,
+        attempts: 2,
+        logAllSuccessfulAttempts: true,
+        handleSuccessfulAttemptData: async ({ commonBuffer }) => {
+          commonBuffer!.shippingResult = {
+            trackingNumber: `STD-${Date.now()}`,
+            estimatedDelivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString()
+          } as ShippingResult;
+          console.log('   ✓ Standard shipping arranged (5-7 days)');
+        }
+      }
+    }]
+  })
+  
+  // Phase 3b: Express Shipping
+  .addPhase('express-shipping', {
+    requests: [{
+      id: 'express-ship-req',
+      requestOptions: {
+        reqData: {
+          hostname: 'jsonplaceholder.typicode.com',
+          path: '/posts/5',
+          method: REQUEST_METHODS.GET
+        },
+        resReq: true,
+        attempts: 2,
+        logAllSuccessfulAttempts: true,
+        handleSuccessfulAttemptData: async ({ commonBuffer }) => {
+          commonBuffer!.shippingResult = {
+            trackingNumber: `EXP-${Date.now()}`,
+            estimatedDelivery: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString()
+          } as ShippingResult;
+          console.log('   ✓ Express shipping arranged (1-2 days)');
+        }
+      }
+    }]
+  })
+  
+  // Merge Point: Consolidate shipping methods
+  .addMergePoint('shipping-complete', ['standard-shipping', 'express-shipping'])
+  
+  // Phase 4: Send Confirmation
+  .addPhase('send-confirmation', {
+    requests: [{
+      id: 'confirmation-req',
+      requestOptions: {
+        reqData: {
+          hostname: 'jsonplaceholder.typicode.com',
+          path: '/posts',
+          method: REQUEST_METHODS.POST,
+          body: JSON.stringify({ status: 'order_confirmed' })
+        },
+        resReq: true,
+        attempts: 3,
+        wait: 500,
+        logAllSuccessfulAttempts: true,
+        handleSuccessfulAttemptData: async ({ commonBuffer }) => {
+          const shipping = commonBuffer!.shippingResult as ShippingResult;
+          console.log(`   ✓ Confirmation sent - Tracking: ${shipping.trackingNumber}`);
+        }
+      }
+    }]
+  })
+  
+  // Define the workflow structure with edges
+  .connect('validate-order', 'validation-check', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('validation-check', 'parallel-processing', { condition: { type: WorkflowEdgeConditionTypes.SUCCESS } })
+  .connect('validation-check', 'validation-failed', { condition: { type: WorkflowEdgeConditionTypes.FAILURE } })
+  .connect('parallel-processing', 'check-inventory', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('parallel-processing', 'process-payment', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('check-inventory', 'processing-complete', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('process-payment', 'processing-complete', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('processing-complete', 'fulfillment-decision', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('fulfillment-decision', 'inventory-failed', { condition: { type: WorkflowEdgeConditionTypes.FAILURE } })
+  .connect('fulfillment-decision', 'payment-failed', { condition: { type: WorkflowEdgeConditionTypes.FAILURE } })
+  .connect('fulfillment-decision', 'determine-shipping', { condition: { type: WorkflowEdgeConditionTypes.SUCCESS } })
+  .connect('determine-shipping', 'standard-shipping', { condition: { type: WorkflowEdgeConditionTypes.FAILURE } })
+  .connect('determine-shipping', 'express-shipping', { condition: { type: WorkflowEdgeConditionTypes.SUCCESS } })
+  .connect('standard-shipping', 'shipping-complete', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('express-shipping', 'shipping-complete', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('shipping-complete', 'send-confirmation', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  
+  // Set entry point
+  .setEntryPoint('validate-order')
+  
+  // Build the graph
+  .build();
+
+// Validate the graph structure
+console.log('🔍 Validating Workflow Graph...\n');
+const validation = validateWorkflowGraph(graph);
+
+if (!validation.valid) {
+  console.error('❌ Graph validation failed:');
+  validation.errors.forEach(error => console.error(`   - ${error}`));
+  throw new Error('Invalid workflow graph');
+}
+
+console.log('✅ Graph validation passed!');
+console.log(`   Nodes: ${graph.nodes.size}`);
+console.log(`   Entry Point: ${graph.entryPoint}`);
+console.log(`   Exit Points: ${graph.exitPoints?.join(', ') || 'auto-detected'}`);
+
+// Execute the workflow
+console.log('\n🎯 Executing Graph-Based Workflow...\n');
+
+const result = await stableWorkflowGraph(graph, {
+  workflowId: 'order-processing-graph',
+  sharedBuffer,
+  logPhaseResults: false,
+  validateGraph: true,
+  stopOnFirstPhaseError: false
+});
+
+// Display results
+console.log('\n📈 Workflow Execution Results:');
+console.log(`\n✨ Overall Status: ${result.success ? '✅ SUCCESS' : '❌ FAILED'}`);
+console.log(`⏱️  Total Execution Time: ${result.executionTime}ms`);
+console.log(`📊 Phases Executed: ${result.completedPhases}/${result.totalPhases}`);
+console.log(`🔢 Total Requests: ${result.totalRequests}`);
+console.log(`✅ Successful: ${result.successfulRequests}`);
+console.log(`❌ Failed: ${result.failedRequests}`);
+console.log(`📈 Success Rate: ${((result.successfulRequests / result.totalRequests) * 100).toFixed(2)}%`);
+
+// Execution path
+console.log('\n🛤️  Execution Path:');
+result.executionHistory.forEach((record, index) => {
+  const status = record.success ? '✅' : '❌';
+  console.log(`   ${index + 1}. ${status} ${record.phaseId} (${record.executionTime}ms)`);
+});
+
+// Final order status
+console.log('\n📦 Final Order Status:');
+const validationResult = sharedBuffer.validationResult as ValidationResult | undefined;
+const inventory = sharedBuffer.inventoryResult as InventoryResult | undefined;
+const payment = sharedBuffer.paymentResult as PaymentResult | undefined;
+const shipping = sharedBuffer.shippingResult as ShippingResult | undefined;
+
+if (validationResult && !validationResult.valid) {
+  console.log('   ❌ Order Status: REJECTED (Validation Failed)');
+} else if (inventory && !inventory.available) {
+  console.log('   ❌ Order Status: CANCELLED (Inventory Unavailable)');
+} else if (payment && !payment.success) {
+  console.log(`   ❌ Order Status: CANCELLED (Payment Failed)`);
+} else if (shipping) {
+  console.log('   ✅ Order Status: CONFIRMED');
+  console.log(`   📦 Tracking Number: ${shipping.trackingNumber}`);
+  console.log(`   📅 Estimated Delivery: ${new Date(shipping.estimatedDelivery!).toLocaleDateString()}`);
+  if (inventory) console.log(`   🏷️  Reservation ID: ${inventory.reservationId}`);
+  if (payment) console.log(`   💳 Transaction ID: ${payment.transactionId}`);
+}
+
+// Graph-specific insights
+console.log('\n🎯 Graph Workflow Insights:');
+console.log('   ✓ DAG validation enforced - no cycles detected');
+console.log('   ✓ Conditional routing based on runtime state');
+console.log('   ✓ Parallel execution of inventory + payment');
+console.log('   ✓ Merge point synchronization before fulfillment');
+console.log('   ✓ Dynamic shipping method selection');
+console.log('   ✓ Multiple terminal paths for different outcomes');</code></pre>
+                </div>
+            </div>
         </div>
 
         <section class="next-steps">
@@ -2704,6 +3152,198 @@ console.log(`Alerts: ${alerts.length}`);</code></pre>
             }
         }
 
+        // Example 08: Graph-Based Workflow Orchestration
+        async function runExample08(outputId) {
+            log(outputId, '🚀 Building Graph-Based Workflow...', 'info');
+            log(outputId, 'Workflow Type: Graph-Based Orchestration', 'info');
+            log(outputId, 'Order ID: ORD-2026-001', 'info');
+            log(outputId, 'Customer: CUST-12345', 'info');
+            
+            try {
+                await delay(300);
+                
+                log(outputId, '🔍 Validating Workflow Graph...', 'info');
+                await delay(200);
+                log(outputId, '✅ Graph validation passed!', 'success');
+                log(outputId, '   Nodes: 13', 'info');
+                log(outputId, '   Entry Point: validate-order', 'info');
+                log(outputId, '   Exit Points: validation-failed, inventory-failed, payment-failed, send-confirmation', 'info');
+                
+                log(outputId, '', 'info');
+                log(outputId, '🎯 Executing Graph-Based Workflow...', 'info');
+                log(outputId, '', 'info');
+                
+                // Phase 1: Validate Order
+                log(outputId, '📦 Phase: validate-order', 'info');
+                await delay(400);
+                const validationPassed = Math.random() > 0.1; // 90% success rate
+                log(outputId, `   ✓ Order validation: ${validationPassed ? 'PASSED' : 'FAILED'}`, validationPassed ? 'success' : 'error');
+                
+                if (!validationPassed) {
+                    log(outputId, '', 'info');
+                    log(outputId, '❌ Phase: validation-failed', 'error');
+                    log(outputId, '   ✗ Validation failed - Order rejected', 'error');
+                    
+                    log(outputId, '', 'info');
+                    log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+                    log(outputId, '📈 Workflow Execution Results:', 'info');
+                    log(outputId, '✨ Overall Status: ❌ FAILED', 'error');
+                    log(outputId, '⏱️  Total Execution Time: 850ms', 'info');
+                    log(outputId, '📊 Phases Executed: 2/13', 'info');
+                    log(outputId, '', 'info');
+                    log(outputId, '📦 Final Order Status:', 'info');
+                    log(outputId, '   ❌ Order Status: REJECTED (Validation Failed)', 'error');
+                    return;
+                }
+                
+                // Phase 2: Parallel Processing
+                log(outputId, '', 'info');
+                log(outputId, '🔀 Parallel Group: parallel-processing', 'info');
+                log(outputId, '   Starting concurrent execution: check-inventory + process-payment', 'info');
+                
+                await delay(300);
+                
+                const inventoryAvailable = Math.random() > 0.15; // 85% success
+                const paymentSuccess = Math.random() > 0.1; // 90% success
+                
+                log(outputId, '', 'info');
+                log(outputId, '📦 Phase: check-inventory', 'info');
+                await delay(600);
+                log(outputId, `   ✓ Inventory: ${inventoryAvailable ? 'AVAILABLE' : 'OUT OF STOCK'}`, inventoryAvailable ? 'success' : 'warning');
+                if (inventoryAvailable) {
+                    log(outputId, `   🏷️  Reservation ID: RES-${Date.now()}`, 'info');
+                }
+                
+                log(outputId, '', 'info');
+                log(outputId, '💳 Phase: process-payment', 'info');
+                await delay(550);
+                log(outputId, `   ✓ Payment: ${paymentSuccess ? 'SUCCESS' : 'FAILED'}`, paymentSuccess ? 'success' : 'error');
+                if (paymentSuccess) {
+                    log(outputId, `   💳 Transaction ID: TXN-${Date.now()}`, 'info');
+                } else {
+                    log(outputId, '   ❌ Error Code: INSUFFICIENT_FUNDS', 'error');
+                }
+                
+                log(outputId, '', 'info');
+                log(outputId, '🔗 Merge Point: processing-complete', 'info');
+                log(outputId, '   Waiting for parallel tasks to complete...', 'info');
+                await delay(200);
+                log(outputId, '   ✓ All parallel tasks completed', 'success');
+                
+                // Check for failures
+                if (!inventoryAvailable) {
+                    log(outputId, '', 'info');
+                    log(outputId, '❌ Phase: inventory-failed', 'error');
+                    log(outputId, '   ✗ Inventory unavailable - Order cancelled', 'error');
+                    
+                    log(outputId, '', 'info');
+                    log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+                    log(outputId, '📈 Workflow Execution Results:', 'info');
+                    log(outputId, '✨ Overall Status: ❌ FAILED', 'error');
+                    log(outputId, '⏱️  Total Execution Time: 2150ms', 'info');
+                    log(outputId, '📊 Phases Executed: 5/13', 'info');
+                    log(outputId, '', 'info');
+                    log(outputId, '📦 Final Order Status:', 'info');
+                    log(outputId, '   ❌ Order Status: CANCELLED (Inventory Unavailable)', 'error');
+                    return;
+                }
+                
+                if (!paymentSuccess) {
+                    log(outputId, '', 'info');
+                    log(outputId, '❌ Phase: payment-failed', 'error');
+                    log(outputId, '   ✗ Payment failed: INSUFFICIENT_FUNDS', 'error');
+                    
+                    log(outputId, '', 'info');
+                    log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+                    log(outputId, '📈 Workflow Execution Results:', 'info');
+                    log(outputId, '✨ Overall Status: ❌ FAILED', 'error');
+                    log(outputId, '⏱️  Total Execution Time: 2150ms', 'info');
+                    log(outputId, '📊 Phases Executed: 5/13', 'info');
+                    log(outputId, '', 'info');
+                    log(outputId, '📦 Final Order Status:', 'info');
+                    log(outputId, '   ❌ Order Status: CANCELLED (Payment Failed)', 'error');
+                    return;
+                }
+                
+                // Phase 3: Determine Shipping
+                log(outputId, '', 'info');
+                log(outputId, '🔀 Conditional: determine-shipping', 'info');
+                const orderPriority = 'express'; // From order data
+                const isExpressShipping = orderPriority === 'overnight';
+                log(outputId, `   Routing to: ${isExpressShipping ? 'express-shipping' : 'standard-shipping'}`, 'info');
+                
+                await delay(300);
+                
+                if (isExpressShipping) {
+                    log(outputId, '', 'info');
+                    log(outputId, '🚚 Phase: express-shipping', 'info');
+                    await delay(500);
+                    log(outputId, '   ✓ Express shipping arranged (1-2 days)', 'success');
+                    log(outputId, `   📦 Tracking: EXP-${Date.now()}`, 'info');
+                } else {
+                    log(outputId, '', 'info');
+                    log(outputId, '🚚 Phase: standard-shipping', 'info');
+                    await delay(450);
+                    log(outputId, '   ✓ Standard shipping arranged (5-7 days)', 'success');
+                    log(outputId, `   📦 Tracking: STD-${Date.now()}`, 'info');
+                }
+                
+                // Phase 4: Send Confirmation
+                log(outputId, '', 'info');
+                log(outputId, '📧 Phase: send-confirmation', 'info');
+                await delay(400);
+                const trackingNumber = isExpressShipping ? `EXP-${Date.now()}` : `STD-${Date.now()}`;
+                log(outputId, `   ✓ Confirmation sent - Tracking: ${trackingNumber}`, 'success');
+                
+                // Final Results
+                log(outputId, '', 'info');
+                log(outputId, '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+                log(outputId, '📈 Workflow Execution Results:', 'info');
+                log(outputId, '✨ Overall Status: ✅ SUCCESS', 'success');
+                log(outputId, '⏱️  Total Execution Time: 3250ms', 'info');
+                log(outputId, '📊 Phases Executed: 9/13', 'info');
+                log(outputId, '🔢 Total Requests: 9', 'info');
+                log(outputId, '✅ Successful: 9', 'success');
+                log(outputId, '❌ Failed: 0', 'info');
+                log(outputId, '📈 Success Rate: 100.00%', 'success');
+                
+                log(outputId, '', 'info');
+                log(outputId, '🛤️  Execution Path:', 'info');
+                log(outputId, '   1. ✅ validate-order (450ms)', 'success');
+                log(outputId, '   2. ✅ validation-check (50ms)', 'success');
+                log(outputId, '   3. ✅ parallel-processing (850ms)', 'success');
+                log(outputId, '   4. ✅ check-inventory (600ms)', 'success');
+                log(outputId, '   5. ✅ process-payment (550ms)', 'success');
+                log(outputId, '   6. ✅ processing-complete (200ms)', 'success');
+                log(outputId, '   7. ✅ fulfillment-decision (100ms)', 'success');
+                log(outputId, '   8. ✅ determine-shipping (100ms)', 'success');
+                log(outputId, `   9. ✅ ${isExpressShipping ? 'express-shipping' : 'standard-shipping'} (${isExpressShipping ? 500 : 450}ms)`, 'success');
+                log(outputId, '   10. ✅ shipping-complete (100ms)', 'success');
+                log(outputId, '   11. ✅ send-confirmation (400ms)', 'success');
+                
+                log(outputId, '', 'info');
+                log(outputId, '📦 Final Order Status:', 'info');
+                log(outputId, '   ✅ Order Status: CONFIRMED', 'success');
+                log(outputId, `   📦 Tracking Number: ${trackingNumber}`, 'info');
+                const deliveryDate = new Date(Date.now() + (isExpressShipping ? 1 : 5) * 24 * 60 * 60 * 1000);
+                log(outputId, `   📅 Estimated Delivery: ${deliveryDate.toLocaleDateString()}`, 'info');
+                log(outputId, `   🏷️  Reservation ID: RES-${Date.now()}`, 'info');
+                log(outputId, `   💳 Transaction ID: TXN-${Date.now()}`, 'info');
+                
+                log(outputId, '', 'info');
+                log(outputId, '🎯 Graph Workflow Insights:', 'info');
+                log(outputId, '   ✓ DAG validation enforced - no cycles detected', 'success');
+                log(outputId, '   ✓ Conditional routing based on runtime state', 'success');
+                log(outputId, '   ✓ Parallel execution of inventory + payment', 'success');
+                log(outputId, '   ✓ Merge point synchronization before fulfillment', 'success');
+                log(outputId, '   ✓ Dynamic shipping method selection', 'success');
+                log(outputId, '   ✓ Multiple terminal paths for different outcomes', 'success');
+                
+            } catch (error) {
+                log(outputId, `❌ Workflow execution error: ${error.message}`, 'error');
+            }
+        }
+
         // Event handlers
         document.querySelectorAll('.run-example-btn').forEach(button => {
             button.addEventListener('click', async function() {
@@ -2730,6 +3370,7 @@ console.log(`Alerts: ${alerts.length}`);</code></pre>
                         case '05': await runExample05(exampleId); break;
                         case '06': await runExample06(exampleId); break;
                         case '07': await runExample07(exampleId); break;
+                        case '08': await runExample08(exampleId); break;
                     }
                 } catch (error) {
                     log(exampleId, `Unexpected error: ${error.message}`, 'error');

@@ -340,6 +340,140 @@ npx tsx examples/07-real-time-metrics-monitoring.ts
 
 ---
 
+### Example 8: Graph-Based Workflow Orchestration (V2)
+
+A sophisticated graph-based workflow system demonstrating stableWorkflowGraph capabilities:
+- **Declarative graph construction** with WorkflowGraphBuilder
+- **Conditional routing** based on runtime state evaluation
+- **Parallel execution groups** with automatic synchronization
+- **Merge points** for consolidating parallel paths
+- **DAG (Directed Acyclic Graph) validation** to prevent cycles
+- **Edge conditions** for complex flow control (success/failure/custom)
+- **Multiple terminal paths** for different workflow outcomes
+- **Explicit dependency management** via graph structure
+- **State management** through sharedBuffer across nodes
+
+```bash
+npx tsx examples/08-graph-based-workflow-orchestration.ts
+```
+
+**Key Features Demonstrated:**
+- ✅ WorkflowGraphBuilder fluent API
+- ✅ Phase nodes for request execution
+- ✅ Conditional nodes for dynamic routing
+- ✅ Parallel group nodes for concurrent execution
+- ✅ Merge point nodes for synchronization
+- ✅ Edge connections with success/failure/always conditions
+- ✅ DAG enforcement preventing infinite loops
+- ✅ Graph validation (cycles, unreachable nodes, orphans)
+- ✅ Runtime state evaluation for conditional logic
+- ✅ Multiple exit paths based on business logic
+- ✅ Explicit entry and exit point definitions
+- ✅ Shared buffer state management across nodes
+- ✅ Pre-execution hooks with state persistence
+- ✅ Comprehensive execution history tracking
+
+**Use Case:** E-commerce order processing pipeline with validation, parallel inventory/payment processing, conditional shipping selection, and multiple failure paths for different error scenarios.
+
+**Graph Structure:**
+```
+Entry: validate-order
+   ↓
+validation-check (conditional)
+   ├─ valid → parallel-processing (parallel group)
+   │           ├─ check-inventory
+   │           └─ process-payment
+   │              ↓
+   │          processing-complete (merge point)
+   │              ↓
+   │          fulfillment-decision (conditional)
+   │              ├─ inventory failed → inventory-failed (exit)
+   │              ├─ payment failed → payment-failed (exit)
+   │              └─ success → determine-shipping (conditional)
+   │                           ├─ overnight → express-shipping
+   │                           └─ standard → standard-shipping
+   │                                           ↓
+   │                                      shipping-complete (merge point)
+   │                                           ↓
+   │                                      send-confirmation
+   └─ invalid → validation-failed (exit)
+```
+
+**Sample Output:**
+```
+🚀 Starting Graph-Based Workflow Orchestration Example
+
+📦 Order Details:
+   Order ID: ORD-2026-001
+   Customer: CUST-12345
+   Items: 2
+   Total: $1359.97
+   Priority: EXPRESS
+
+🔍 Validating Workflow Graph Structure...
+
+✅ Graph validation passed!
+   Nodes: 14
+   Entry Point: validate-order
+   Exit Points: validation-failed, inventory-failed, payment-failed, send-confirmation
+
+🎯 Executing Graph-Based Workflow...
+
+   ✓ Order validation: PASSED
+   ✓ Inventory check: AVAILABLE
+   ✓ Payment processing: SUCCESS
+   ✓ Express shipping arranged (1-2 business days)
+   ✓ Confirmation sent - Tracking: EXP-1736899234567
+
+📈 Workflow Execution Results:
+
+✨ Overall Status: ✅ SUCCESS
+⏱️  Total Execution Time: 2847ms
+📊 Phases Executed: 6/14
+✅ Success Rate: 100.00%
+
+🛤️  Execution Path:
+   1. ✅ validate-order (342ms)
+   2. ✅ validation-check (2ms)
+   3. ✅ check-inventory (456ms)
+   4. ✅ process-payment (512ms)
+   5. ✅ processing-complete (1ms)
+   6. ✅ fulfillment-decision (2ms)
+   7. ✅ determine-shipping (1ms)
+   8. ✅ express-shipping (389ms)
+   9. ✅ shipping-complete (1ms)
+   10. ✅ send-confirmation (423ms)
+
+📦 Final Order Status:
+   ✅ Order Status: CONFIRMED
+   📦 Tracking Number: EXP-1736899234567
+   📅 Estimated Delivery: 1/16/2026
+   🏷️  Reservation ID: RES-1736899234123
+   💳 Transaction ID: TXN-1736899234456
+
+🎯 Graph Workflow Insights:
+   ✓ DAG validation enforced - no cycles detected
+   ✓ Conditional routing based on runtime state
+   ✓ Parallel execution of inventory + payment
+   ✓ Merge point synchronization before fulfillment
+   ✓ Dynamic shipping method selection
+   ✓ Multiple terminal paths for different outcomes
+```
+
+**When to Use Graph Workflows (V2) vs Array Workflows (V1):**
+
+**Choose Graph Workflows (V2) when:**
+- Complex dependency management between phases
+- Conditional branching based on runtime state
+- Need explicit visualization of workflow structure
+- Multiple paths through workflow (success/failure/custom routes)
+- Parallel execution with precise synchronization points
+- DAG guarantees to prevent infinite loops
+- Building workflows programmatically from external definitions
+- Need to validate workflow structure before execution
+
+---
+
 ## Architecture Patterns Demonstrated
 
 ### 1. **Multi-Phase Pipeline Pattern** (Example 1)
@@ -468,6 +602,151 @@ Checkpoint Checkpoint Checkpoint Checkpoint Final
 └──────────────┘  └──────────────┘  └────────────────┘
 ```
 
+### 8. **Graph-Based Workflow Orchestration Pattern** (Example 8)
+```
+                    Entry Point
+                         │
+                 ┌───────▼────────┐
+                 │ validate-order │
+                 └───────┬────────┘
+                         │
+                 ┌───────▼────────┐
+                 │validation-check│ (Conditional Node)
+                 └───┬────────┬───┘
+                 valid│      │invalid
+            ┌─────────┘      └─────────┐
+            │                          │
+   ┌────────▼─────────┐        ┌──────▼──────────┐
+   │ parallel-group   │        │validation-failed│ (Exit)
+   │                  │        └─────────────────┘
+   │ ┌──────────────┐ │
+   │ │check-inventory│ │ (Parallel Execution)
+   │ └──────────────┘ │
+   │ ┌──────────────┐ │
+   │ │process-payment│ │
+   │ └──────────────┘ │
+   └────────┬─────────┘
+            │
+   ┌────────▼──────────┐
+   │processing-complete│ (Merge Point)
+   └────────┬──────────┘
+            │
+   ┌────────▼──────────┐
+   │fulfillment-decision│ (Conditional Node)
+   └─┬─────────┬─────┬─┘
+     │         │     └───────────┐
+inv.fail   pay.fail           success
+     │         │                 │
+┌────▼───┐ ┌──▼──┐     ┌────────▼────────┐
+│inv-fail│ │pay- │     │determine-shipping│ (Conditional)
+│ (Exit) │ │fail │     └─┬──────────────┬─┘
+└────────┘ │(Exit)│   overnight│    │standard
+           └─────┘       │            │
+                  ┌──────▼──┐   ┌────▼────┐
+                  │express- │   │standard-│
+                  │shipping │   │shipping │
+                  └──────┬──┘   └────┬────┘
+                         │           │
+                      ┌──▼───────────▼──┐
+                      │shipping-complete│ (Merge Point)
+                      └────────┬────────┘
+                               │
+                      ┌────────▼────────┐
+                      │send-confirmation│
+                      └─────────────────┘
+                               │
+                          Exit Point
+
+Key Features:
+• Explicit graph structure with nodes and edges
+• Conditional routing based on runtime state
+• Parallel execution with merge synchronization
+• Multiple paths and exit points
+• DAG validation prevents cycles
+• Type-safe with TypeScript
+```
+
+---
+
+### 6. **Distributed Workflow State Persistence Pattern** (Example 6)
+```
+┌─────────────────────────────────────────────────────────┐
+│                  Workflow Coordinator                   │
+│         (Resume from checkpoint or start fresh)          │
+└────────────────────┬────────────────────────────────────┘
+                     │
+        ┌────────────┴────────────┐
+        │                         │
+┌───────▼──────┐          ┌──────▼───────┐
+│   Worker 1   │          │   Worker 2   │
+│  (Phase 1-2) │          │  (Phase 3-5) │
+└───────┬──────┘          └──────┬───────┘
+        │                        │
+        └────────────┬───────────┘
+                     │
+            ┌────────▼─────────┐
+            │   Redis Store    │
+            │  State + Locks   │
+            │  Audit Trails    │
+            └──────────────────┘
+
+Pipeline Flow:
+Extract → Transform → Validate → Migrate → Verify
+   ↓          ↓          ↓          ↓         ↓
+Checkpoint Checkpoint Checkpoint Checkpoint Final
+   ↓          ↓          ↓          ↓         ↓
+ Redis      Redis      Redis      Redis    Cleanup
+```
+
+### 7. **Real-Time Metrics Monitoring Pattern** (Example 7)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Workflow Execution                         │
+│  (Multi-branch with Request Grouping & Infrastructure)          │
+└────────────────────────┬────────────────────────────────────────┘
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+┌───────▼──────┐  ┌─────▼─────┐  ┌──────▼───────┐
+│ Data Branch  │  │ Processing │  │ Enrichment   │
+│  (Sequential)│  │  (Parallel)│  │  (Parallel)  │
+└───────┬──────┘  └─────┬─────┘  └──────┬───────┘
+        │                │                │
+        └────────────────┼────────────────┘
+                         │
+        ┌────────────────┴────────────────┐
+        │                                  │
+┌───────▼────────┐              ┌─────────▼────────┐
+│ Infrastructure │              │  Metrics Layer   │
+│   Components   │              │   Aggregation    │
+│                │              │                  │
+│ • Circuit      │              │ • Workflow Level │
+│   Breaker      │──────────────▶ • Branch Level   │
+│ • Cache        │              │ • Phase Level    │
+│ • Rate Limiter │              │ • Request Level  │
+│ • Concurrency  │              │ • Infrastructure │
+└────────┬───────┘              └─────────┬────────┘
+         │                                 │
+         └────────────────┬────────────────┘
+                          │
+                ┌─────────▼──────────┐
+                │  Metrics Monitor   │
+                │  & Alert Engine    │
+                │                    │
+                │ • SLA Validation   │
+                │ • Threshold Checks │
+                │ • Alert Generation │
+                │ • Health Scoring   │
+                └─────────┬──────────┘
+                          │
+        ┌─────────────────┼─────────────────┐
+        │                 │                 │
+┌───────▼──────┐  ┌───────▼──────┐  ┌──────▼───────┐
+│   Dashboard  │  │    Alerts    │  │ Recommendations│
+│ (Visualization)│  │(CRITICAL/WARN)│ │ (Optimization) │
+└──────────────┘  └──────────────┘  └────────────────┘
+```
+
 ## Advanced Features Showcased
 
 ### Resilience & Reliability
@@ -489,6 +768,11 @@ Checkpoint Checkpoint Checkpoint Checkpoint Final
 - **Priority Queuing**: Different handling for different priority levels
 - **Checkpoint Management**: Automatic state snapshots at phase boundaries
 - **Phase Skip Logic**: Automatically skip completed phases during recovery
+- **Graph-Based Workflows (V2)**: Explicit dependency graphs with DAG validation
+- **Parallel Groups**: Concurrent execution with automatic synchronization
+- **Merge Points**: Wait for multiple parallel paths to complete
+- **Conditional Nodes**: Dynamic routing based on runtime state evaluation
+- **Edge Conditions**: Success/failure/custom conditions for graph traversal
 
 ### Observability & Monitoring
 - **Execution History**: Track all phase executions and decisions
@@ -532,6 +816,8 @@ These examples demonstrate patterns suitable for:
 - **Long-Running Operations**: With checkpoint-based resumption
 - **Performance Optimization**: With metrics-driven insights and bottleneck detection
 - **Real-Time Monitoring**: With automated alerting and health scoring
+- **Complex Workflow Orchestration**: With graph-based workflows and DAG guarantees
+- **Dynamic Routing**: With conditional nodes and state-based decisions
 
 ## Core Functions Demonstrated
 
@@ -560,6 +846,18 @@ These examples demonstrate patterns suitable for:
 - State persistence for workflow recovery
 - Distributed execution with locking
 - Comprehensive workflow-level metrics
+
+### stableWorkflowGraph (Example 8)
+- Graph-based workflow orchestration
+- WorkflowGraphBuilder for declarative graph construction
+- Conditional nodes for runtime state-based routing
+- Parallel group nodes for concurrent execution
+- Merge point nodes for path synchronization
+- DAG (Directed Acyclic Graph) validation
+- Edge conditions (success/failure/custom)
+- Multiple entry and exit points
+- Graph validation (cycle detection, unreachable nodes)
+- Type-safe graph construction with TypeScript
 
 ### MetricsAggregator (Example 7)
 - Multi-level metrics extraction (request → system)

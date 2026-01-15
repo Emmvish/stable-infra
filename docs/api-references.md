@@ -1,6 +1,6 @@
 # API Reference
 
-Complete API documentation for `@emmvish/stable-request` `v1.8.1`
+Complete API documentation for `@emmvish/stable-request` `v1.9.0`
 
 ## Table of Contents
 
@@ -378,6 +378,342 @@ console.log(`Success: ${result.success}`);
 console.log(`Total requests: ${result.totalRequests}`);
 console.log(`Execution time: ${result.executionTime}ms`);
 ```
+
+---
+
+### stableWorkflowGraph
+
+Execute graph-based workflows with explicit node dependencies, conditional routing, parallel execution groups, and DAG (Directed Acyclic Graph) validation.
+
+```typescript
+function stableWorkflowGraph<RequestDataType = any, ResponseDataType = any>(
+  graph: WorkflowGraph<RequestDataType, ResponseDataType>,
+  options: WorkflowGraphOptions<RequestDataType, ResponseDataType>
+): Promise<STABLE_WORKFLOW_RESULT<ResponseDataType>>
+```
+
+#### Parameters
+
+**`graph`** (`WorkflowGraph<RequestDataType, ResponseDataType>`)
+
+A workflow graph constructed using `WorkflowGraphBuilder`. The graph defines:
+- **Nodes**: Phase nodes, conditional nodes, parallel groups, merge points
+- **Edges**: Connections between nodes with conditions (success/failure/custom/always)
+- **Entry Point**: Starting node for workflow execution
+- **Exit Points**: Terminal nodes where workflow can complete
+
+**Graph Structure:**
+```typescript
+interface WorkflowGraph<RequestDataType, ResponseDataType> {
+  nodes: Map<string, WorkflowNode<RequestDataType, ResponseDataType>>;
+  edges: Map<string, WorkflowEdge[]>;
+  entryPoint: string;
+  exitPoints?: string[];
+  metadata?: Record<string, any>;
+}
+```
+
+**Node Types:**
+- `phase`: Execute a set of HTTP requests (same as `STABLE_WORKFLOW_PHASE`)
+- `conditional`: Evaluate runtime state and route to next node dynamically
+- `parallel-group`: Execute multiple phase nodes concurrently
+- `merge-point`: Wait for multiple parallel paths to complete before continuing
+
+**Edge Conditions:**
+- `WorkflowEdgeConditionTypes.SUCCESS`: Follow edge when node succeeds
+- `WorkflowEdgeConditionTypes.FAILURE`: Follow edge when node fails
+- `WorkflowEdgeConditionTypes.ALWAYS`: Always follow edge regardless of result
+- `WorkflowEdgeConditionTypes.CUSTOM`: Custom evaluation function
+
+**`options`** (`WorkflowGraphOptions<RequestDataType, ResponseDataType>`)
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `workflowId` | `string` | No | `'workflow-graph-{timestamp}'` | Unique identifier for this graph workflow execution. |
+| `sharedBuffer` | `Record<string, any>` | No | `{}` | Shared buffer accessible across all nodes for state management. |
+| `validateGraph` | `boolean` | No | `true` | If `true`, validates graph structure before execution (cycles, unreachable nodes, etc.). |
+| `logPhaseResults` | `boolean` | No | `false` | If `true`, logs each phase result to console. |
+| `stopOnFirstPhaseError` | `boolean` | No | `false` | If `true`, stops workflow execution after first phase error. |
+| `maxSerializableChars` | `number` | No | `1000` | Maximum characters for serialization in logs. |
+| `handlePhaseCompletion` | `(options: HandlePhaseCompletionHookOptions) => any \| Promise<any>` | No | `console.log` | Hook called after each phase completes successfully. |
+| `handlePhaseError` | `(options: HandlePhaseErrorHookOptions) => any \| Promise<any>` | No | `console.log` | Hook called when a phase encounters an error. |
+| `workflowHookParams` | `WorkflowHookParams` | No | `{}` | Custom parameters passed to workflow-level hooks. |
+| **All `API_GATEWAY_OPTIONS`** | - | No | - | All options from `stableApiGateway` (common config for all phases). |
+
+#### Returns
+
+**`Promise<STABLE_WORKFLOW_RESULT<ResponseDataType>>`**
+
+Same structure as `stableWorkflow` result. See [STABLE_WORKFLOW_RESULT](#stable_workflow_result).
+
+**Additional Graph-Specific Information:**
+- `executionHistory`: Shows the actual path taken through the graph (which nodes were executed)
+- `completedPhases`: Number of phase nodes executed
+- `totalPhases`: Total number of phase nodes in the graph (not all may be executed depending on routing)
+
+#### Building Graphs with WorkflowGraphBuilder
+
+The `WorkflowGraphBuilder` class provides a fluent API for constructing workflow graphs:
+
+```typescript
+import { WorkflowGraphBuilder, WorkflowEdgeConditionTypes } from '@emmvish/stable-request';
+
+const builder = new WorkflowGraphBuilder();
+
+// Add phase node
+builder.addPhase(nodeId: string, config: PhaseConfig)
+
+// Add conditional node
+builder.addConditional(
+  nodeId: string,
+  evaluate: (context: ConditionalEvaluationContext) => string | Promise<string>
+)
+
+// Add parallel group
+builder.addParallelGroup(nodeId: string, phaseNodeIds: string[])
+
+// Add merge point
+builder.addMergePoint(nodeId: string, waitForNodeIds: string[])
+
+// Connect nodes
+builder.connect(fromNodeId: string, toNodeId: string, options?: {
+  condition?: EdgeCondition;
+  weight?: number;
+  label?: string;
+  metadata?: Record<string, any>;
+})
+
+// Set entry point
+builder.setEntryPoint(nodeId: string)
+
+// Set exit points (optional - auto-detected if not specified)
+builder.addExitPoint(nodeId: string)
+
+// Enable/disable DAG enforcement (default: true)
+builder.setEnforceDAG(enforce: boolean)
+
+// Build the graph
+const graph = builder.build();
+```
+
+**Conditional Node Context:**
+```typescript
+interface ConditionalEvaluationContext<ResponseDataType = any> {
+  results: Map<string, STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>>;
+  sharedBuffer?: Record<string, any>;
+  executionHistory: PhaseExecutionRecord[];
+}
+```
+
+The conditional's `evaluate` function must return the ID of the next node to execute.
+
+**DAG Validation:**
+
+By default, the builder enforces DAG (Directed Acyclic Graph) constraints:
+- **Prevents cycles**: Detects and rejects graphs with circular dependencies
+- **Ensures termination**: Guarantees workflow can complete without infinite loops
+- **Error reporting**: Provides detailed cycle information if detected
+
+Disable with `builder.setEnforceDAG(false)` if you need cyclic workflows (use with caution).
+
+#### Graph Validation
+
+Validate graph structure before execution:
+
+```typescript
+import { validateWorkflowGraph } from '@emmvish/stable-request';
+
+const validation = validateWorkflowGraph(graph);
+
+if (!validation.valid) {
+  console.error('Graph validation failed:');
+  validation.errors.forEach(error => console.error(error));
+}
+
+if (validation.warnings.length > 0) {
+  console.warn('Graph validation warnings:');
+  validation.warnings.forEach(warning => console.warn(warning));
+}
+
+console.log('Validation result:', {
+  valid: validation.valid,
+  errors: validation.errors,
+  warnings: validation.warnings,
+  cycles: validation.cycles,
+  unreachableNodes: validation.unreachableNodes,
+  orphanNodes: validation.orphanNodes
+});
+```
+
+**Validation Checks:**
+- **Cycles**: Detects circular dependencies (reported as errors if DAG enforcement enabled)
+- **Unreachable nodes**: Nodes that cannot be reached from entry point
+- **Orphan nodes**: Nodes with no incoming or outgoing edges
+- **Missing entry point**: Graph must have an entry point
+- **Invalid references**: Edge references to non-existent nodes
+
+#### Example
+
+```typescript
+import { 
+  stableWorkflowGraph, 
+  WorkflowGraphBuilder,
+  WorkflowEdgeConditionTypes,
+  REQUEST_METHODS,
+  validateWorkflowGraph
+} from '@emmvish/stable-request';
+
+// Build the workflow graph
+const graph = new WorkflowGraphBuilder()
+  // Add order validation phase
+  .addPhase('validate-order', {
+    requests: [{
+      id: 'validate',
+      requestOptions: {
+        reqData: {
+          hostname: 'api.example.com',
+          path: '/orders/validate',
+          method: REQUEST_METHODS.POST
+        },
+        resReq: true,
+        attempts: 3,
+        logAllSuccessfulAttempts: true,
+        handleSuccessfulAttemptData: async ({ commonBuffer }) => {
+          commonBuffer!.orderValid = true;
+        }
+      }
+    }]
+  })
+  
+  // Add conditional routing based on validation
+  .addConditional('validation-check', async ({ sharedBuffer }) => {
+    return sharedBuffer?.orderValid ? 'parallel-processing' : 'reject-order';
+  })
+  
+  // Add parallel group for inventory and payment
+  .addParallelGroup('parallel-processing', ['check-inventory', 'process-payment'])
+  
+  .addPhase('check-inventory', {
+    requests: [{
+      id: 'inventory',
+      requestOptions: {
+        reqData: { path: '/inventory/check' },
+        resReq: true,
+        attempts: 3,
+        handleSuccessfulAttemptData: async ({ commonBuffer }) => {
+          commonBuffer!.inventoryAvailable = true;
+        }
+      }
+    }]
+  })
+  
+  .addPhase('process-payment', {
+    requests: [{
+      id: 'payment',
+      requestOptions: {
+        reqData: { path: '/payment/process' },
+        resReq: true,
+        attempts: 3,
+        handleSuccessfulAttemptData: async ({ commonBuffer }) => {
+          commonBuffer!.paymentSuccess = true;
+        }
+      }
+    }]
+  })
+  
+  // Merge point to wait for both parallel paths
+  .addMergePoint('processing-complete', ['check-inventory', 'process-payment'])
+  
+  // Conditional to check both succeeded
+  .addConditional('fulfillment-check', async ({ sharedBuffer }) => {
+    const inventory = sharedBuffer?.inventoryAvailable;
+    const payment = sharedBuffer?.paymentSuccess;
+    return (inventory && payment) ? 'fulfill-order' : 'cancel-order';
+  })
+  
+  .addPhase('fulfill-order', {
+    requests: [{
+      id: 'fulfill',
+      requestOptions: {
+        reqData: { path: '/orders/fulfill', method: REQUEST_METHODS.POST },
+        resReq: true
+      }
+    }]
+  })
+  
+  .addPhase('cancel-order', {
+    requests: [{
+      id: 'cancel',
+      requestOptions: {
+        reqData: { path: '/orders/cancel', method: REQUEST_METHODS.POST },
+        resReq: true
+      }
+    }]
+  })
+  
+  .addPhase('reject-order', {
+    requests: [{
+      id: 'reject',
+      requestOptions: {
+        reqData: { path: '/orders/reject', method: REQUEST_METHODS.POST },
+        resReq: true
+      }
+    }]
+  })
+  
+  // Connect all nodes with appropriate edge conditions
+  .connect('validate-order', 'validation-check', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('validation-check', 'parallel-processing', { condition: { type: WorkflowEdgeConditionTypes.SUCCESS } })
+  .connect('validation-check', 'reject-order', { condition: { type: WorkflowEdgeConditionTypes.FAILURE } })
+  .connect('parallel-processing', 'check-inventory', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('parallel-processing', 'process-payment', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('check-inventory', 'processing-complete', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('process-payment', 'processing-complete', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('processing-complete', 'fulfillment-check', { condition: { type: WorkflowEdgeConditionTypes.ALWAYS } })
+  .connect('fulfillment-check', 'fulfill-order', { condition: { type: WorkflowEdgeConditionTypes.SUCCESS } })
+  .connect('fulfillment-check', 'cancel-order', { condition: { type: WorkflowEdgeConditionTypes.FAILURE } })
+  
+  .setEntryPoint('validate-order')
+  .build();
+
+// Validate the graph
+const validation = validateWorkflowGraph(graph);
+if (!validation.valid) {
+  throw new Error(`Invalid graph: ${validation.errors.join(', ')}`);
+}
+
+// Execute the workflow graph
+const result = await stableWorkflowGraph(graph, {
+  workflowId: 'order-processing-graph',
+  sharedBuffer: { orderId: 'ORD-123' },
+  validateGraph: true,
+  logPhaseResults: true,
+  commonRequestData: {
+    hostname: 'api.example.com',
+    headers: { 'Authorization': 'Bearer token123' }
+  }
+});
+
+console.log('Graph workflow result:', {
+  success: result.success,
+  completedPhases: result.completedPhases,
+  totalPhases: result.totalPhases,
+  executionPath: result.executionHistory.map(h => h.phaseId),
+  totalRequests: result.totalRequests,
+  successfulRequests: result.successfulRequests
+});
+```
+
+**When to Use Graph Workflows vs Array Workflows:**
+
+**Use `stableWorkflowGraph` when:**
+- Complex dependency management between phases
+- Conditional branching based on runtime state
+- Need explicit visualization of workflow structure
+- Multiple paths through workflow (success/failure/custom routes)
+- Parallel execution with precise synchronization points
+- DAG guarantees to prevent infinite loops
+- Building workflows programmatically from external definitions
 
 ---
 

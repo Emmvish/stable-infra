@@ -23,7 +23,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
         logPhaseResults = false,
         handlePhaseCompletion = ({ workflowId, phaseResult, maxSerializableChars = 1000 }) =>
             console.info(
-                'stable-request:\n',
+                `${formatLogContext({ workflowId })}stable-request:\n`,
                 'Workflow ID:\n',
                 workflowId,
                 '\nPhase result:\n',
@@ -31,17 +31,17 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
             ),
         handlePhaseError = ({ workflowId, error, phaseResult, maxSerializableChars = 1000 }) =>
             console.error(
-                'stable-request:\n',
+                `${formatLogContext({ workflowId })}stable-request:\n`,
                 'Workflow ID:\n',
                 workflowId,
                 '\nError:\n',
                 safelyStringify({ error, phaseResult }, maxSerializableChars)
             ),
-        handlePhaseDecision = (options: any) => {},
+        handlePhaseDecision = (options) => {},
         handleBranchCompletion = ({ success, branchId, workflowId, maxSerializableChars }: any) => console.info(
-            `stable-request: [Workflow: ${workflowId}] Branch ${branchId} completed with status: ${success ? 'SUCCESS' : 'FAILURE'}`
+            `${formatLogContext({ workflowId, branchId })}stable-request: Branch ${branchId} completed with status: ${success ? 'SUCCESS' : 'FAILURE'}`
         ),
-        handleBranchDecision = (decision: any, branchResult: any, maxSerializableChars?: number) => {},
+        handleBranchDecision = (decision, branchResult, maxSerializableChars?) => {},
         maxSerializableChars = 1000,
         requestGroups = [],
         workflowHookParams = {},
@@ -73,7 +73,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
         if (enableBranchExecution && branches && branches.length > 0) {
             if (logPhaseResults) {
                 console.info(
-                    `\nstable-request: [Workflow: ${workflowId}] Starting branch-based workflow execution with ${branches.length} branches`
+                    `${formatLogContext({ workflowId })}stable-request: Starting branch-based workflow execution with ${branches.length} branches`
                 );
             }
 
@@ -134,7 +134,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
         if (enableNonLinearExecution) {
             if (logPhaseResults) {
                 console.info(
-                    `\nstable-request: [Workflow: ${workflowId}] Starting non-linear workflow execution with ${phases.length} phases`
+                    `${formatLogContext({ workflowId })}stable-request: Starting non-linear workflow execution with ${phases.length} phases`
                 );
             }
 
@@ -186,7 +186,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
 
             if (logPhaseResults) {
                 console.info(
-                    `\nstable-request: [Workflow: ${workflowId}] Non-linear workflow completed:`,
+                    `${formatLogContext({ workflowId })}stable-request: Non-linear workflow completed:`,
                     `${successfulRequests}/${totalRequests} requests successful`,
                     `across ${phaseResults.length} phase executions`,
                     `(${workflowExecutionTime}ms)`
@@ -194,7 +194,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
 
                 if (nonLinearResult.terminatedEarly) {
                     console.info(
-                        `stable-request: [Workflow: ${workflowId}] Workflow terminated early: ${nonLinearResult.terminationReason}`
+                        `${formatLogContext({ workflowId })}stable-request: Workflow terminated early: ${nonLinearResult.terminationReason}`
                     );
                 }
             }
@@ -229,7 +229,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
             if (logPhaseResults) {
                 console.error(
                     `${formatLogContext({ workflowId, phaseId })}stable-request: Phase ${phaseId} failed:`,
-                    error
+                    error.message
                 );
             }
 
@@ -249,7 +249,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 );
             } catch (hookError) {
                 console.error(
-                    `stable-request: [Workflow: ${workflowId}] Error in handlePhaseError hook:`,
+                    `${formatLogContext({ workflowId })}stable-request: Error in handlePhaseError hook:`,
                     hookError
                 );
             }
@@ -277,7 +277,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                             phase.id || `phase-${index + 1}`
                         ).join(', ');
                         console.info(
-                            `\nstable-request: [Workflow: ${workflowId}] Executing concurrent group: [${phaseIds}]`
+                            `${formatLogContext({ workflowId })}stable-request: Executing concurrent group: [${phaseIds}]`
                         );
                     }
 
@@ -315,7 +315,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                     if (stopOnFirstPhaseError && failedRequests > 0) {
                         if (logPhaseResults) {
                             console.error(
-                                `stable-request: [Workflow: ${workflowId}] Stopping workflow due to phase failure in concurrent group`
+                                `${formatLogContext({ workflowId })}stable-request: Stopping workflow due to phase failure in concurrent group`
                             );
                         }
                         break;
@@ -325,7 +325,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 } else {
                     if (logPhaseResults) {
                         console.info(
-                            `\nstable-request: [Workflow: ${workflowId}] Starting Phase ${i + 1}/${phases.length}: ${currentPhaseId}`
+                            `${formatLogContext({ workflowId, phaseId: currentPhaseId })}stable-request: Starting Phase ${i + 1}/${phases.length}: ${currentPhaseId}`
                         );
                     }
 
@@ -348,7 +348,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                         if (phaseResult.failedRequests > 0 && stopOnFirstPhaseError) {
                             if (logPhaseResults) {
                                 console.error(
-                                    `stable-request: [Workflow: ${workflowId}] Stopping workflow due to phase failure`
+                                    `${formatLogContext({ workflowId })}stable-request: Stopping workflow due to phase failure`
                                 );
                             }
                             break;
@@ -360,7 +360,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                         if (stopOnFirstPhaseError) {
                             if (logPhaseResults) {
                                 console.error(
-                                    `stable-request: [Workflow: ${workflowId}] Stopping workflow due to phase error`
+                                    `${formatLogContext({ workflowId })}stable-request: Stopping workflow due to phase error`
                                 );
                             }
                             break;
@@ -409,7 +409,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 const phaseId = phase.id || `phase-${i + 1}`;
 
                 if (logPhaseResults) {
-                    console.info(`\nstable-request: [Workflow: ${workflowId}] Starting Phase ${i + 1}/${phases.length}: ${phaseId}`);
+                    console.info(`${formatLogContext({ workflowId, phaseId })}stable-request: Starting Phase ${i + 1}/${phases.length}: ${phaseId}`);
                 }
 
                 try {
@@ -433,7 +433,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                     if (!phaseResult.success && stopOnFirstPhaseError) {
                         if (logPhaseResults) {
                             console.error(
-                                `stable-request: [Workflow: ${workflowId}] Stopping workflow due to phase error`
+                                `${formatLogContext({ workflowId })}stable-request: Stopping workflow due to phase error`
                             );
                         }
                         break;
@@ -445,7 +445,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                     if (stopOnFirstPhaseError) {
                         if (logPhaseResults) {
                             console.error(
-                                `stable-request: [Workflow: ${workflowId}] Stopping workflow due to phase error`
+                                `${formatLogContext({ workflowId })}stable-request: Stopping workflow due to phase error`
                             );
                         }
                         break;
@@ -478,7 +478,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
 
         if (logPhaseResults) {
             console.info(
-                `\nstable-request: [Workflow: ${workflowId}] Completed:`,
+                `${formatLogContext({ workflowId })}stable-request: Completed:`,
                 `${successfulRequests}/${totalRequests} requests successful`,
                 `across ${phaseResults.length}/${phases.length} phases`,
                 `(${workflowExecutionTime}ms)`
@@ -492,7 +492,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
 
         if (logPhaseResults) {
             console.error(
-                `stable-request: [Workflow: ${workflowId}] Fatal error:`,
+                `${formatLogContext({ workflowId })}stable-request: Fatal error:`,
                 workflowError.message
             );
         }

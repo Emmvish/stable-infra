@@ -1,7 +1,8 @@
 export { 
     stableRequest,
     stableApiGateway,
-    stableWorkflow 
+    stableWorkflow,
+    stableWorkflowGraph
 } from './core/index.js';
 
 export {
@@ -11,7 +12,9 @@ export {
     REQUEST_METHODS,
     RESPONSE_ERRORS,
     RETRY_STRATEGIES,
-    VALID_REQUEST_PROTOCOLS
+    VALID_REQUEST_PROTOCOLS,
+    WorkflowEdgeConditionTypes,
+    WorkflowNodeTypes
 } from './enums/index.js';
 
 export type {
@@ -79,7 +82,19 @@ export type {
     CacheDashboardMetrics,
     RateLimiterDashboardMetrics,
     ConcurrencyLimiterDashboardMetrics,
-    SystemMetrics
+    SystemMetrics,
+    WorkflowGraph,
+    WorkflowNode,
+    WorkflowNodeType,
+    WorkflowEdge,
+    EdgeCondition,
+    EdgeEvaluationContext,
+    ConditionalNode,
+    ConditionalEvaluationContext,
+    WorkflowGraphOptions,
+    WorkflowGraphValidationResult,
+    WorkflowGraphExecutionPlan,
+    EdgeConditionType
 } from './types/index.js';
 
 export {
@@ -114,5 +129,13 @@ export {
     reqFn,
     safelyExecuteUnknownFunction,
     safelyStringify,
-    validateTrialModeProbabilities
+    validateTrialModeProbabilities,
+    WorkflowGraphBuilder,
+    createLinearWorkflowGraph,
+    validateWorkflowGraph,
+    detectCycles,
+    detectUnreachableNodes,
+    detectOrphanNodes,
+    calculateGraphDepth,
+    executeWorkflowGraph
 } from './utilities/index.js';
