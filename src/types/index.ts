@@ -1051,6 +1051,9 @@ export interface WorkflowNode<RequestDataType = any, ResponseDataType = any> {
   parallelNodes?: string[];
   waitForNodes?: string[];
   metadata?: Record<string, any>;
+  phaseDecisionHook?: (
+    context: PhaseDecisionHookOptions<ResponseDataType>
+  ) => PhaseExecutionDecision | Promise<PhaseExecutionDecision>;
 }
 
 export interface WorkflowEdge {

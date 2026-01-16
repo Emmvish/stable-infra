@@ -140,96 +140,153 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
     
     const phaseIndex = phaseResults.length;
     const phaseId = node.phase.id || nodeId;
+    let executionNumber = 1;
+    let shouldReplay = false;
     
-    try {
-      let phase = node.phase;
-      if (options.prePhaseExecutionHook) {
-        phase = await executeWithPersistence(
-          options.prePhaseExecutionHook,
-          {
-            phase,
-            phaseId,
-            phaseIndex,
-            workflowId,
-            sharedBuffer,
-            params: options.workflowHookParams?.prePhaseExecutionHookParams
-          },
-          options.statePersistence,
-          { workflowId, phaseId },
-          sharedBuffer
-        );
-      }
-      
-      const phaseResult = await executePhase(
-        phase,
-        phaseIndex,
-        workflowId,
-        options,
-        options.requestGroups || [],
-        options.logPhaseResults || false,
-        options.handlePhaseCompletion || (async () => {}),
-        options.maxSerializableChars || 1000,
-        options.workflowHookParams || {},
-        sharedBuffer,
-        undefined,
-        options.prePhaseExecutionHook
-      );
-      
-      results.set(nodeId, phaseResult);
-      phaseResults.push(phaseResult);
-      
-      totalRequests += phaseResult.totalRequests;
-      successfulRequests += phaseResult.successfulRequests;
-      failedRequests += phaseResult.failedRequests;
-      
-      executionHistory.push({
-        phaseId,
-        phaseIndex,
-        executionNumber: 1,
-        timestamp: phaseResult.timestamp,
-        success: phaseResult.success,
-        executionTime: phaseResult.executionTime
-      });
-      
-      if (options.logPhaseResults) {
-        const logContext = formatLogContext({
+    do {
+      try {
+        let phase = node.phase;
+        if (options.prePhaseExecutionHook) {
+          phase = await executeWithPersistence(
+            options.prePhaseExecutionHook,
+            {
+              phase,
+              phaseId,
+              phaseIndex,
+              workflowId,
+              sharedBuffer,
+              params: options.workflowHookParams?.prePhaseExecutionHookParams
+            },
+            options.statePersistence,
+            { workflowId, phaseId },
+            sharedBuffer
+          );
+        }
+        
+        const phaseResult = await executePhase(
+          phase,
+          phaseIndex,
           workflowId,
-          phaseId
-        });
-        console.info(`${logContext}stable-request: Phase completed - Success: ${phaseResult.success}, Requests: ${phaseResult.totalRequests}`);
-        console.info(`${logContext}stable-request: ${safelyStringify(phaseResult, options.maxSerializableChars || 1000)}`);
-      }
+          options,
+          options.requestGroups || [],
+          options.logPhaseResults || false,
+          options.handlePhaseCompletion || (async () => {}),
+          options.maxSerializableChars || 1000,
+          options.workflowHookParams || {},
+          sharedBuffer,
+          undefined,
+          options.prePhaseExecutionHook
+        );
+        
+        results.set(nodeId, phaseResult);
+        phaseResults.push(phaseResult);
+        
+        totalRequests += phaseResult.totalRequests;
+        successfulRequests += phaseResult.successfulRequests;
+        failedRequests += phaseResult.failedRequests;
+        
+        const executionRecord: PhaseExecutionRecord = {
+          phaseId,
+          phaseIndex,
+          executionNumber,
+          timestamp: phaseResult.timestamp,
+          success: phaseResult.success,
+          executionTime: phaseResult.executionTime
+        };
+        
+        shouldReplay = false;
+        if (node.phaseDecisionHook) {
+          const decision = await executeWithPersistence(
+            node.phaseDecisionHook,
+            {
+              workflowId,
+              phaseResult,
+              phaseId,
+              phaseIndex,
+              executionHistory,
+              sharedBuffer,
+              params: options.workflowHookParams?.handlePhaseDecisionParams
+            },
+            options.statePersistence,
+            { workflowId, phaseId },
+            sharedBuffer
+          );
+          
+          executionRecord.decision = decision;
+          
+          if (decision.action === 'replay') {
+            shouldReplay = true;
+            executionNumber++;
+            
+            if (options.logPhaseResults) {
+              console.info(`${formatLogContext({ workflowId, phaseId })}stable-request: Phase decision - REPLAY (execution ${executionNumber})`);
+            }
+          } else if (decision.action === 'terminate') {
+            terminatedEarly = true;
+            terminationReason = decision.reason || 'Phase decision hook requested termination';
+            
+            if (options.logPhaseResults) {
+              console.info(`${formatLogContext({ workflowId, phaseId })}stable-request: Phase decision - TERMINATE: ${terminationReason}`);
+            }
+          }
+        }
+        
+        executionHistory.push(executionRecord);
+        
+        if (options.logPhaseResults) {
+          const logContext = formatLogContext({
+            workflowId,
+            phaseId
+          });
+          console.info(`${logContext}stable-request: Phase completed - Success: ${phaseResult.success}, Requests: ${phaseResult.totalRequests}`);
+          console.info(`${logContext}stable-request: ${safelyStringify(phaseResult, options.maxSerializableChars || 1000)}`);
+        }
+        
+        if (options.handlePhaseCompletion) {
+          await executeWithPersistence(
+            options.handlePhaseCompletion,
+            {
+              phaseResult,
+              phaseId,
+              phaseIndex,
+              workflowId,
+              sharedBuffer,
+              params: options.workflowHookParams?.handlePhaseCompletionParams
+            },
+            options.statePersistence,
+            { workflowId, phaseId },
+            sharedBuffer
+          );
+        }
       
-      if (!phaseResult.success && options.stopOnFirstPhaseError) {
+        if (!phaseResult.success && options.stopOnFirstPhaseError) {
+          terminatedEarly = true;
+          terminationReason = `Phase '${phaseId}' failed`;
+          shouldReplay = false;
+        }
+      } catch (error: any) {
+        const errorResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType> = {
+          workflowId,
+          phaseId,
+          phaseIndex,
+          success: false,
+          executionTime: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          totalRequests: 0,
+          successfulRequests: 0,
+          failedRequests: 0,
+          responses: [],
+          error: error.message || 'Unknown error'
+        };
+        
+        results.set(nodeId, errorResult);
+        phaseResults.push(errorResult);
+        
         terminatedEarly = true;
-        terminationReason = `Phase '${phaseId}' failed`;
-        return;
+        terminationReason = error.message || `${formatLogContext({ workflowId })}stable-request: Unknown error during execution`;
+        shouldReplay = false;
       }
-      
-    } catch (error: any) {
-      const errorResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType> = {
-        workflowId,
-        phaseId,
-        phaseIndex,
-        success: false,
-        executionTime: Date.now() - startTime,
-        timestamp: new Date().toISOString(),
-        totalRequests: 0,
-        successfulRequests: 0,
-        failedRequests: 0,
-        responses: [],
-        error: error.message || 'Unknown error'
-      };
-      
-      results.set(nodeId, errorResult);
-      phaseResults.push(errorResult);
-      
-      if (options.stopOnFirstPhaseError) {
-        terminatedEarly = true;
-        terminationReason = `${formatLogContext({ workflowId, phaseId })}Phase '${phaseId}' threw error: ${error.message}`;
-        throw error;
-      }
-    }
+    } while (shouldReplay && !terminatedEarly);
   };
   
   const executeBranchNode = async (node: WorkflowNode<RequestDataType, ResponseDataType>, nodeId: string): Promise<void> => {

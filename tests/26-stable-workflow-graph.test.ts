@@ -6,7 +6,10 @@ import {
   validateWorkflowGraph,
   detectCycles,
   REQUEST_METHODS,
-  WorkflowEdgeConditionTypes
+  WorkflowEdgeConditionTypes,
+  PHASE_DECISION_ACTIONS,
+  PhaseDecisionHookOptions, 
+  PhaseExecutionDecision
 } from '../src/index.js';
 
 describe('stableWorkflowGraph - Graph-Based Workflows', () => {
@@ -1435,5 +1438,363 @@ describe('stableWorkflowGraph - Graph-Based Workflows', () => {
       expect(result.success).toBe(true);
       expect(result.totalRequests).toBe(2);
     });
+  });
+});
+
+describe('Workflow Graph - Phase Decision Hook with Replay', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should replay a phase when phaseDecisionHook returns REPLAY action', async () => {
+    let executionCount = 0;
+    const sharedBuffer: Record<string, any> = { attempts: [] };
+
+    const testFunction = async (): Promise<string> => {
+      executionCount++;
+      sharedBuffer.attempts.push(executionCount);
+      return `Execution ${executionCount}`;
+    };
+
+    const graph = new WorkflowGraphBuilder()
+      .addPhase('test-phase', {
+        functions: [{
+          id: 'test-fn',
+          functionOptions: {
+            fn: testFunction,
+            args: []
+          }
+        }]
+      })
+      .setEntryPoint('test-phase')
+      .build();
+
+    // Add phaseDecisionHook to the phase node
+    const phaseNode = graph.nodes.get('test-phase')!;
+    phaseNode.phaseDecisionHook = async ({ phaseResult, sharedBuffer }: PhaseDecisionHookOptions): Promise<PhaseExecutionDecision> => {
+      // Replay if less than 3 executions
+      if (sharedBuffer!.attempts.length < 3) {
+        return {
+          action: PHASE_DECISION_ACTIONS.REPLAY
+        };
+      }
+      return {
+        action: PHASE_DECISION_ACTIONS.CONTINUE
+      };
+    };
+
+    const result = await stableWorkflowGraph(graph, {
+      workflowId: 'replay-test',
+      sharedBuffer
+    });
+
+    expect(result.success).toBe(true);
+    expect(executionCount).toBe(3);
+    expect(sharedBuffer.attempts).toEqual([1, 2, 3]);
+    expect(result.executionHistory.filter(h => h.phaseId === 'test-phase')).toHaveLength(3);
+  });
+
+  it('should stop replaying when CONTINUE is returned', async () => {
+    let executionCount = 0;
+
+    const testFunction = async (): Promise<number> => {
+      executionCount++;
+      return executionCount;
+    };
+
+    const graph = new WorkflowGraphBuilder()
+      .addPhase('replay-phase', {
+        functions: [{
+          id: 'counter-fn',
+          functionOptions: {
+            fn: testFunction,
+            args: []
+          }
+        }]
+      })
+      .setEntryPoint('replay-phase')
+      .build();
+
+    const phaseNode = graph.nodes.get('replay-phase')!;
+    phaseNode.phaseDecisionHook = async () => {
+      // Only replay once
+      if (executionCount === 1) {
+        return { action: PHASE_DECISION_ACTIONS.REPLAY };
+      }
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    };
+
+    const result = await stableWorkflowGraph(graph, {
+      workflowId: 'stop-replay-test'
+    });
+
+    expect(result.success).toBe(true);
+    expect(executionCount).toBe(2);
+  });
+
+  it('should terminate workflow when phaseDecisionHook returns TERMINATE', async () => {
+    let phase1Count = 0;
+    let phase2Count = 0;
+
+    const graph = new WorkflowGraphBuilder()
+      .addPhase('phase-1', {
+        functions: [{
+          id: 'fn-1',
+          functionOptions: {
+            fn: async () => { phase1Count++; return 'done'; },
+            args: []
+          }
+        }]
+      })
+      .addPhase('phase-2', {
+        functions: [{
+          id: 'fn-2',
+          functionOptions: {
+            fn: async () => { phase2Count++; return 'done'; },
+            args: []
+          }
+        }]
+      })
+      .connectSequence('phase-1', 'phase-2')
+      .setEntryPoint('phase-1')
+      .build();
+
+    const phaseNode = graph.nodes.get('phase-1')!;
+    phaseNode.phaseDecisionHook = async () => {
+      return {
+        action: PHASE_DECISION_ACTIONS.TERMINATE,
+        reason: 'Testing termination'
+      };
+    };
+
+    const result = await stableWorkflowGraph(graph, {
+      workflowId: 'terminate-test'
+    });
+
+    expect(result.terminatedEarly).toBe(true);
+    expect(result.terminationReason).toContain('Testing termination');
+    expect(phase1Count).toBe(1);
+    expect(phase2Count).toBe(0); // Phase 2 should not execute
+  });
+
+  it('should access phaseResult in phaseDecisionHook', async () => {
+    let hookCalled = false;
+    let capturedPhaseResult: any = null;
+
+    const graph = new WorkflowGraphBuilder()
+      .addPhase('data-phase', {
+        functions: [{
+          id: 'data-fn',
+          functionOptions: {
+            fn: async () => ({ value: 42 }),
+            args: []
+          }
+        }]
+      })
+      .setEntryPoint('data-phase')
+      .build();
+
+    const phaseNode = graph.nodes.get('data-phase')!;
+    phaseNode.phaseDecisionHook = async ({ phaseResult }: PhaseDecisionHookOptions): Promise<PhaseExecutionDecision> => {
+      hookCalled = true;
+      capturedPhaseResult = phaseResult;
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    };
+
+    const result = await stableWorkflowGraph(graph, {
+      workflowId: 'access-result-test'
+    });
+
+    expect(result.success).toBe(true);
+    expect(hookCalled).toBe(true);
+    expect(capturedPhaseResult).toBeDefined();
+    expect(capturedPhaseResult.success).toBe(true);
+    expect(capturedPhaseResult.phaseId).toBe('data-phase');
+  });
+
+  it('should track execution numbers correctly during replay', async () => {
+    const executionRecords: number[] = [];
+
+    const graph = new WorkflowGraphBuilder()
+      .addPhase('tracked-phase', {
+        functions: [{
+          id: 'tracker-fn',
+          functionOptions: {
+            fn: async () => 'result',
+            args: []
+          }
+        }]
+      })
+      .setEntryPoint('tracked-phase')
+      .build();
+
+    const phaseNode = graph.nodes.get('tracked-phase')!;
+    phaseNode.phaseDecisionHook = async () => {
+      executionRecords.push(executionRecords.length + 1);
+      if (executionRecords.length < 4) {
+        return { action: PHASE_DECISION_ACTIONS.REPLAY };
+      }
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    };
+
+    const result = await stableWorkflowGraph(graph, {
+      workflowId: 'tracking-test'
+    });
+
+    expect(result.success).toBe(true);
+    const phaseExecutions = result.executionHistory.filter(h => h.phaseId === 'tracked-phase');
+    expect(phaseExecutions).toHaveLength(4);
+    expect(phaseExecutions[0].executionNumber).toBe(1);
+    expect(phaseExecutions[1].executionNumber).toBe(2);
+    expect(phaseExecutions[2].executionNumber).toBe(3);
+    expect(phaseExecutions[3].executionNumber).toBe(4);
+  });
+
+  it('should work with shared buffer updates during replay', async () => {
+    const sharedBuffer: Record<string, any> = { counter: 0, values: [] };
+
+    const incrementFunction = async (): Promise<number> => {
+      sharedBuffer.counter++;
+      sharedBuffer.values.push(sharedBuffer.counter * 10);
+      return sharedBuffer.counter;
+    };
+
+    const graph = new WorkflowGraphBuilder()
+      .addPhase('buffer-phase', {
+        functions: [{
+          id: 'increment-fn',
+          functionOptions: {
+            fn: incrementFunction,
+            args: []
+          }
+        }]
+      })
+      .setEntryPoint('buffer-phase')
+      .build();
+
+    const phaseNode = graph.nodes.get('buffer-phase')!;
+    phaseNode.phaseDecisionHook = async ({ sharedBuffer }: PhaseDecisionHookOptions): Promise<PhaseExecutionDecision> => {
+      if (sharedBuffer!.counter < 5) {
+        return { action: PHASE_DECISION_ACTIONS.REPLAY };
+      }
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    };
+
+    const result = await stableWorkflowGraph(graph, {
+      workflowId: 'buffer-replay-test',
+      sharedBuffer
+    });
+
+    expect(result.success).toBe(true);
+    expect(sharedBuffer.counter).toBe(5);
+    expect(sharedBuffer.values).toEqual([10, 20, 30, 40, 50]);
+  });
+
+  it('should handle replay with conditional success criteria', async () => {
+    let attempts = 0;
+    const sharedBuffer: Record<string, any> = {};
+
+    const mayFailFunction = async (): Promise<string> => {
+      attempts++;
+      if (attempts < 3) {
+        throw new Error(`Attempt ${attempts} failed`);
+      }
+      return 'Success';
+    };
+
+    const graph = new WorkflowGraphBuilder()
+      .addPhase('retry-phase', {
+        functions: [{
+          id: 'may-fail-fn',
+          functionOptions: {
+            fn: mayFailFunction,
+            args: [],
+            attempts: 1 // No internal retry
+          }
+        }]
+      })
+      .setEntryPoint('retry-phase')
+      .build();
+
+    const phaseNode = graph.nodes.get('retry-phase')!;
+    phaseNode.phaseDecisionHook = async ({ phaseResult }: PhaseDecisionHookOptions): Promise<PhaseExecutionDecision> => {
+      // Replay if phase failed
+      if (!phaseResult.success) {
+        return { action: PHASE_DECISION_ACTIONS.REPLAY };
+      }
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    };
+
+    const result = await stableWorkflowGraph(graph, {
+      workflowId: 'conditional-retry-test',
+      sharedBuffer
+    });
+
+    // The workflow reports failure because failed requests are counted even though replay eventually succeeds
+    // This is expected behavior - failedRequests accumulates across all attempts
+    expect(attempts).toBe(3);
+    expect(result.failedRequests).toBe(2); // First 2 attempts failed
+    expect(result.successfulRequests).toBe(1); // Last attempt succeeded
+    
+    // The final phase execution was successful
+    const lastPhaseResult = result.phases[result.phases.length - 1];
+    expect(lastPhaseResult.success).toBe(true);
+  });
+
+  it('should work in multi-phase workflow with selective replay', async () => {
+    let phase1Count = 0;
+    let phase2Count = 0;
+    let phase3Count = 0;
+
+    const graph = new WorkflowGraphBuilder()
+      .addPhase('phase-1', {
+        functions: [{
+          id: 'fn-1',
+          functionOptions: {
+            fn: async () => { phase1Count++; return 'phase-1-done'; },
+            args: []
+          }
+        }]
+      })
+      .addPhase('phase-2', {
+        functions: [{
+          id: 'fn-2',
+          functionOptions: {
+            fn: async () => { phase2Count++; return 'phase-2-done'; },
+            args: []
+          }
+        }]
+      })
+      .addPhase('phase-3', {
+        functions: [{
+          id: 'fn-3',
+          functionOptions: {
+            fn: async () => { phase3Count++; return 'phase-3-done'; },
+            args: []
+          }
+        }]
+      })
+      .connectSequence('phase-1', 'phase-2')
+      .connectSequence('phase-2', 'phase-3')
+      .setEntryPoint('phase-1')
+      .build();
+
+    // Only phase-2 should replay
+    const phase2Node = graph.nodes.get('phase-2')!;
+    phase2Node.phaseDecisionHook = async () => {
+      if (phase2Count < 2) {
+        return { action: PHASE_DECISION_ACTIONS.REPLAY };
+      }
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    };
+
+    const result = await stableWorkflowGraph(graph, {
+      workflowId: 'multi-phase-replay-test'
+    });
+
+    expect(result.success).toBe(true);
+    expect(phase1Count).toBe(1); // Executes once
+    expect(phase2Count).toBe(2); // Replays once
+    expect(phase3Count).toBe(1); // Executes once
   });
 });
