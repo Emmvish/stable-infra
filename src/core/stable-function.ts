@@ -186,7 +186,7 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
           const canExecute = await circuitBreakerInstance.canExecute();
           if (!canExecute) {
             throw new CircuitBreakerOpenError(
-              `stable-request: Circuit breaker is ${circuitBreakerInstance.getState().state}. Function execution blocked at attempt ${currentAttempt}.`
+              `${formatLogContext(executionContext)}stable-request: Circuit breaker is ${circuitBreakerInstance.getState().state}. Function execution blocked at attempt ${currentAttempt}.`
             );
           }
         }
@@ -225,7 +225,7 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
           circuitBreakerInstance.recordAttemptFailure();
           if (circuitBreakerInstance.getState().state === CircuitBreakerState.OPEN) {
             throw new CircuitBreakerOpenError(
-              `stable-request: Circuit breaker opened after attempt ${currentAttempt}. No further retries.`
+              `${formatLogContext(executionContext)}stable-request: Circuit breaker opened after attempt ${currentAttempt}. No further retries.`
             );
           }
         }
@@ -277,7 +277,7 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
           circuitBreakerInstance.recordAttemptFailure();
           if (circuitBreakerInstance.getState().state === CircuitBreakerState.OPEN) {
             throw new CircuitBreakerOpenError(
-              `stable-request: Circuit breaker opened after attempt ${currentAttempt}/${maxAttempts}. Blocking further retries.`
+              `${formatLogContext(executionContext)}stable-request: Circuit breaker opened after attempt ${currentAttempt}/${maxAttempts}. Blocking further retries.`
             );
           }
         }
