@@ -203,7 +203,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
               );
             } catch (hookError) {
               console.error(
-                `stable-request: [Workflow: ${workflowId}] Error in handlePhaseDecision hook:`,
+                `${formatLogContext({ workflowId, branchId })}stable-request: [Workflow: ${workflowId}] Error in handlePhaseDecision hook:`,
                 hookError
               );
             }
@@ -436,7 +436,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
               );
             } catch (hookError) {
               console.error(
-                `stable-request: [Workflow: ${workflowId}] Error in handlePhaseDecision hook:`,
+                `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: [Workflow: ${workflowId}] Error in handlePhaseDecision hook:`,
                 hookError
               );
             }
@@ -487,7 +487,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
       if (phaseResult.failedRequests > 0 && stopOnFirstPhaseError) {
         if (logPhaseResults) {
           console.error(
-            `stable-request: [Workflow: ${workflowId}] Phase '${phaseId}' has failures. Stopping workflow due to stopOnFirstPhaseError.`
+            `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: [Workflow: ${workflowId}] Phase '${phaseId}' has failures. Stopping workflow due to stopOnFirstPhaseError.`
           );
         }
         terminatedEarly = true;

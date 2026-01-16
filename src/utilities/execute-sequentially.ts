@@ -1,16 +1,15 @@
-import { stableRequest } from "../core/index.js";
-import { prepareApiRequestData } from "./prepare-api-request-data.js";
-import { prepareApiRequestOptions } from './prepare-api-request-options.js';
+import { executeGatewayItem } from "./execute-gateway-item.js";
+import { RequestOrFunction } from "../enums/index.js";
 import {
     API_GATEWAY_REQUEST,
+    API_GATEWAY_ITEM,
     API_GATEWAY_RESPONSE,
-    STABLE_REQUEST_RESULT,
     SEQUENTIAL_REQUEST_EXECUTION_OPTIONS 
 } from '../types/index.js';
 import { CircuitBreaker, CircuitBreakerOpenError } from "./circuit-breaker.js";
 
 export async function executeSequentially<RequestDataType = any, ResponseDataType = any>(
-    requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] = [],
+    items: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] | API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[] = [],
     requestExecutionOptions: SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType> = {}
 ): Promise<API_GATEWAY_RESPONSE<ResponseDataType>[]> {
     const responses: API_GATEWAY_RESPONSE<ResponseDataType>[] = [];
@@ -21,62 +20,41 @@ export async function executeSequentially<RequestDataType = any, ResponseDataTyp
             : new CircuitBreaker(requestExecutionOptions.circuitBreaker as any))
         : null;
     
-    for (let i = 0; i < requests.length; i++) {
-        const req = requests[i];
+    // Convert to unified format if needed
+    const unifiedItems: API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[] = items.map(item => {
+        if ('type' in item) {
+            return item as API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>;
+        } else {
+            return {
+                type: RequestOrFunction.REQUEST,
+                request: item as API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>
+            };
+        }
+    });
+    
+    for (let i = 0; i < unifiedItems.length; i++) {
+        const item = unifiedItems[i];
         
         try {
-            if (circuitBreaker && !circuitBreaker.getState().config.trackIndividualAttempts) {
-                const canExecute = await circuitBreaker.canExecute();
-                if (!canExecute) {
-                    throw new CircuitBreakerOpenError(
-                        `stable-request: Circuit breaker is ${circuitBreaker.getState().state}. Request blocked.`
-                    );
-                }
+            const response = await executeGatewayItem(item, requestExecutionOptions, circuitBreaker);
+            responses.push(response);
+            
+            if (!response.success && requestExecutionOptions.stopOnFirstError) {
+                break;
             }
-
-            const finalRequestOptions = { 
-                reqData: prepareApiRequestData<RequestDataType, ResponseDataType>(req, requestExecutionOptions),
-                ...prepareApiRequestOptions<RequestDataType, ResponseDataType>(req, requestExecutionOptions),
-                commonBuffer: requestExecutionOptions.sharedBuffer ?? req.requestOptions.commonBuffer,
-                ...(circuitBreaker ? { circuitBreaker } : {}),
-                executionContext: {
-                    ...requestExecutionOptions.executionContext,
-                    requestId: req.id
-                }
-            };
-            
-            const requestResult = await stableRequest<RequestDataType, ResponseDataType>(finalRequestOptions);
-            
-            if (circuitBreaker && !circuitBreaker.getState().config.trackIndividualAttempts) {
-                circuitBreaker.recordSuccess();
-            }
-            
-            responses.push({
-                requestId: req.id,
-                ...(req.groupId && { groupId: req.groupId }),
-                success: requestResult.success,
-                ...(requestResult.data !== undefined && { data: requestResult.data }),
-                ...(!requestResult.success && {
-                    error: requestResult.error || 'Request was unsuccessful, but the error was analyzed successfully!'
-                })
-            });
-            
         } catch (error: any) {
-            if (circuitBreaker && 
-                !(error instanceof CircuitBreakerOpenError) &&
-                !circuitBreaker.getState().config.trackIndividualAttempts) {
-                circuitBreaker.recordFailure();
-            }
-            
+            const itemId = item.type === RequestOrFunction.REQUEST ? item.request.id : item.function.id;
+            const groupId = item.type === RequestOrFunction.REQUEST ? item.request.groupId : item.function.groupId;
             const isCircuitBreakerError = error instanceof CircuitBreakerOpenError;
             
             responses.push({
-                requestId: req.id,
-                ...(req.groupId && { groupId: req.groupId }),
+                requestId: itemId,
+                ...(groupId && { groupId }),
                 success: false,
                 error: isCircuitBreakerError 
                     ? `Circuit breaker open: ${error.message}`
-                    : (error?.message || 'An error occurred! Error description is unavailable.')
+                    : (error?.message || 'An error occurred! Error description is unavailable.'),
+                type: item.type
             });
             
             if (requestExecutionOptions.stopOnFirstError) {

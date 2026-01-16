@@ -1,6 +1,8 @@
 import {
     API_GATEWAY_OPTIONS,
     API_GATEWAY_REQUEST,
+    API_GATEWAY_FUNCTION,
+    API_GATEWAY_ITEM,
     API_GATEWAY_RESPONSE,
     API_GATEWAY_RESULT,
     CacheDashboardMetrics,
@@ -21,11 +23,34 @@ import {
     getGlobalRateLimiter,
     getGlobalConcurrencyLimiter
 } from '../utilities/index.js';
+import { RequestOrFunction } from '../enums/index.js';
 
 export async function stableApiGateway<RequestDataType = any, ResponseDataType = any>(
-    requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] = [],
-    options: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType> = {}
+    requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] | API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[],
+    options: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>
+): Promise<API_GATEWAY_RESULT<ResponseDataType>>;
+
+export async function stableApiGateway<RequestDataType = any, ResponseDataType = any>(
+    requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] | API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[],
+    functions: API_GATEWAY_FUNCTION<any[], any>[],
+    options: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>
+): Promise<API_GATEWAY_RESULT<ResponseDataType>>;
+
+export async function stableApiGateway<RequestDataType = any, ResponseDataType = any>(
+    requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] | API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[] = [],
+    functionsOrOptions?: API_GATEWAY_FUNCTION<any[], any>[] | API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>,
+    options?: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>
 ): Promise<API_GATEWAY_RESULT<ResponseDataType>> {
+    let functions: API_GATEWAY_FUNCTION<any[], any>[] = [];
+    let finalOptions: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType> = {};
+    
+    if (Array.isArray(functionsOrOptions)) {
+        functions = functionsOrOptions;
+        finalOptions = options || {};
+    } else {
+        finalOptions = functionsOrOptions || {};
+    }
+    
     const {
         concurrentExecution = true,
         stopOnFirstError = false,
@@ -33,9 +58,25 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
         maxConcurrentRequests,
         rateLimit,
         circuitBreaker,
-    } = options;
+    } = finalOptions;
 
-    if (!Array.isArray(requests) || requests.length === 0) {
+    let items: API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[] = [];
+    
+    if (requests.length > 0 && 'type' in requests[0]) {
+        items = requests as API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[];
+    } else {
+        items = (requests as API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[]).map(req => ({
+            type: RequestOrFunction.REQUEST,
+            request: req
+        }));
+        
+        items.push(...functions.map(fn => ({
+            type: RequestOrFunction.FUNCTION as const,
+            function: fn
+        })));
+    }
+
+    if (items.length === 0) {
         const emptyResult = [] as API_GATEWAY_RESULT<ResponseDataType>;
         emptyResult.metrics = {
             totalRequests: 0,
@@ -50,18 +91,19 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
     const requestExecutionOptions: CONCURRENT_REQUEST_EXECUTION_OPTIONS | SEQUENTIAL_REQUEST_EXECUTION_OPTIONS = {
         stopOnFirstError,
         requestGroups,
-        sharedBuffer: options.sharedBuffer,
+        sharedBuffer: finalOptions.sharedBuffer,
         ...(maxConcurrentRequests !== undefined && { maxConcurrentRequests }),
         ...(rateLimit !== undefined && { rateLimit }),
         ...(circuitBreaker !== undefined && { circuitBreaker }),
-        ...extractCommonOptions<RequestDataType, ResponseDataType>(options)
+        ...extractCommonOptions<RequestDataType, ResponseDataType>(finalOptions),
+        executionContext: finalOptions.executionContext
     }
 
     let responses: API_GATEWAY_RESPONSE<ResponseDataType>[];
     if (concurrentExecution) {
-        responses = await executeConcurrently<RequestDataType, ResponseDataType>(requests, requestExecutionOptions as CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>);
+        responses = await executeConcurrently<RequestDataType, ResponseDataType>(items, requestExecutionOptions as CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>);
     } else {
-        responses = await executeSequentially<RequestDataType, ResponseDataType>(requests, requestExecutionOptions as SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>);
+        responses = await executeSequentially<RequestDataType, ResponseDataType>(items, requestExecutionOptions as SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>);
     }
 
     const successfulRequests = responses.filter(r => r.success).length;
@@ -92,7 +134,7 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
         }
     }
     
-    if (options.commonCache) {
+    if (finalOptions.commonCache) {
         const cache = getGlobalCacheManager();
         if (cache) {
             infrastructureMetrics.cache = MetricsAggregator.extractCacheMetrics(cache);

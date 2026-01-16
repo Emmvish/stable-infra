@@ -58,3 +58,8 @@ export enum WorkflowEdgeConditionTypes {
   CUSTOM = 'custom',
   ALWAYS = 'always'
 }
+
+export enum RequestOrFunction {
+  REQUEST = 'request',
+  FUNCTION = 'function'
+}

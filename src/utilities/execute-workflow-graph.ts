@@ -56,7 +56,7 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
     
     const node = graph.nodes.get(nodeId);
     if (!node) {
-      throw new Error(`Node '${nodeId}' not found in graph`);
+      throw new Error(`${formatLogContext({ workflowId })}Node '${nodeId}' not found in graph`);
     }
     
     if (node.type === WorkflowNodeTypes.MERGE_POINT && node.waitForNodes) {
@@ -135,7 +135,7 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
   
   const executePhaseNode = async (node: WorkflowNode<RequestDataType, ResponseDataType>, nodeId: string): Promise<void> => {
     if (!node.phase) {
-      throw new Error(`Phase node '${nodeId}' has no phase configuration`);
+      throw new Error(`${formatLogContext({ workflowId })}Phase node '${nodeId}' has no phase configuration`);
     }
     
     const phaseIndex = phaseResults.length;
@@ -226,7 +226,7 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
       
       if (options.stopOnFirstPhaseError) {
         terminatedEarly = true;
-        terminationReason = `Phase '${phaseId}' threw error: ${error.message}`;
+        terminationReason = `${formatLogContext({ workflowId, phaseId })}Phase '${phaseId}' threw error: ${error.message}`;
         throw error;
       }
     }
@@ -234,7 +234,7 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
   
   const executeBranchNode = async (node: WorkflowNode<RequestDataType, ResponseDataType>, nodeId: string): Promise<void> => {
     if (!node.branch) {
-      throw new Error(`Branch node '${nodeId}' has no branch configuration`);
+      throw new Error(`${formatLogContext({ workflowId })}Branch node '${nodeId}' has no branch configuration`);
     }
     
     const branchResult = await executeBranchWorkflow({
@@ -285,7 +285,7 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
   
   const executeConditionalNode = async (node: WorkflowNode<RequestDataType, ResponseDataType>, nodeId: string): Promise<void> => {
     if (!node.condition) {
-      throw new Error(`Conditional node '${nodeId}' has no condition`);
+      throw new Error(`${formatLogContext({ workflowId })}Conditional node '${nodeId}' has no condition`);
     }
     
     visited.add(nodeId);
@@ -310,13 +310,13 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
     if (graph.nodes.has(nextNodeId)) {
       await executeNode(nextNodeId);
     } else {
-      throw new Error(`Conditional node '${nodeId}' evaluated to non-existent node '${nextNodeId}'`);
+      throw new Error(`${formatLogContext({ workflowId })}Conditional node '${nodeId}' evaluated to non-existent node '${nextNodeId}'`);
     }
   };
   
   const executeParallelGroupNode = async (node: WorkflowNode<RequestDataType, ResponseDataType>, nodeId: string): Promise<void> => {
     if (!node.parallelNodes || node.parallelNodes.length === 0) {
-      throw new Error(`Parallel group node '${nodeId}' has no parallel nodes`);
+      throw new Error(`${formatLogContext({ workflowId })}Parallel group node '${nodeId}' has no parallel nodes`);
     }
     
     if (options.logPhaseResults) {
@@ -337,7 +337,7 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
   } catch (error: any) {
     if (!terminatedEarly) {
       terminatedEarly = true;
-      terminationReason = error.message || 'Unknown error during execution';
+      terminationReason = error.message || `${formatLogContext({ workflowId })}stable-request: Unknown error during execution`;
     }
   }
   

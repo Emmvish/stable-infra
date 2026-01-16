@@ -1,18 +1,17 @@
-import { stableRequest } from "../core/index.js";
+import { RequestOrFunction } from '../enums/index.js';
 import {
     API_GATEWAY_REQUEST,
+    API_GATEWAY_ITEM,
     API_GATEWAY_RESPONSE,
-    STABLE_REQUEST_RESULT,
     CONCURRENT_REQUEST_EXECUTION_OPTIONS,
 } from '../types/index.js';
-import { prepareApiRequestData } from "./prepare-api-request-data.js";
-import { prepareApiRequestOptions } from "./prepare-api-request-options.js";
+import { executeGatewayItem } from "./execute-gateway-item.js";
 import { ConcurrencyLimiter } from "./concurrency-limiter.js";
 import { RateLimiter } from "./rate-limiter.js";
 import { CircuitBreaker, CircuitBreakerOpenError } from "./circuit-breaker.js";
 
 export async function executeConcurrently<RequestDataType = any, ResponseDataType = any>(
-    requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] = [],
+    items: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] | API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[] = [],
     requestExecutionOptions: CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType> = {}
 ): Promise<API_GATEWAY_RESPONSE<ResponseDataType>[]> {
     const responses: API_GATEWAY_RESPONSE<ResponseDataType>[] = [];
@@ -24,60 +23,36 @@ export async function executeConcurrently<RequestDataType = any, ResponseDataTyp
             : new CircuitBreaker(requestExecutionOptions.circuitBreaker as any))
         : null;
     
-    const requestFunctions = requests.map((req) => {
-        return async () => {
-            if (circuitBreaker && !circuitBreaker.getState().config.trackIndividualAttempts) {
-                const canExecute = await circuitBreaker.canExecute();
-                if (!canExecute) {
-                    throw new CircuitBreakerOpenError(
-                        `stable-request: Circuit breaker is ${circuitBreaker.getState().state}. Request blocked.`
-                    );
-                }
-            }
-
-            const finalRequestOptions = { 
-                reqData: prepareApiRequestData<RequestDataType, ResponseDataType>(req, requestExecutionOptions),
-                ...prepareApiRequestOptions<RequestDataType, ResponseDataType>(req, requestExecutionOptions),
-                commonBuffer: requestExecutionOptions.sharedBuffer ?? req.requestOptions.commonBuffer,
-                ...(circuitBreaker ? { circuitBreaker } : {}),
-                executionContext: {
-                    ...requestExecutionOptions.executionContext,
-                    requestId: req.id
-                }
+    const unifiedItems: API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[] = items.map(item => {
+        if ('type' in item) {
+            return item as API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>;
+        } else {
+            return {
+                type: RequestOrFunction.REQUEST as const,
+                request: item as API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>
             };
-
-            try {
-                const result = await stableRequest<RequestDataType, ResponseDataType>(finalRequestOptions);
-                
-                if (circuitBreaker && !circuitBreaker.getState().config.trackIndividualAttempts) {
-                    circuitBreaker.recordSuccess();
-                }
-                
-                return result;
-            } catch (error) {
-                if (circuitBreaker && 
-                    !(error instanceof CircuitBreakerOpenError) &&
-                    !circuitBreaker.getState().config.trackIndividualAttempts) {
-                    circuitBreaker.recordFailure();
-                }
-                throw error;
-            }
+        }
+    });
+    
+    const itemFunctions = unifiedItems.map((item) => {
+        return async () => {
+            return await executeGatewayItem(item, requestExecutionOptions, circuitBreaker);
         };
     });
 
     const hasConcurrencyLimit = requestExecutionOptions.maxConcurrentRequests && 
         requestExecutionOptions.maxConcurrentRequests > 0 && 
-        requestExecutionOptions.maxConcurrentRequests < requests.length;
+        requestExecutionOptions.maxConcurrentRequests < unifiedItems.length;
     
     const hasRateLimit = requestExecutionOptions.rateLimit && 
         requestExecutionOptions.rateLimit.maxRequests > 0 &&
         requestExecutionOptions.rateLimit.windowMs > 0;
 
-    let stableRequests: Promise<STABLE_REQUEST_RESULT<ResponseDataType>>[];
-    let settledResponses: PromiseSettledResult<STABLE_REQUEST_RESULT<ResponseDataType>>[];
+    let itemResults: Promise<API_GATEWAY_RESPONSE<ResponseDataType>>[];
+    let settledResponses: PromiseSettledResult<API_GATEWAY_RESPONSE<ResponseDataType>>[];
 
     if (stopOnFirstError) {
-        const results: PromiseSettledResult<STABLE_REQUEST_RESULT<ResponseDataType>>[] = [];
+        const results: PromiseSettledResult<API_GATEWAY_RESPONSE<ResponseDataType>>[] = [];
         let errorDetected = false;
         const activePromises = new Set<Promise<void>>();
 
@@ -91,7 +66,7 @@ export async function executeConcurrently<RequestDataType = any, ResponseDataTyp
             )
             : null;
 
-        const createExecutor = (fn: () => Promise<STABLE_REQUEST_RESULT<ResponseDataType>>) => {
+        const createExecutor = (fn: () => Promise<API_GATEWAY_RESPONSE<ResponseDataType>>) => {
             if (concurrencyLimiter && rateLimiter) {
                 return () => concurrencyLimiter.execute(() => rateLimiter.execute(fn));
             } else if (concurrencyLimiter) {
@@ -102,28 +77,31 @@ export async function executeConcurrently<RequestDataType = any, ResponseDataTyp
             return fn;
         };
 
-        for (let i = 0; i < requestFunctions.length; i++) {
+        for (let i = 0; i < itemFunctions.length; i++) {
             if (errorDetected) {
                 break;
             }
 
-            const executor = createExecutor(requestFunctions[i]);
-            const executeRequest = async (index: number) => {
+            const executor = createExecutor(itemFunctions[i]);
+            const executeItem = async (index: number) => {
                 try {
                     const result = await executor();
                     results[index] = { status: 'fulfilled', value: result };
+                    if (!result.success) {
+                        errorDetected = true;
+                    }
                 } catch (error) {
                     results[index] = { status: 'rejected', reason: error };
                     errorDetected = true;
                 }
             };
 
-            const promise = executeRequest(i);
+            const promise = executeItem(i);
             activePromises.add(promise);
             
             promise.finally(() => activePromises.delete(promise));
 
-            if (i < requestFunctions.length - 1) {
+            if (i < itemFunctions.length - 1) {
                 await Promise.race([
                     promise,
                     new Promise(resolve => setTimeout(resolve, 0))
@@ -144,51 +122,45 @@ export async function executeConcurrently<RequestDataType = any, ResponseDataTyp
                 requestExecutionOptions.rateLimit!.windowMs
             );
 
-            stableRequests = requestFunctions.map(fn => 
+            itemResults = itemFunctions.map(fn => 
                 concurrencyLimiter.execute(() => rateLimiter.execute(fn))
             );
         } else if (hasConcurrencyLimit) {
             const concurrencyLimiter = new ConcurrencyLimiter(requestExecutionOptions.maxConcurrentRequests!);
-            stableRequests = requestFunctions.map(fn => concurrencyLimiter.execute(fn));
+            itemResults = itemFunctions.map(fn => concurrencyLimiter.execute(fn));
         } else if (hasRateLimit) {
             const rateLimiter = new RateLimiter(
                 requestExecutionOptions.rateLimit!.maxRequests,
                 requestExecutionOptions.rateLimit!.windowMs
             );
-            stableRequests = requestFunctions.map(fn => rateLimiter.execute(fn));
+            itemResults = itemFunctions.map(fn => rateLimiter.execute(fn));
         } else {
-            stableRequests = requestFunctions.map(fn => fn());
+            itemResults = itemFunctions.map(fn => fn());
         }
 
-        settledResponses = await Promise.allSettled(stableRequests);
+        settledResponses = await Promise.allSettled(itemResults);
     }
     
     for (let i = 0; i < settledResponses.length; i++) {
         const res = settledResponses[i];
-        const req = requests[i];
         
         if(res.status === 'fulfilled') {
-            const requestResult = res.value;
-            responses.push({
-                requestId: req.id,
-                ...(req.groupId && { groupId: req.groupId }),
-                success: requestResult.success,
-                ...(requestResult.data !== undefined && { data: requestResult.data }),
-                ...(!requestResult.success && {
-                    error: requestResult.error || 'Request was unsuccessful, but the error was analyzed successfully!'
-                })
-            });
+            responses.push(res.value);
         } else {
             const error = res.reason;
+            const item = unifiedItems[i];
+            const itemId = item.type === RequestOrFunction.REQUEST ? item.request.id : item.function.id;
+            const groupId = item.type === RequestOrFunction.REQUEST ? item.request.groupId : item.function.groupId;
             const isCircuitBreakerError = error instanceof CircuitBreakerOpenError;
             
             responses.push({
-                requestId: req.id,
-                ...(req.groupId && { groupId: req.groupId }),
+                requestId: itemId,
+                ...(groupId && { groupId }),
                 success: false,
                 error: isCircuitBreakerError 
                     ? `Circuit breaker open: ${error.message}`
-                    : (error?.message || 'An error occurred! Error description is unavailable.')
+                    : (error?.message || 'An error occurred! Error description is unavailable.'),
+                type: item.type
             });
         }
     }

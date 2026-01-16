@@ -1,4 +1,4 @@
-import { WorkflowNodeTypes } from '../enums/index.js'
+import { WorkflowNodeTypes, RequestOrFunction } from '../enums/index.js'
 import {
   WorkflowGraph,
   WorkflowGraphValidationResult,
@@ -74,8 +74,14 @@ function validateNode<T, R>(node: WorkflowNode<T, R>, graph: WorkflowGraph<T, R>
     case WorkflowNodeTypes.PHASE:
       if (!node.phase) {
         errors.push(`Phase node '${node.id}' is missing phase configuration`);
-      } else if (!node.phase.requests || node.phase.requests.length === 0) {
-        errors.push(`Phase node '${node.id}' has no requests`);
+      } else {
+        const hasRequests = node.phase.requests && node.phase.requests.length > 0;
+        const hasFunctions = node.phase.functions && node.phase.functions.length > 0;
+        const hasItems = node.phase.items && node.phase.items.length > 0;
+        
+        if (!hasRequests && !hasFunctions && !hasItems) {
+          errors.push(`Phase node '${node.id}' has no requests, functions, or items`);
+        }
       }
       break;
       
@@ -88,7 +94,7 @@ function validateNode<T, R>(node: WorkflowNode<T, R>, graph: WorkflowGraph<T, R>
       break;
       
     case WorkflowNodeTypes.CONDITIONAL:
-      if (!node.condition || typeof node.condition.evaluate !== 'function') {
+      if (!node.condition || typeof node.condition.evaluate !== RequestOrFunction.FUNCTION) {
         errors.push(`Conditional node '${node.id}' is missing evaluation function`);
       }
       break;
@@ -166,9 +172,6 @@ export function detectCycles<T = any, R = any>(
   return cycles;
 }
 
-/**
- * Detect nodes that cannot be reached from the entry point
- */
 export function detectUnreachableNodes<T = any, R = any>(
   graph: WorkflowGraph<T, R>
 ): string[] {

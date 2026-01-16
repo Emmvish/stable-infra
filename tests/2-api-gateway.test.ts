@@ -52,7 +52,7 @@ describe('stableApiGateway - Batch Processing', () => {
 
     expect(results).toHaveLength(3);
     expect(results.every(r => r.success)).toBe(true);
-    expect(results[0]).toEqual({
+    expect(results[0]).toMatchObject({
       requestId: 'user-1',
       success: true,
       data: { id: 1, name: 'User 1' }

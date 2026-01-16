@@ -95,7 +95,7 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
     if(axios.isCancel(e)) {
       return {
         ok: false,
-        error: 'Request was cancelled.',
+        error: 'stable-request: Request was cancelled.',
         isRetryable: false,
         timestamp,
         executionTime: stopTime - startTime,
@@ -105,7 +105,7 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
     }
     return {
       ok: false,
-      error: (e as AxiosError)?.response?.data ?? e?.message,
+      error: `stable-request: ${(e as AxiosError)?.response?.data ?? e?.message}`,
       isRetryable: isRetryableError(e as AxiosError, trialMode),
       timestamp,
       executionTime: stopTime - startTime,

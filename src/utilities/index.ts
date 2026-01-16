@@ -1,4 +1,5 @@
 export { CacheManager, getGlobalCacheManager, resetGlobalCacheManager } from './cache-manager.js';
+export { FunctionCacheManager, getGlobalFunctionCacheManager } from './function-cache-manager.js';
 export { CircuitBreaker, CircuitBreakerOpenError, getGlobalCircuitBreaker, resetGlobalCircuitBreaker } from './circuit-breaker.js';
 export { ConcurrencyLimiter, getGlobalConcurrencyLimiter, resetGlobalConcurrencyLimiter } from './concurrency-limiter.js';
 export { delay } from './delay.js';
@@ -16,8 +17,11 @@ export { isRetryableError } from './is-retryable-error.js';
 export { MetricsAggregator } from './metrics-aggregator.js';
 export { prepareApiRequestData } from './prepare-api-request-data.js';
 export { prepareApiRequestOptions } from './prepare-api-request-options.js';
+export { prepareApiFunctionOptions } from './prepare-api-function-options.js';
+export { executeGatewayItem, executeGatewayRequest, executeGatewayFunction } from './execute-gateway-item.js';
 export { RateLimiter, getGlobalRateLimiter, resetGlobalRateLimiter } from './rate-limiter.js';
 export { reqFn } from './req-fn.js';
+export { fnExec } from './fn-exec.js';
 export { safelyExecuteUnknownFunction } from './safely-execute-unknown-function.js';
 export { safelyStringify } from './safely-stringify.js';
 export { validateTrialModeProbabilities } from './validate-trial-mode-probabilities.js';

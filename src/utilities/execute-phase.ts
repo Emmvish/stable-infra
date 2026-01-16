@@ -2,7 +2,7 @@ import { stableApiGateway } from '../core/index.js';
 import { executeWithPersistence } from './execute-with-persistence.js';
 import { formatLogContext } from './format-log-context';
 import { MetricsAggregator } from './metrics-aggregator.js';
-import { safelyExecuteUnknownFunction } from './safely-execute-unknown-function.js';
+import { RequestOrFunction } from '../enums/index.js';
 import { STABLE_WORKFLOW_PHASE, STABLE_WORKFLOW_PHASE_RESULT, PrePhaseExecutionHookOptions } from '../types/index.js';
 
 export async function executePhase<RequestDataType = any, ResponseDataType = any>(
@@ -83,8 +83,21 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
         phaseGatewayOptions.circuitBreaker = modifiedPhase.circuitBreaker;
     }
 
+    let items: any = [];
+    
+    if (modifiedPhase.items) {
+        items = modifiedPhase.items;
+    } else if (modifiedPhase.functions) {
+        items = modifiedPhase.functions.map(fn => ({
+            type: RequestOrFunction.FUNCTION,
+            function: fn
+        }));
+    } else if (modifiedPhase.requests) {
+        items = modifiedPhase.requests;
+    }
+    
     const phaseResponses = await stableApiGateway<RequestDataType, ResponseDataType>(
-        modifiedPhase.requests,
+        items,
         phaseGatewayOptions
     );
 

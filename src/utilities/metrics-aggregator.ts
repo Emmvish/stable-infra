@@ -304,6 +304,46 @@ export class MetricsAggregator {
             cacheEfficiency: stats.hitRate
         };
     }
+
+    /**
+     * Extract function cache dashboard metrics
+     */
+    static extractFunctionCacheMetrics(
+        cache: any
+    ): CacheDashboardMetrics {
+        const stats = cache.getStats();
+        
+        return {
+            isEnabled: true,
+            
+            currentSize: stats.size,
+            maxSize: stats.maxSize,
+            validEntries: stats.size,
+            expiredEntries: 0,
+            utilizationPercentage: (stats.size / stats.maxSize) * 100,
+            
+            totalRequests: stats.hits + stats.misses,
+            hits: stats.hits,
+            misses: stats.misses,
+            hitRate: stats.hitRate,
+            missRate: stats.missRate,
+            
+            sets: stats.sets,
+            evictions: stats.evictions,
+            expirations: 0,
+            
+            averageGetTime: stats.averageGetTime,
+            averageSetTime: stats.averageSetTime,
+            averageCacheAge: 0,
+            
+            oldestEntryAge: null,
+            newestEntryAge: null,
+            
+            networkRequestsSaved: stats.hits,
+            cacheEfficiency: stats.hitRate
+        };
+    }
+
     
     /**
      * Extract rate limiter dashboard metrics

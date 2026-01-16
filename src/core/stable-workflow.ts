@@ -210,6 +210,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
         };
 
         const handlePhaseExecutionError = async (phaseId: string, phaseIndex: number, error: any, phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>) => {
+            const items = phase.items || phase.functions || phase.requests || [];
             const phaseResult = {
                 workflowId,
                 phaseId,
@@ -217,9 +218,9 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 success: false,
                 executionTime: 0,
                 timestamp: new Date().toISOString(),
-                totalRequests: phase.requests.length,
+                totalRequests: items.length,
                 successfulRequests: 0,
-                failedRequests: phase.requests.length,
+                failedRequests: items.length,
                 responses: [],
                 error: error?.message || 'Phase execution failed'
             };

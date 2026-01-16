@@ -7,7 +7,8 @@ import {
   RETRY_STRATEGIES,
   VALID_REQUEST_PROTOCOLS,
   WorkflowEdgeConditionTypes,
-  WorkflowNodeTypes
+  WorkflowNodeTypes,
+  RequestOrFunction
 } from '../enums/index.js';
 
 import { CircuitBreaker } from '../utilities/index.js'
@@ -44,6 +45,18 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
   commonPreExecution?: RequestPreExecutionOptions;
   commonCache?: CacheConfig;
   commonStatePersistence?: StatePersistenceConfig;
+  commonFunctionHookParams?: FunctionHookParams;
+  commonFunctionResponseAnalyzer?: <TArgs extends any[], TReturn>(options: FunctionResponseAnalysisHookOptions<TArgs, TReturn>) => boolean | Promise<boolean>;
+  commonReturnResult?: boolean;
+  commonFinalFunctionErrorAnalyzer?: <TArgs extends any[]>(options: FinalFunctionErrorAnalysisHookOptions<TArgs>) => boolean | Promise<boolean>;
+  commonHandleFunctionErrors?: <TArgs extends any[]>(
+    options: HandleFunctionErrorHookOptions<TArgs>
+  ) => any | Promise<any>;
+  commonHandleSuccessfulFunctionAttemptData?: <TArgs extends any[], TReturn>(
+    options: HandleSuccessfulFunctionAttemptDataHookOptions<TArgs, TReturn>
+  ) => any | Promise<any>;
+  commonFunctionPreExecution?: <TArgs extends any[], TReturn>(options: FunctionPreExecutionOptions<TArgs, TReturn>) => any;
+  commonFunctionCache?: <TArgs extends any[], TReturn>(config: FunctionCacheConfig<TArgs, TReturn>) => any;
   concurrentExecution?: boolean;
   requestGroups?: RequestGroup<RequestDataType, ResponseDataType>[];
   stopOnFirstError?: boolean;
@@ -73,12 +86,33 @@ export interface API_GATEWAY_REQUEST<RequestDataType = any, ResponseDataType = a
   requestOptions: API_GATEWAY_REQUEST_OPTIONS_TYPE<RequestDataType, ResponseDataType>;
 }
 
+export type API_GATEWAY_FUNCTION_OPTIONS_TYPE<
+  TArgs extends any[],
+  TReturn
+> =
+  Omit<STABLE_FUNCTION<TArgs, TReturn>, 'fn' | 'args'> & {
+    fn?: STABLE_FUNCTION<TArgs, TReturn>['fn'];
+    args?: TArgs;
+  };
+
+export interface API_GATEWAY_FUNCTION<TArgs extends any[] = any[], TReturn = any> {
+  id: string;
+  groupId?: string;
+  functionOptions: API_GATEWAY_FUNCTION_OPTIONS_TYPE<TArgs, TReturn>;
+}
+
+export type RequestOrFunctionType = RequestOrFunction.REQUEST | RequestOrFunction.FUNCTION;
+
+export type API_GATEWAY_ITEM<RequestDataType = any, ResponseDataType = any, TArgs extends any[] = any[], TReturn = any> =
+  | { type: RequestOrFunction.REQUEST; request: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType> }
+  | { type: RequestOrFunction.FUNCTION; function: API_GATEWAY_FUNCTION<TArgs, TReturn> };
 export interface API_GATEWAY_RESPONSE<ResponseDataType = any> {
   requestId: string;
   groupId?: string;
   success: boolean;
   data?: ResponseDataType;
   error?: string;
+  type?: RequestOrFunctionType;
 }
 
 export interface API_GATEWAY_RESULT<ResponseDataType = any> extends Array<API_GATEWAY_RESPONSE<ResponseDataType>> {
@@ -127,6 +161,16 @@ export interface ReqFnResponse<ResponseDataType = any> {
   error?: string;
   statusCode: number;
   data?: ResponseDataType | { trialMode: TRIAL_MODE_OPTIONS };
+  fromCache?: boolean;
+}
+
+export interface FnExecResponse<TReturn = any> {
+  ok: boolean;
+  isRetryable: boolean;
+  timestamp: string;
+  executionTime: number;
+  error?: string;
+  data?: TReturn | { trialMode: TRIAL_MODE_OPTIONS };
   fromCache?: boolean;
 }
 
@@ -198,10 +242,57 @@ export interface HookParams {
   finalErrorAnalyzerParams?: any;
 }
 
+export interface FunctionHookParams {
+  responseAnalyzerParams?: any;
+  handleSuccessfulAttemptDataParams?: any;
+  handleErrorsParams?: any;
+  finalErrorAnalyzerParams?: any;
+}
+
+interface FunctionObservabilityHooksOptions<TArgs extends any[] = any[]> {
+  fn: (...args: TArgs) => any;
+  args: TArgs;
+  params?: any;
+  maxSerializableChars?: number;
+  preExecutionResult?: any;
+  commonBuffer?: Record<string, any>;
+  executionContext?: ExecutionContext;
+}
+
+interface FunctionAnalysisHookOptions<TArgs extends any[] = any[]> extends Omit<FunctionObservabilityHooksOptions<TArgs>, "maxSerializableChars"> {
+  trialMode?: TRIAL_MODE_OPTIONS;
+  params?: any;
+  preExecutionResult?: any;
+  executionContext?: ExecutionContext;
+  commonBuffer?: Record<string, any>;
+}
+
+export interface FunctionResponseAnalysisHookOptions<TArgs extends any[] = any[], TReturn = any> extends FunctionAnalysisHookOptions<TArgs> {
+  data: TReturn
+}
+
+export interface FinalFunctionErrorAnalysisHookOptions<TArgs extends any[] = any[]> extends FunctionAnalysisHookOptions<TArgs> {
+  error: any
+}
+
+export interface HandleFunctionErrorHookOptions<TArgs extends any[] = any[]> extends FunctionObservabilityHooksOptions<TArgs> {
+  errorLog: FUNCTION_ERROR_LOG
+}
+
+export interface HandleSuccessfulFunctionAttemptDataHookOptions<TArgs extends any[] = any[], TReturn = any> extends FunctionObservabilityHooksOptions<TArgs> {
+  successfulAttemptData: SUCCESSFUL_FUNCTION_ATTEMPT_DATA<TReturn>
+}
+
 export interface PreExecutionHookOptions<RequestDataType = any, ResponseDataType = any> {
   inputParams?: any;
   commonBuffer?: Record<string, any>;
   stableRequestOptions: STABLE_REQUEST<RequestDataType, ResponseDataType>;
+}
+
+export interface FunctionPreExecutionHookOptions<TArgs extends any[] = any[], TReturn = any> {
+  inputParams?: any;
+  commonBuffer?: Record<string, any>;
+  stableFunctionOptions: STABLE_FUNCTION<TArgs, TReturn>;
 }
 
 interface WorkflowPreExecutionHookOptions {
@@ -225,6 +316,13 @@ export interface PreBranchExecutionHookOptions<RequestDataType = any, ResponseDa
 
 export interface RequestPreExecutionOptions<RequestDataType = any, ResponseDataType = any> {
   preExecutionHook: (options: PreExecutionHookOptions<RequestDataType, ResponseDataType>) => any | Promise<any>;
+  preExecutionHookParams?: any;
+  applyPreExecutionConfigOverride?: boolean;
+  continueOnPreExecutionHookFailure?: boolean;
+}
+
+export interface FunctionPreExecutionOptions<TArgs extends any[] = any[], TReturn = any> {
+  preExecutionHook: (options: FunctionPreExecutionHookOptions<TArgs, TReturn>) => any | Promise<any>;
   preExecutionHookParams?: any;
   applyPreExecutionConfigOverride?: boolean;
   continueOnPreExecutionHookFailure?: boolean;
@@ -273,6 +371,39 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   statePersistence?: StatePersistenceConfig;
 }
 
+export interface STABLE_FUNCTION<TArgs extends any[] = any[], TReturn = any> {
+  fn: (...args: TArgs) => TReturn | Promise<TReturn>;
+  args: TArgs;
+  responseAnalyzer?: (options: FunctionResponseAnalysisHookOptions<TArgs, TReturn>) => boolean | Promise<boolean>;
+  returnResult?: boolean;
+  attempts?: number;
+  performAllAttempts?: boolean;
+  wait?: number;
+  maxAllowedWait?: number;
+  retryStrategy?: RETRY_STRATEGY_TYPES;
+  jitter?: number;
+  logAllErrors?: boolean;
+  handleErrors?: (
+    options: HandleFunctionErrorHookOptions<TArgs>
+  ) => any | Promise<any>;
+  logAllSuccessfulAttempts?: boolean;
+  handleSuccessfulAttemptData?: (
+    options: HandleSuccessfulFunctionAttemptDataHookOptions<TArgs, TReturn>
+  ) => any | Promise<any>;
+  maxSerializableChars?: number;
+  finalErrorAnalyzer?: (options: FinalFunctionErrorAnalysisHookOptions<TArgs>) => boolean | Promise<boolean>;
+  trialMode?: TRIAL_MODE_OPTIONS;
+  hookParams?: FunctionHookParams;
+  preExecution?: FunctionPreExecutionOptions<TArgs, TReturn>;
+  commonBuffer?: Record<string, any>;
+  cache?: FunctionCacheConfig<TArgs, TReturn>;
+  executionContext?: ExecutionContext;
+  circuitBreaker?: CircuitBreakerConfig | CircuitBreaker;
+  statePersistence?: StatePersistenceConfig;
+  rateLimit?: RateLimitConfig;
+  maxConcurrentRequests?: number;
+}
+
 export interface STABLE_REQUEST_RESULT<ResponseDataType = any> {
   success: boolean;
   data?: ResponseDataType;
@@ -292,12 +423,48 @@ export interface STABLE_REQUEST_RESULT<ResponseDataType = any> {
   };
 }
 
+export interface STABLE_FUNCTION_RESULT<TReturn = any> {
+  success: boolean;
+  data?: TReturn;
+  error?: string;
+  errorLogs?: FUNCTION_ERROR_LOG[];
+  successfulAttempts?: SUCCESSFUL_FUNCTION_ATTEMPT_DATA<TReturn>[];
+  metrics?: {
+    totalAttempts: number;
+    successfulAttempts: number;
+    failedAttempts: number;
+    totalExecutionTime: number;
+    averageAttemptTime: number;
+    infrastructureMetrics?: {
+      circuitBreaker?: CircuitBreakerDashboardMetrics;
+      cache?: CacheDashboardMetrics;
+      rateLimiter?: RateLimiterDashboardMetrics;
+      concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
+    };
+  };
+}
+
 export interface SUCCESSFUL_ATTEMPT_DATA<ResponseDataType = any> {
   attempt: string;
   timestamp: string;
   executionTime: number;
   data: ResponseDataType;
   statusCode: number;
+}
+
+export interface SUCCESSFUL_FUNCTION_ATTEMPT_DATA<TReturn = any> {
+  attempt: string;
+  timestamp: string;
+  executionTime: number;
+  data: TReturn;
+}
+
+export interface FUNCTION_ERROR_LOG {
+  timestamp: string;
+  executionTime: number;
+  attempt: string;
+  error: string;
+  isRetryable: boolean;
 }
 
 export interface TRIAL_MODE_OPTIONS {
@@ -312,7 +479,9 @@ export type VALID_REQUEST_PROTOCOL_TYPES =
 
 export interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType = any> {
   id?: string;
-  requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[];
+  requests?: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[];
+  functions?: API_GATEWAY_FUNCTION<any[], any>[];
+  items?: API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[];
   concurrentExecution?: boolean;
   stopOnFirstError?: boolean;
   markConcurrentPhase?: boolean;
@@ -473,6 +642,13 @@ export interface CacheConfig {
   maxSize?: number;
   excludeMethods?: string[];
   keyGenerator?: (config: AxiosRequestConfig) => string;
+}
+
+export interface FunctionCacheConfig<TArgs extends any[] = any[], TReturn = any> {
+  enabled: boolean;
+  ttl?: number;
+  maxSize?: number;
+  keyGenerator?: (fn: (...args: TArgs) => any, args: TArgs) => string;
 }
 
 export interface CachedResponse<T = any> {

@@ -1,18 +1,15 @@
-import { AxiosRequestConfig } from 'axios';
-
 import {
   RETRY_STRATEGIES,
-  RESPONSE_ERRORS,
   CircuitBreakerState
 } from '../enums/index.js';
 
 import { 
-  ERROR_LOG,
-  PreExecutionHookOptions,
-  ReqFnResponse, 
-  STABLE_REQUEST,
-  STABLE_REQUEST_RESULT,
-  SUCCESSFUL_ATTEMPT_DATA,
+  FUNCTION_ERROR_LOG,
+  FunctionPreExecutionHookOptions,
+  FnExecResponse, 
+  STABLE_FUNCTION,
+  STABLE_FUNCTION_RESULT,
+  SUCCESSFUL_FUNCTION_ATTEMPT_DATA,
 } from '../types/index.js';
 
 import {
@@ -20,22 +17,23 @@ import {
   CircuitBreakerOpenError,
   executeWithPersistence,
   formatLogContext,
-  generateAxiosRequestConfig,
+  getGlobalFunctionCacheManager,
   getNewDelayTime,
-  getGlobalCacheManager,
   delay,
-  reqFn,
+  fnExec,
   safelyStringify,
   validateTrialModeProbabilities,
-  MetricsAggregator
+  MetricsAggregator,
+  RateLimiter,
+  ConcurrencyLimiter
 } from '../utilities/index.js';
 
-export async function stableRequest<RequestDataType = any, ResponseDataType = any>(
-  options: STABLE_REQUEST<RequestDataType, ResponseDataType>
-): Promise<STABLE_REQUEST_RESULT<ResponseDataType>> {
+export async function stableFunction<TArgs extends any[] = any[], TReturn = any>(
+  options: STABLE_FUNCTION<TArgs, TReturn>
+): Promise<STABLE_FUNCTION_RESULT<TReturn>> {
   const { 
     preExecution = {
-      preExecutionHook: ({ inputParams, commonBuffer }: PreExecutionHookOptions) => {},
+      preExecutionHook: ({ inputParams, commonBuffer }: FunctionPreExecutionHookOptions) => {},
       preExecutionHookParams: {},
       applyPreExecutionConfigOverride: false,
       continueOnPreExecutionHookFailure: false,
@@ -43,14 +41,15 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     commonBuffer = {},
     executionContext
   } = options;
-  let preExecutionResult: Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>> | unknown;
+  
+  let preExecutionResult: Partial<STABLE_FUNCTION<TArgs, TReturn>> | unknown;
   try {
-    preExecutionResult = await executeWithPersistence<Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>> | unknown>(
+    preExecutionResult = await executeWithPersistence<Partial<STABLE_FUNCTION<TArgs, TReturn>> | unknown>(
       preExecution?.preExecutionHook as Function,
       {
         inputParams: preExecution?.preExecutionHookParams,
         commonBuffer,
-        stableRequestOptions: options
+        stableFunctionOptions: options
       },
       options.statePersistence,
       executionContext || {},
@@ -59,7 +58,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     if(preExecution?.applyPreExecutionConfigOverride) {
       const finalOptions = {
         ...options,
-        ...preExecutionResult as Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>>
+        ...preExecutionResult as Partial<STABLE_FUNCTION<TArgs, TReturn>>
       }
       Object.assign(options, finalOptions);
     }
@@ -68,52 +67,58 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
       throw e;
     }
   }
+
   const {
-    reqData: givenReqData,
-    responseAnalyzer = ({ reqData, data, trialMode = { enabled: false } }) => true,
-    resReq = false,
+    fn,
+    args,
+    responseAnalyzer = ({ data, trialMode = { enabled: false } }) => true,
+    returnResult = false,
     attempts: givenAttempts = 1,
     performAllAttempts = false,
     wait = 1000,
     maxAllowedWait = 60000,
     retryStrategy = RETRY_STRATEGIES.FIXED,
     logAllErrors = false,
-    handleErrors = ({ reqData, errorLog, maxSerializableChars = 1000, executionContext }) => 
+    handleErrors = ({ fn, args, errorLog, maxSerializableChars = 1000, executionContext }) => 
       console.error(
         `${formatLogContext(executionContext)}stable-request:\n`,
-        'Request data:\n',
-        safelyStringify(reqData, maxSerializableChars),
+        `Function: ${fn.name || 'anonymous'}\n`,
+        'Args:\n',
+        safelyStringify(args, maxSerializableChars),
         '\nError log:\n',
         safelyStringify(errorLog, maxSerializableChars)
       ),
     logAllSuccessfulAttempts = false,
-    handleSuccessfulAttemptData = ({ reqData, successfulAttemptData, maxSerializableChars = 1000, executionContext }) =>
+    handleSuccessfulAttemptData = ({ fn, args, successfulAttemptData, maxSerializableChars = 1000, executionContext }) =>
       console.info(
         `${formatLogContext(executionContext)}stable-request:\n`,
-        'Request data:\n',
-        safelyStringify(reqData, maxSerializableChars),
+        `Function: ${fn.name || 'anonymous'}\n`,
+        'Args:\n',
+        safelyStringify(args, maxSerializableChars),
         '\nSuccessful attempt:\n',
         safelyStringify(successfulAttemptData, maxSerializableChars)
       ),
     maxSerializableChars = 1000,
-    finalErrorAnalyzer = ({ reqData, error, trialMode = { enabled: false } }) => false,
+    finalErrorAnalyzer = ({ fn, args, error, trialMode = { enabled: false } }) => false,
     trialMode = { enabled: false },
     hookParams = {},
     cache,
     circuitBreaker,
     jitter = 0,
-    statePersistence
+    statePersistence,
+    rateLimit,
+    maxConcurrentRequests
   } = options;
+
   let attempts = givenAttempts;
-  const reqData: AxiosRequestConfig<RequestDataType> = generateAxiosRequestConfig<RequestDataType>(givenReqData);
   
-  const requestStartTime = Date.now();
-  const errorLogs: ERROR_LOG[] = [];
-  const successfulAttemptsList: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>[] = [];
+  const functionStartTime = Date.now();
+  const errorLogs: FUNCTION_ERROR_LOG[] = [];
+  const successfulAttemptsList: SUCCESSFUL_FUNCTION_ATTEMPT_DATA<TReturn>[] = [];
   let totalAttemptsMade = 0;
   
-  const buildResult = (success: boolean, data?: ResponseDataType, error?: string): STABLE_REQUEST_RESULT<ResponseDataType> => {
-    const totalExecutionTime = Date.now() - requestStartTime;
+  const buildResult = (success: boolean, data?: TReturn, error?: string): STABLE_FUNCTION_RESULT<TReturn> => {
+    const totalExecutionTime = Date.now() - functionStartTime;
     const successfulAttemptsCount = successfulAttemptsList.length;
     const failedAttemptsCount = totalAttemptsMade - successfulAttemptsCount;
     
@@ -131,7 +136,9 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
         averageAttemptTime: totalAttemptsMade > 0 ? totalExecutionTime / totalAttemptsMade : 0,
         infrastructureMetrics: {
           ...(circuitBreakerInstance && { circuitBreaker: MetricsAggregator.extractCircuitBreakerMetrics(circuitBreakerInstance) }),
-          ...(cache && getGlobalCacheManager() && { cache: MetricsAggregator.extractCacheMetrics(getGlobalCacheManager()) })
+          ...(cache && getGlobalFunctionCacheManager() && { cache: MetricsAggregator.extractFunctionCacheMetrics(getGlobalFunctionCacheManager()) }),
+          ...(rateLimiterInstance && { rateLimiter: MetricsAggregator.extractRateLimiterMetrics(rateLimiterInstance) }),
+          ...(concurrencyLimiterInstance && { concurrencyLimiter: MetricsAggregator.extractConcurrencyLimiterMetrics(concurrencyLimiterInstance) })
         }
       }
     };
@@ -143,43 +150,71 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
       ? circuitBreaker
       : new CircuitBreaker(circuitBreaker as any);
   }
+
+  let rateLimiterInstance: RateLimiter | null = null;
+  if (rateLimit && rateLimit.maxRequests > 0 && rateLimit.windowMs > 0) {
+    rateLimiterInstance = new RateLimiter(rateLimit.maxRequests, rateLimit.windowMs);
+  }
+
+  let concurrencyLimiterInstance: ConcurrencyLimiter | null = null;
+  if (maxConcurrentRequests && maxConcurrentRequests > 0) {
+    concurrencyLimiterInstance = new ConcurrencyLimiter(maxConcurrentRequests);
+  }
+
   try {
     validateTrialModeProbabilities(trialMode);
-    let res: ReqFnResponse = {
+
+    let res: FnExecResponse<TReturn> = {
       ok: false,
       isRetryable: true,
       timestamp: new Date().toISOString(),
-      executionTime: 0,
-      statusCode: 0
+      executionTime: 0
     };
+
     const maxAttempts = attempts;
-    let lastSuccessfulAttemptData: ResponseDataType | undefined = undefined;
+    let lastSuccessfulAttemptData: TReturn | undefined = undefined;
     let hadAtLeastOneSuccess = false;
+
     do {
       attempts--;
       const currentAttempt = maxAttempts - attempts;
       totalAttemptsMade = currentAttempt;
+
       if (circuitBreakerInstance) {
         const cbConfig = circuitBreakerInstance.getState().config;
         if (cbConfig.trackIndividualAttempts || currentAttempt === 1) {
           const canExecute = await circuitBreakerInstance.canExecute();
           if (!canExecute) {
             throw new CircuitBreakerOpenError(
-              `stable-request: Circuit breaker is ${circuitBreakerInstance.getState().state}. Request blocked at attempt ${currentAttempt}.`
+              `stable-request: Circuit breaker is ${circuitBreakerInstance.getState().state}. Function execution blocked at attempt ${currentAttempt}.`
             );
           }
         }
       }
+
       try {
-        res = await reqFn<RequestDataType, ResponseDataType>(reqData, resReq, maxSerializableChars, trialMode, cache, executionContext);
+        const executeAttempt = async () => {
+          return await fnExec<TArgs, TReturn>(fn, args, returnResult, maxSerializableChars, trialMode, cache, executionContext);
+        };
+
+        if (rateLimiterInstance && concurrencyLimiterInstance) {
+          res = await rateLimiterInstance.execute(() => concurrencyLimiterInstance!.execute(executeAttempt));
+        } else if (rateLimiterInstance) {
+          res = await rateLimiterInstance.execute(executeAttempt);
+        } else if (concurrencyLimiterInstance) {
+          res = await concurrencyLimiterInstance.execute(executeAttempt);
+        } else {
+          res = await executeAttempt();
+        }
+        
         if (res.fromCache && res.ok) {
           if (trialMode.enabled) {
             console.info(
               `${formatLogContext(executionContext)}stable-request: Response served from cache:\n`,
-              safelyStringify(res?.data, maxSerializableChars)
+              safelyStringify(res?.data as Record<string, any>, maxSerializableChars)
             );
           }
-          return buildResult(true, resReq ? res?.data! : true as any);
+          return buildResult(true, returnResult ? res?.data as TReturn : true as any);
         }
         
       } catch(attemptError: any) {
@@ -196,14 +231,17 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
         }
         throw attemptError;
       }
+
       const originalResOk = res.ok;
       let performNextAttempt: boolean = false;
+
       if (res.ok) {
         try {
           performNextAttempt = !(await executeWithPersistence<boolean>(
             responseAnalyzer,
             {
-              reqData,
+              fn,
+              args,
               data: res?.data,
               trialMode,
               params: hookParams?.responseAnalyzerParams,
@@ -218,7 +256,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
         } catch (e: any) {
           console.error(
             `${formatLogContext(executionContext)}stable-request: Unable to analyze the response returned on attempt #${currentAttempt}. Response: ${safelyStringify(
-              res?.data,
+              res?.data as Record<string, any>,
               maxSerializableChars
             )}`
           );
@@ -246,28 +284,26 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
       }
       
       if ((!res.ok || (res.ok && performNextAttempt)) && logAllErrors) {
-        const errorLog: ERROR_LOG = {
+        const errorLog: FUNCTION_ERROR_LOG = {
           timestamp: res.timestamp,
           attempt: `${currentAttempt}/${maxAttempts}`,
           error:
             res?.error ??
             `stable-request: The response did not match your expectations! Response: ${safelyStringify(
-              res?.data,
+              res?.data as Record<string, any>,
               maxSerializableChars
             )}`,
-          type: !res.ok
-            ? RESPONSE_ERRORS.HTTP_ERROR
-            : RESPONSE_ERRORS.INVALID_CONTENT,
           isRetryable: res.isRetryable,
-          executionTime: res.executionTime,
-          statusCode: res.statusCode
+          executionTime: res.executionTime
         };
         errorLogs.push(errorLog);
+
         try {
           await executeWithPersistence<void>(
             handleErrors,
             {
-              reqData,
+              fn,
+              args,
               errorLog,
               maxSerializableChars,
               params: hookParams?.handleErrorsParams,
@@ -288,23 +324,26 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
           );
         }
       }
+
       if (res.ok && !performNextAttempt) {
         hadAtLeastOneSuccess = true;
-        lastSuccessfulAttemptData = res?.data;
+        lastSuccessfulAttemptData = res?.data as TReturn;
+
         if (logAllSuccessfulAttempts) {
-          const successfulAttemptLog: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType> = {
+          const successfulAttemptLog: SUCCESSFUL_FUNCTION_ATTEMPT_DATA<TReturn> = {
             attempt: `${currentAttempt}/${maxAttempts}`,
             timestamp: res.timestamp,
-            data: res?.data,
-            executionTime: res.executionTime,
-            statusCode: res.statusCode
+            data: res?.data as TReturn,
+            executionTime: res.executionTime
           };
           successfulAttemptsList.push(successfulAttemptLog);
+
           try {
             await executeWithPersistence<void>(
               handleSuccessfulAttemptData,
               {
-                reqData,
+                fn,
+                args,
                 successfulAttemptData: successfulAttemptLog,
                 maxSerializableChars,
                 params: hookParams?.handleSuccessfulAttemptDataParams,
@@ -326,9 +365,11 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
           }
         }
       }
+
       if (performNextAttempt && res.isRetryable) {
         res.ok = false;
       }
+
       if (
         attempts > 0 &&
         ((!originalResOk && res.isRetryable) ||
@@ -349,22 +390,23 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
           safelyStringify(lastSuccessfulAttemptData as Record<string, any>, maxSerializableChars)
         );
       }
-      return buildResult(true, resReq ? lastSuccessfulAttemptData! : true as any);
+      return buildResult(true, returnResult ? lastSuccessfulAttemptData! : true as any);
     } else if (res.ok) {
       if (trialMode.enabled) {
         const finalResponse = res?.data ?? lastSuccessfulAttemptData;
         console.info(
           `${formatLogContext(executionContext)}stable-request: Final response:\n`,
-          safelyStringify(finalResponse, maxSerializableChars)
+          safelyStringify(finalResponse as Record<string, any>, maxSerializableChars)
         );
       }
-      return buildResult(true, resReq ? (res?.data ?? lastSuccessfulAttemptData!) : true as any);
+      return buildResult(true, returnResult ? ((res?.data ?? lastSuccessfulAttemptData) as TReturn) : true as any);
     } else {
       throw new Error(
         safelyStringify(
           {
             error: res?.error,
-            'Request Data': reqData,
+            'Function': fn.name || 'anonymous',
+            'Args': args,
           },
           maxSerializableChars
         )
@@ -374,12 +416,14 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     if (trialMode.enabled) {
       console.error(`${formatLogContext(executionContext)}stable-request: Final error:\n`, e.message);
     }
+
     let errorAnalysisResult = false;
     try {
       errorAnalysisResult = await executeWithPersistence<boolean>(
         finalErrorAnalyzer,
         {
-          reqData,
+          fn,
+          args,
           error: e,
           trialMode,
           params: hookParams?.finalErrorAnalyzerParams,
@@ -399,10 +443,11 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
         )}`
       );
     }
+
     if(!errorAnalysisResult) {
       throw e;
     } else {
-      return buildResult(false, undefined, e.message || 'Request failed');
+      return buildResult(false, undefined, e.message || 'Function execution failed');
     }
   }
 }

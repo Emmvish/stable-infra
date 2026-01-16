@@ -285,7 +285,7 @@ export class CircuitBreaker {
         
         if (!canExecute) {
             throw new CircuitBreakerOpenError(
-                `Circuit breaker is ${this.state}. Request blocked.`
+                `stable-request: Circuit breaker is ${this.state}. Request blocked.`
             );
         }
 

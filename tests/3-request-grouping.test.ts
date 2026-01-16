@@ -302,7 +302,7 @@ describe('Request Grouping - Hierarchical Configuration', () => {
       requestGroups: [{ id: 'my-group', commonConfig: {} }]
     });
 
-    expect(results[0]).toEqual({
+    expect(results[0]).toMatchObject({
       requestId: 'req-1',
       groupId: 'my-group',
       success: true,
