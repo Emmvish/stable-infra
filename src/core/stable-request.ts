@@ -251,7 +251,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
           attempt: `${currentAttempt}/${maxAttempts}`,
           error:
             res?.error ??
-            `stable-request: The response did not match your expectations! Response: ${safelyStringify(
+            `${formatLogContext(executionContext)}stable-request: The response did not match your expectations! Response: ${safelyStringify(
               res?.data,
               maxSerializableChars
             )}`,

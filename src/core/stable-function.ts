@@ -289,7 +289,7 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
           attempt: `${currentAttempt}/${maxAttempts}`,
           error:
             res?.error ??
-            `stable-request: The response did not match your expectations! Response: ${safelyStringify(
+            `${formatLogContext(executionContext)}stable-request: The response did not match your expectations! Response: ${safelyStringify(
               res?.data as Record<string, any>,
               maxSerializableChars
             )}`,
