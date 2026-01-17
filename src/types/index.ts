@@ -20,7 +20,7 @@ export interface ExecutionContext {
   requestId?: string;
 }
 
-export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any> {
+export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
   commonRequestData?: Partial<REQUEST_DATA<RequestDataType>>;
   commonAttempts?: number;
   commonHookParams?: HookParams;
@@ -139,7 +139,7 @@ export type ApiRequestOptionsMapping = {
   targetKey: string;
 };
 
-export type CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, ResponseDataType = any> = Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, "concurrentExecution"> & {
+export type CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> = Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>, "concurrentExecution"> & {
   executionContext?: Partial<ExecutionContext>;
 };
 
@@ -198,7 +198,7 @@ type RESPONSE_ERROR_TYPES = RESPONSE_ERRORS.HTTP_ERROR | RESPONSE_ERRORS.INVALID
 
 export type RETRY_STRATEGY_TYPES = RETRY_STRATEGIES.FIXED | RETRY_STRATEGIES.LINEAR | RETRY_STRATEGIES.EXPONENTIAL;
 
-export type SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, ResponseDataType = any> = Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, "concurrentExecution"> & {
+export type SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> = Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>, "concurrentExecution"> & {
   executionContext?: Partial<ExecutionContext>;
 };
 
@@ -477,7 +477,7 @@ export type VALID_REQUEST_PROTOCOL_TYPES =
   | VALID_REQUEST_PROTOCOLS.HTTP
   | VALID_REQUEST_PROTOCOLS.HTTPS;
 
-export interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType = any> {
+export interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
   id?: string;
   requests?: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[];
   functions?: API_GATEWAY_FUNCTION<any[], any>[];
@@ -500,8 +500,8 @@ export interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType =
   statePersistence?: StatePersistenceConfig;
 }
 
-export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType = any> 
-  extends Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, 
+export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>
+  extends Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>, 
     'concurrentExecution' | 'stopOnFirstError'> {
   workflowId?: string;
   stopOnFirstPhaseError?: boolean;
@@ -726,9 +726,9 @@ export interface EXECUTE_NON_LINEAR_WORKFLOW_RESPONSE<ResponseDataType = any> {
   terminationReason?: string;
 }
 
-export interface STABLE_WORKFLOW_BRANCH<RequestDataType = any, ResponseDataType = any> {
+export interface STABLE_WORKFLOW_BRANCH<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
   id: string;
-  phases: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>[];
+  phases: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
   markConcurrentBranch?: boolean;
   allowReplay?: boolean;
   maxReplayCount?: number;
@@ -737,7 +737,7 @@ export interface STABLE_WORKFLOW_BRANCH<RequestDataType = any, ResponseDataType 
     options: BranchDecisionHookOptions<ResponseDataType>
   ) => BranchExecutionDecision | Promise<BranchExecutionDecision>;
   statePersistence?: StatePersistenceConfig;
-  commonConfig?: Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>, 
+  commonConfig?: Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>, 
     'concurrentExecution' | 'stopOnFirstError' | 'requestGroups' | 'maxConcurrentRequests' | 'rateLimit' | 'circuitBreaker'>;
 }
 
@@ -1034,19 +1034,19 @@ export interface SystemMetrics {
 
 export type WorkflowNodeType = WorkflowNodeTypes.PHASE | WorkflowNodeTypes.BRANCH | WorkflowNodeTypes.CONDITIONAL | WorkflowNodeTypes.PARALLEL_GROUP | WorkflowNodeTypes.MERGE_POINT
 
-export interface WorkflowGraph<RequestDataType = any, ResponseDataType = any> {
-  nodes: Map<string, WorkflowNode<RequestDataType, ResponseDataType>>;
+export interface WorkflowGraph<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
+  nodes: Map<string, WorkflowNode<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>;
   edges: Map<string, WorkflowEdge[]>;
   entryPoint: string;
   exitPoints?: string[];
   metadata?: Record<string, any>;
 }
 
-export interface WorkflowNode<RequestDataType = any, ResponseDataType = any> {
+export interface WorkflowNode<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
   id: string;
   type: WorkflowNodeType;
-  phase?: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>;
-  branch?: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>;
+  phase?: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
+  branch?: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
   condition?: ConditionalNode<ResponseDataType>;
   parallelNodes?: string[];
   waitForNodes?: string[];
@@ -1091,8 +1091,8 @@ export interface ConditionalEvaluationContext<ResponseDataType = any> {
   phaseResult?: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>;
 }
 
-export interface WorkflowGraphOptions<RequestDataType = any, ResponseDataType = any> 
-  extends Omit<STABLE_WORKFLOW_OPTIONS<RequestDataType, ResponseDataType>, 'branches' | 'enableBranchExecution' | 'concurrentPhaseExecution' | 'enableMixedExecution' | 'enableNonLinearExecution'> {
+export interface WorkflowGraphOptions<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> 
+  extends Omit<STABLE_WORKFLOW_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>, 'branches' | 'enableBranchExecution' | 'concurrentPhaseExecution' | 'enableMixedExecution' | 'enableNonLinearExecution'> {
   validateGraph?: boolean;
   optimizeExecution?: boolean;
   maxGraphDepth?: number;

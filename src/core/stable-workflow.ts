@@ -14,10 +14,10 @@ import {
     MetricsAggregator
 } from '../utilities/index.js';
 
-export async function stableWorkflow<RequestDataType = any, ResponseDataType = any>(
-    phases: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>[],
-    options: STABLE_WORKFLOW_OPTIONS<RequestDataType, ResponseDataType> = {}
-): Promise<STABLE_WORKFLOW_RESULT<ResponseDataType>> {
+export async function stableWorkflow<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+    phases: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[],
+    options: STABLE_WORKFLOW_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {}
+): Promise<STABLE_WORKFLOW_RESULT<ResponseDataType | FunctionReturnType>> {
     const {
         stopOnFirstPhaseError = false,
         logPhaseResults = false,

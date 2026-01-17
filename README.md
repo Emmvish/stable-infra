@@ -1,6 +1,6 @@
 # @emmvish/stable-request
 
-A production-grade TypeScript framework for resilient API integrations, batch processing, and orchestrating complex workflows with deterministic error handling, type safety, and comprehensive observability.
+A production-grade TypeScript library for resilient API integrations, batch processing, and orchestrating complex workflows with deterministic error handling, type safety, and comprehensive observability.
 
 ## Table of Contents
 
@@ -42,12 +42,12 @@ A production-grade TypeScript framework for resilient API integrations, batch pr
 
 ## Overview
 
-**@emmvish/stable-request** evolved from a focused library for resilient API calls to a comprehensive workflow execution framework. Originally addressing **API integration challenges** via `stableRequest` function, it expanded to include:
+**@emmvish/stable-request** evolved from a focused library for resilient API calls to a comprehensive execution framework. Originally addressing API integration challenges, it expanded to include:
 
-- **Batch orchestration** via `stableApiGateway` for processing groups of mixed requests/functions
-- **Phased workflows** via `stableWorkflow` for array-based multi-phase execution with dynamic control flow
-- **Graph-based workflows** via `stableWorkflowGraph` for DAG execution with higher parallelism
-- **Generic function execution** via `stableFunction`, inheriting all resilience guards
+1. **Batch orchestration** via `stableApiGateway` for processing groups of mixed requests/functions
+2. **Phased workflows** via `stableWorkflow` for array-based multi-phase execution with dynamic control flow
+3. **Graph-based workflows** via `stableWorkflowGraph` for DAG execution with higher parallelism
+4. **Generic function execution** via `stableFunction`, inheriting all resilience guards
 
 All four execution modes support the same resilience stack: retries, jitter, circuit breaking, caching, rate/concurrency limits, config cascading, shared buffers, trial mode, comprehensive hooks, and metrics. This uniformity makes it trivial to compose requests and functions in any topology.
 
@@ -88,9 +88,16 @@ Single API call with resilience, type-safe request and response types.
 ```typescript
 import { stableRequest, REQUEST_METHODS, VALID_REQUEST_PROTOCOLS } from '@emmvish/stable-request';
 
-type User = { id: number; name: string };
+interface GetUserRequest {
+  // Empty for GET requests with no body
+}
 
-const result = await stableRequest<unknown, User>({
+interface User {
+  id: number;
+  name: string;
+}
+
+const result = await stableRequest<GetUserRequest, User>({
   reqData: {
     method: REQUEST_METHODS.GET,
     protocol: VALID_REQUEST_PROTOCOLS.HTTPS,
@@ -175,19 +182,37 @@ import {
 } from '@emmvish/stable-request';
 import type { API_GATEWAY_ITEM } from '@emmvish/stable-request';
 
-type ApiResponse = { id: number; value: string };
+// Define request types
+interface ApiRequestData {
+  filters?: Record<string, any>;
+}
 
-const items: API_GATEWAY_ITEM[] = [
+interface ApiResponse {
+  id: number;
+  value: string;
+}
+
+// Define function types
+type TransformArgs = [ApiResponse[], number];
+type TransformResult = {
+  transformed: ApiResponse[];
+  count: number;
+};
+
+type ValidateArgs = [TransformResult];
+type ValidateResult = boolean;
+
+const items: API_GATEWAY_ITEM<ApiRequestData, ApiResponse, TransformArgs | ValidateArgs, TransformResult | ValidateResult>[] = [
   {
     type: RequestOrFunction.REQUEST,
     request: {
-      id: 'fetch-user',
+      id: 'fetch-data',
       requestOptions: {
         reqData: {
           method: REQUEST_METHODS.GET,
           protocol: VALID_REQUEST_PROTOCOLS.HTTPS,
           hostname: 'api.example.com',
-          path: '/users/1'
+          path: '/data'
         },
         resReq: true,
         attempts: 3
@@ -199,18 +224,31 @@ const items: API_GATEWAY_ITEM[] = [
     function: {
       id: 'transform-data',
       functionOptions: {
-        fn: (user?: any) => ({
-          transformed: user?.name?.toUpperCase() || 'UNKNOWN'
+        fn: (data: ApiResponse[], threshold: number): TransformResult => ({
+          transformed: data.filter(item => item.id > threshold),
+          count: data.length
         }),
-        args: [],
+        args: [[], 10] as TransformArgs,
         returnResult: true,
-        attempts: 1
+        attempts: 2,
+        cache: { enabled: true, ttl: 5000 }
+      }
+    }
+  },
+  {
+    type: RequestOrFunction.FUNCTION,
+    function: {
+      id: 'validate-result',
+      functionOptions: {
+        fn: (result: TransformResult): ValidateResult => result.count > 0,
+        args: [{ transformed: [], count: 0 }] as ValidateArgs,
+        returnResult: true
       }
     }
   }
 ];
 
-const responses = await stableApiGateway<unknown, ApiResponse>(items, {
+const responses = await stableApiGateway<ApiRequestData, ApiResponse>(items, {
   concurrentExecution: true,
   stopOnFirstError: false,
   sharedBuffer: {},
@@ -237,19 +275,35 @@ responses.forEach((resp, i) => {
 Phased array-based workflows with sequential/concurrent phases, mixed items, and non-linear control flow.
 
 ```typescript
-import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
-import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-request';
+import { stableWorkflow, PHASE_DECISION_ACTIONS, RequestOrFunction } from '@emmvish/stable-request';
+import type { STABLE_WORKFLOW_PHASE, API_GATEWAY_ITEM } from '@emmvish/stable-request';
 
-const phases: STABLE_WORKFLOW_PHASE[] = [
+// Define types for requests
+interface FetchRequestData {}
+interface FetchResponse {
+  users: Array<{ id: number; name: string }>;
+  posts: Array<{ id: number; title: string }>;
+}
+
+// Define types for functions
+type ProcessArgs = [FetchResponse];
+type ProcessResult = {
+  merged: Array<{ userId: number; userName: string; postTitle: string }>;
+};
+
+type AuditArgs = [ProcessResult, string];
+type AuditResult = { logged: boolean; timestamp: string };
+
+const phases: STABLE_WORKFLOW_PHASE<FetchRequestData, FetchResponse, ProcessArgs | AuditArgs, ProcessResult | AuditResult>[] = [
   {
     id: 'fetch-data',
     requests: [
       {
-        id: 'api-call',
+        id: 'get-users-posts',
         requestOptions: {
           reqData: {
             hostname: 'api.example.com',
-            path: '/data'
+            path: '/users-and-posts'
           },
           resReq: true,
           attempts: 3
@@ -259,15 +313,21 @@ const phases: STABLE_WORKFLOW_PHASE[] = [
   },
   {
     id: 'process-and-audit',
-    markConcurrentPhase: true, // Run requests concurrently within phase
+    markConcurrentPhase: true,
     items: [
       {
         type: RequestOrFunction.FUNCTION,
         function: {
-          id: 'process',
+          id: 'process-data',
           functionOptions: {
-            fn: async (data?: any) => ({ processed: !!data }),
-            args: [],
+            fn: (data: FetchResponse): ProcessResult => ({
+              merged: data.users.map((user, idx) => ({
+                userId: user.id,
+                userName: user.name,
+                postTitle: data.posts[idx]?.title || 'No post'
+              }))
+            }),
+            args: [{ users: [], posts: [] }] as ProcessArgs,
             returnResult: true
           }
         }
@@ -275,10 +335,13 @@ const phases: STABLE_WORKFLOW_PHASE[] = [
       {
         type: RequestOrFunction.FUNCTION,
         function: {
-          id: 'audit-log',
+          id: 'audit-processing',
           functionOptions: {
-            fn: () => 'logged',
-            args: [],
+            fn: async (result: ProcessResult, auditId: string): Promise<AuditResult> => {
+              console.log(`Audit ${auditId}:`, result);
+              return { logged: true, timestamp: new Date().toISOString() };
+            },
+            args: [{ merged: [] }, 'audit-123'] as AuditArgs,
             returnResult: true
           }
         }
@@ -405,7 +468,10 @@ Constant wait between retries.
 ```typescript
 import { stableRequest, RETRY_STRATEGIES } from '@emmvish/stable-request';
 
-const result = await stableRequest({
+interface DataRequest {}
+interface DataResponse { data: any; }
+
+const result = await stableRequest<DataRequest, DataResponse>({
   reqData: { hostname: 'api.example.com', path: '/data' },
   resReq: true,
   attempts: 4,
@@ -420,7 +486,7 @@ const result = await stableRequest({
 Wait increases linearly with attempt number.
 
 ```typescript
-const result = await stableRequest({
+const result = await stableRequest<DataRequest, DataResponse>({
   reqData: { hostname: 'api.example.com', path: '/data' },
   resReq: true,
   attempts: 4,
@@ -435,7 +501,7 @@ const result = await stableRequest({
 Wait increases exponentially; useful for heavily loaded services.
 
 ```typescript
-const result = await stableRequest({
+const result = await stableRequest<DataRequest, DataResponse>({
   reqData: { hostname: 'api.example.com', path: '/data' },
   resReq: true,
   attempts: 4,
@@ -452,7 +518,7 @@ const result = await stableRequest({
 Add random milliseconds to prevent synchronization.
 
 ```typescript
-const result = await stableRequest({
+const result = await stableRequest<DataRequest, DataResponse>({
   reqData: { hostname: 'api.example.com', path: '/data' },
   resReq: true,
   attempts: 3,
@@ -467,7 +533,7 @@ const result = await stableRequest({
 Collect all outcomes instead of failing on first error.
 
 ```typescript
-const result = await stableRequest({
+const result = await stableRequest<DataRequest, DataResponse>({
   reqData: { hostname: 'api.example.com', path: '/data' },
   resReq: true,
   attempts: 3,
@@ -483,6 +549,9 @@ Prevent cascading failures by failing fast when a dependency becomes unhealthy.
 ```typescript
 import { stableApiGateway, CircuitBreaker } from '@emmvish/stable-request';
 
+interface FlakyRequest {}
+interface FlakyResponse { status: string; }
+
 const breaker = new CircuitBreaker({
   failureThresholdPercentage: 50,
   minimumRequests: 10,
@@ -496,7 +565,7 @@ const requests = [
   { id: 'req-2', requestOptions: { reqData: { path: '/flaky' }, resReq: true } }
 ];
 
-const responses = await stableApiGateway(requests, {
+const responses = await stableApiGateway<FlakyRequest, FlakyResponse>(requests, {
   circuitBreaker: breaker
 });
 
@@ -520,20 +589,27 @@ Cache responses to avoid redundant calls.
 ```typescript
 import { stableRequest, CacheManager } from '@emmvish/stable-request';
 
+interface UserRequest {}
+interface UserResponse {
+  id: number;
+  name: string;
+  email: string;
+}
+
 const cache = new CacheManager({
   enabled: true,
   ttl: 5000 // 5 seconds
 });
 
 // First call: cache miss, hits API
-const result1 = await stableRequest({
+const result1 = await stableRequest<UserRequest, UserResponse>({
   reqData: { hostname: 'api.example.com', path: '/user/1' },
   resReq: true,
   cache
 });
 
 // Second call within 5s: cache hit, returns cached response
-const result2 = await stableRequest({
+const result2 = await stableRequest<UserRequest, UserResponse>({
   reqData: { hostname: 'api.example.com', path: '/user/1' },
   resReq: true,
   cache
@@ -578,6 +654,12 @@ Enforce max requests per time window.
 ```typescript
 import { stableApiGateway } from '@emmvish/stable-request';
 
+interface ItemRequest {}
+interface ItemResponse {
+  id: number;
+  data: any;
+}
+
 const requests = Array.from({ length: 20 }, (_, i) => ({
   id: `req-${i}`,
   requestOptions: {
@@ -586,7 +668,7 @@ const requests = Array.from({ length: 20 }, (_, i) => ({
   }
 }));
 
-const responses = await stableApiGateway(requests, {
+const responses = await stableApiGateway<ItemRequest, ItemResponse>(requests, {
   concurrentExecution: true,
   rateLimit: {
     maxRequests: 5,
@@ -603,6 +685,12 @@ Limit concurrent in-flight requests.
 ```typescript
 import { stableApiGateway } from '@emmvish/stable-request';
 
+interface ItemRequest {}
+interface ItemResponse {
+  id: number;
+  data: any;
+}
+
 const requests = Array.from({ length: 50 }, (_, i) => ({
   id: `req-${i}`,
   requestOptions: {
@@ -612,7 +700,7 @@ const requests = Array.from({ length: 50 }, (_, i) => ({
   }
 }));
 
-const responses = await stableApiGateway(requests, {
+const responses = await stableApiGateway<ItemRequest, ItemResponse>(requests, {
   concurrentExecution: true,
   maxConcurrentRequests: 5 // Only 5 requests in-flight at a time
   // Others queued and executed as slots free
@@ -923,11 +1011,107 @@ const result = await stableWorkflow([], {
 // Both branches access/modify sharedBuffer
 ```
 
-### Graph-Based Workflows
+### Graph-Based Workflows with Mixed Items
 
-For complex topologies with explicit dependencies, use DAG execution.
+For complex topologies with explicit dependencies, use DAG execution mixing requests and functions.
 
-#### Parallel Groups
+```typescript
+import { stableWorkflowGraph, WorkflowGraphBuilder, RequestOrFunction } from '@emmvish/stable-request';
+import type { API_GATEWAY_ITEM } from '@emmvish/stable-request';
+
+// Request types
+interface PostsRequest {}
+interface PostsResponse { posts: Array<{ id: number; title: string }> };
+
+interface UsersRequest {}
+interface UsersResponse { users: Array<{ id: number; name: string }> };
+
+// Function types
+type AggregateArgs = [PostsResponse, UsersResponse];
+type AggregateResult = {
+  combined: Array<{ userId: number; userName: string; postCount: number }>;
+};
+
+type AnalyzeArgs = [AggregateResult];
+type AnalyzeResult = { totalPosts: number; activeUsers: number };
+
+const graph = new WorkflowGraphBuilder<
+  PostsRequest | UsersRequest,
+  PostsResponse | UsersResponse,
+  AggregateArgs | AnalyzeArgs,
+  AggregateResult | AnalyzeResult
+>()
+  .addPhase('fetch-posts', {
+    requests: [{
+      id: 'get-posts',
+      requestOptions: {
+        reqData: { path: '/posts' },
+        resReq: true
+      }
+    }]
+  })
+  .addPhase('fetch-users', {
+    requests: [{
+      id: 'get-users',
+      requestOptions: {
+        reqData: { path: '/users' },
+        resReq: true
+      }
+    }]
+  })
+  .addParallelGroup('fetch-all', ['fetch-posts', 'fetch-users'])
+  .addPhase('aggregate', {
+    functions: [{
+      id: 'combine-data',
+      functionOptions: {
+        fn: (posts: PostsResponse, users: UsersResponse): AggregateResult => ({
+          combined: users.users.map(user => ({
+            userId: user.id,
+            userName: user.name,
+            postCount: posts.posts.filter(p => p.id === user.id).length
+          }))
+        }),
+        args: [{ posts: [] }, { users: [] }] as AggregateArgs,
+        returnResult: true
+      }
+    }]
+  })
+  .addPhase('analyze', {
+    functions: [{
+      id: 'analyze-data',
+      functionOptions: {
+        fn: (aggregated: AggregateResult): AnalyzeResult => ({
+          totalPosts: aggregated.combined.reduce((sum, u) => sum + u.postCount, 0),
+          activeUsers: aggregated.combined.filter(u => u.postCount > 0).length
+        }),
+        args: [{ combined: [] }] as AnalyzeArgs,
+        returnResult: true
+      }
+    }]
+  })
+  .addMergePoint('sync', ['fetch-all'])
+  .connectSequence('fetch-all', 'sync', 'aggregate', 'analyze')
+  .setEntryPoint('fetch-all')
+  .build();
+
+const result = await stableWorkflowGraph(graph, {
+  workflowId: 'data-aggregation'
+});
+
+console.log(`Graph workflow success: ${result.success}`);
+```
+
+**Key responsibilities:**
+- Define phases as DAG nodes with explicit dependency edges
+- Execute independent phases in parallel automatically
+- Support parallel groups, merge points, and conditional routing
+- Validate graph structure (cycle detection, reachability, orphan detection)
+- Provide deterministic execution order
+- Offer higher parallelism than phased workflows for complex topologies
+
+---
+
+## Workflow Patterns
 
 Execute multiple phases concurrently within a group.
 
@@ -1160,7 +1344,13 @@ Modify config or state before execution.
 ```typescript
 import { stableRequest } from '@emmvish/stable-request';
 
-const result = await stableRequest({
+interface SecureRequest {}
+interface SecureResponse {
+  data: any;
+  token?: string;
+}
+
+const result = await stableRequest<SecureRequest, SecureResponse>({
   reqData: { path: '/secure-data' },
   resReq: true,
   preExecution: {
@@ -1191,9 +1381,13 @@ Validate responses and errors.
 ```typescript
 import { stableRequest } from '@emmvish/stable-request';
 
-type ApiResponse = { id: number; status: 'active' | 'inactive' };
+interface ResourceRequest {}
+interface ApiResponse {
+  id: number;
+  status: 'active' | 'inactive';
+}
 
-const result = await stableRequest<unknown, ApiResponse>({
+const result = await stableRequest<ResourceRequest, ApiResponse>({
   reqData: { path: '/resource' },
   resReq: true,
   responseAnalyzer: ({ data, reqData, trialMode }) => {
@@ -1213,7 +1407,13 @@ Decide whether to suppress error gracefully.
 ```typescript
 import { stableRequest } from '@emmvish/stable-request';
 
-const result = await stableRequest({
+interface FeatureRequest {}
+interface FeatureResponse {
+  enabled: boolean;
+  data?: any;
+}
+
+const result = await stableRequest<FeatureRequest, FeatureResponse>({
   reqData: { path: '/optional-feature' },
   resReq: true,
   finalErrorAnalyzer: ({ error, reqData, trialMode }) => {
@@ -1243,7 +1443,13 @@ Custom logging and processing.
 ```typescript
 import { stableRequest } from '@emmvish/stable-request';
 
-const result = await stableRequest({
+interface DataRequest {}
+interface DataResponse {
+  id: number;
+  value: string;
+}
+
+const result = await stableRequest<DataRequest, DataResponse>({
   reqData: { path: '/data' },
   resReq: true,
   logAllSuccessfulAttempts: true,
@@ -1266,7 +1472,7 @@ const result = await stableRequest({
 #### Error Handler
 
 ```typescript
-const result = await stableRequest({
+const result = await stableRequest<DataRequest, DataResponse>({
   reqData: { path: '/data' },
   resReq: true,
   logAllErrors: true,
@@ -1346,7 +1552,10 @@ Automatic metrics collection across all execution modes.
 ```typescript
 import { stableRequest } from '@emmvish/stable-request';
 
-const result = await stableRequest({
+interface DataRequest {}
+interface DataResponse { data: any; }
+
+const result = await stableRequest<DataRequest, DataResponse>({
   reqData: { path: '/data' },
   resReq: true,
   attempts: 3
@@ -1401,7 +1610,7 @@ console.log(result); // {
 #### Structured Error Logs
 
 ```typescript
-const result = await stableRequest({
+const result = await stableRequest<DataRequest, DataResponse>({
   reqData: { path: '/flaky' },
   resReq: true,
   attempts: 3,
@@ -1473,7 +1682,10 @@ Persist state across retry attempts for distributed tracing.
 ```typescript
 import { stableRequest } from '@emmvish/stable-request';
 
-const result = await stableRequest({
+interface DataRequest {}
+interface DataResponse { data: any; }
+
+const result = await stableRequest<DataRequest, DataResponse>({
   reqData: { path: '/data' },
   resReq: true,
   attempts: 3,
@@ -1497,21 +1709,68 @@ const result = await stableRequest({
 
 ### Mixed Request & Function Phases
 
-Combine API calls and computations in single phases.
+Combine API calls and computations in single phases with full type safety.
 
 ```typescript
 import { stableWorkflow, RequestOrFunction } from '@emmvish/stable-request';
 import type { STABLE_WORKFLOW_PHASE, API_GATEWAY_ITEM } from '@emmvish/stable-request';
 
-const phase: STABLE_WORKFLOW_PHASE = {
+// Request types
+interface ProductRequest {}\ninterface ProductResponse {
+  id: number;
+  name: string;
+  price: number;
+}
+
+interface InventoryRequest {}
+interface InventoryResponse {
+  productId: number;
+  stock: number;
+}
+
+// Function types
+type EnrichArgs = [ProductResponse[], InventoryResponse[]];
+type EnrichResult = Array<{
+  id: number;
+  name: string;
+  price: number;
+  stock: number;
+  inStock: boolean;
+}>;
+
+type CalculateArgs = [EnrichResult];
+type CalculateResult = {
+  totalValue: number;
+  lowStockItems: number;
+};
+
+type NotifyArgs = [CalculateResult, string];
+type NotifyResult = { notified: boolean };
+
+const phase: STABLE_WORKFLOW_PHASE<
+  ProductRequest | InventoryRequest,
+  ProductResponse | InventoryResponse,
+  EnrichArgs | CalculateArgs | NotifyArgs,
+  EnrichResult | CalculateResult | NotifyResult
+> = {
   id: 'mixed-phase',
   items: [
     {
       type: RequestOrFunction.REQUEST,
       request: {
-        id: 'fetch-user',
+        id: 'fetch-products',
         requestOptions: {
-          reqData: { path: '/users/1' },
+          reqData: { path: '/products' },
+          resReq: true
+        }
+      }
+    },
+    {
+      type: RequestOrFunction.REQUEST,
+      request: {
+        id: 'fetch-inventory',
+        requestOptions: {
+          reqData: { path: '/inventory' },
           resReq: true
         }
       }
@@ -1519,21 +1778,54 @@ const phase: STABLE_WORKFLOW_PHASE = {
     {
       type: RequestOrFunction.FUNCTION,
       function: {
-        id: 'transform',
+        id: 'enrich-products',
         functionOptions: {
-          fn: (user?: any) => ({ name: user?.name?.toUpperCase() }),
-          args: [],
+          fn: (products: ProductResponse[], inventory: InventoryResponse[]): EnrichResult => {
+            return products.map(product => {
+              const inv = inventory.find(i => i.productId === product.id);
+              return {
+                ...product,
+                stock: inv?.stock || 0,
+                inStock: (inv?.stock || 0) > 0
+              };
+            });
+          },
+          args: [[], []] as EnrichArgs,
+          returnResult: true,
+          cache: { enabled: true, ttl: 30000 }
+        }
+      }
+    },
+    {
+      type: RequestOrFunction.FUNCTION,
+      function: {
+        id: 'calculate-metrics',
+        functionOptions: {
+          fn: (enriched: EnrichResult): CalculateResult => ({
+            totalValue: enriched.reduce((sum, p) => sum + (p.price * p.stock), 0),
+            lowStockItems: enriched.filter(p => p.stock < 10 && p.stock > 0).length
+          }),
+          args: [[]] as CalculateArgs,
           returnResult: true
         }
       }
     },
     {
-      type: RequestOrFunction.REQUEST,
-      request: {
-        id: 'store-transformed',
-        requestOptions: {
-          reqData: { path: '/cache/user-names' },
-          resReq: false
+      type: RequestOrFunction.FUNCTION,
+      function: {
+        id: 'notify-if-needed',
+        functionOptions: {
+          fn: async (metrics: CalculateResult, channel: string): Promise<NotifyResult> => {
+            if (metrics.lowStockItems > 5) {
+              console.log(`Sending alert to ${channel}: ${metrics.lowStockItems} items low`);
+              return { notified: true };
+            }
+            return { notified: false };
+          },
+          args: [{ totalValue: 0, lowStockItems: 0 }, 'slack'] as NotifyArgs,
+          returnResult: true,
+          attempts: 3,
+          wait: 1000
         }
       }
     }
@@ -1541,7 +1833,8 @@ const phase: STABLE_WORKFLOW_PHASE = {
 };
 
 const result = await stableWorkflow([phase], {
-  workflowId: 'mixed-execution'
+  workflowId: 'mixed-execution',
+  sharedBuffer: {}
 });
 ```
 
@@ -1576,9 +1869,13 @@ await stableWorkflow(phases, {
 Use analyzers to ensure data shape and freshness.
 
 ```typescript
-type ApiResponse = { id: number; lastUpdated: string };
+interface DataRequest {}
+interface ApiResponse {
+  id: number;
+  lastUpdated: string;
+}
 
-const result = await stableRequest<unknown, ApiResponse>({
+const result = await stableRequest<DataRequest, ApiResponse>({
   reqData: { path: '/data' },
   resReq: true,
   responseAnalyzer: ({ data }) => {
@@ -1596,19 +1893,25 @@ const result = await stableRequest<unknown, ApiResponse>({
 Reduce latency and load on dependencies.
 
 ```typescript
+interface UserRequest {}
+interface UserResponse {
+  id: number;
+  name: string;
+}
+
 const userCache = new CacheManager({
   enabled: true,
   ttl: 30000, // 30 seconds
   respectCacheControl: true
 });
 
-await stableRequest({
+await stableRequest<UserRequest, UserResponse>({
   reqData: { path: '/users/1' },
   resReq: true,
   cache: userCache
 });
 
-await stableRequest({
+await stableRequest<UserRequest, UserResponse>({
   reqData: { path: '/users/1' },
   resReq: true,
   cache: userCache // Cached within 30s
@@ -1620,6 +1923,9 @@ await stableRequest({
 Protect against cascading failures.
 
 ```typescript
+interface ServiceRequest {}
+interface ServiceResponse { status: string; data: any; }
+
 const unstabledServiceBreaker = new CircuitBreaker({
   failureThresholdPercentage: 40,
   minimumRequests: 5,
@@ -1627,7 +1933,7 @@ const unstabledServiceBreaker = new CircuitBreaker({
   successThresholdPercentage: 80
 });
 
-await stableApiGateway(requests, {
+await stableApiGateway<ServiceRequest, ServiceResponse>(requests, {
   circuitBreaker: unstabledServiceBreaker
 });
 ```
@@ -1637,13 +1943,16 @@ await stableApiGateway(requests, {
 Respect external quotas and capacity.
 
 ```typescript
+interface ApiRequest {}
+interface ApiResponse { result: any; }
+
 // API allows 100 req/second, use 80% headroom
 const rateLimit = { maxRequests: 80, windowMs: 1000 };
 
 // Database connection pool has 10 slots, use 5
 const maxConcurrent = 5;
 
-await stableApiGateway(requests, {
+await stableApiGateway<ApiRequest, ApiResponse>(requests, {
   rateLimit,
   maxConcurrentRequests: maxConcurrent
 });
@@ -1669,7 +1978,10 @@ await stableWorkflow(phases, {
 Prevent noisy logs from large payloads.
 
 ```typescript
-await stableRequest({
+interface DataRequest {}
+interface DataResponse { data: any; }
+
+await stableRequest<DataRequest, DataResponse>({
   reqData: { path: '/data' },
   resReq: true,
   maxSerializableChars: 500, // Truncate logs to 500 chars

@@ -30,22 +30,22 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
     options: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>
 ): Promise<API_GATEWAY_RESULT<ResponseDataType>>;
 
-export async function stableApiGateway<RequestDataType = any, ResponseDataType = any>(
-    requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] | API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[],
-    functions: API_GATEWAY_FUNCTION<any[], any>[],
-    options: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>
-): Promise<API_GATEWAY_RESULT<ResponseDataType>>;
+export async function stableApiGateway<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+    requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] | API_GATEWAY_ITEM<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[],
+    functions: API_GATEWAY_FUNCTION<FunctionArgsType, FunctionReturnType>[],
+    options: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
+): Promise<API_GATEWAY_RESULT<ResponseDataType | FunctionReturnType>>;
 
-export async function stableApiGateway<RequestDataType = any, ResponseDataType = any>(
-    requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] | API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[] = [],
-    functionsOrOptions?: API_GATEWAY_FUNCTION<any[], any>[] | API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>,
-    options?: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>
-): Promise<API_GATEWAY_RESULT<ResponseDataType>> {
-    let functions: API_GATEWAY_FUNCTION<any[], any>[] = [];
-    let finalOptions: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType> = {};
+export async function stableApiGateway<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+    requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] | API_GATEWAY_ITEM<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[] = [],
+    functionsOrOptions?: API_GATEWAY_FUNCTION<FunctionArgsType, FunctionReturnType>[] | API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
+    options?: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
+): Promise<API_GATEWAY_RESULT<ResponseDataType | FunctionReturnType>> {
+    let functions: API_GATEWAY_FUNCTION<FunctionArgsType, FunctionReturnType>[] = [];
+    let finalOptions: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {};
     
     if (Array.isArray(functionsOrOptions)) {
-        functions = functionsOrOptions;
+        functions = functionsOrOptions as API_GATEWAY_FUNCTION<FunctionArgsType, FunctionReturnType>[];
         finalOptions = options || {};
     } else {
         finalOptions = functionsOrOptions || {};
@@ -60,10 +60,10 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
         circuitBreaker,
     } = finalOptions;
 
-    let items: API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[] = [];
+    let items: API_GATEWAY_ITEM<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[] = [];
     
     if (requests.length > 0 && 'type' in requests[0]) {
-        items = requests as API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[];
+        items = requests as API_GATEWAY_ITEM<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
     } else {
         items = (requests as API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[]).map(req => ({
             type: RequestOrFunction.REQUEST,
@@ -77,7 +77,7 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
     }
 
     if (items.length === 0) {
-        const emptyResult = [] as API_GATEWAY_RESULT<ResponseDataType>;
+        const emptyResult = [] as API_GATEWAY_RESULT<ResponseDataType | FunctionReturnType>;
         emptyResult.metrics = {
             totalRequests: 0,
             successfulRequests: 0,
@@ -88,7 +88,7 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
         return emptyResult;
     }
 
-    const requestExecutionOptions: CONCURRENT_REQUEST_EXECUTION_OPTIONS | SEQUENTIAL_REQUEST_EXECUTION_OPTIONS = {
+    const requestExecutionOptions: CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> | SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {
         stopOnFirstError,
         requestGroups,
         sharedBuffer: finalOptions.sharedBuffer,
@@ -99,18 +99,18 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
         executionContext: finalOptions.executionContext
     }
 
-    let responses: API_GATEWAY_RESPONSE<ResponseDataType>[];
+    let responses: API_GATEWAY_RESPONSE<ResponseDataType | FunctionReturnType>[];
     if (concurrentExecution) {
-        responses = await executeConcurrently<RequestDataType, ResponseDataType>(items, requestExecutionOptions as CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>);
+        responses = await executeConcurrently<RequestDataType, ResponseDataType>(items as any, requestExecutionOptions as CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>);
     } else {
-        responses = await executeSequentially<RequestDataType, ResponseDataType>(items, requestExecutionOptions as SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>);
+        responses = await executeSequentially<RequestDataType, ResponseDataType>(items as any, requestExecutionOptions as SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>);
     }
 
     const successfulRequests = responses.filter(r => r.success).length;
     const failedRequests = responses.filter(r => !r.success).length;
     const totalRequests = responses.length;
 
-    const result = responses as API_GATEWAY_RESULT<ResponseDataType>;
+    const result = responses as API_GATEWAY_RESULT<ResponseDataType | FunctionReturnType>;
     result.metrics = {
         totalRequests,
         successfulRequests,
