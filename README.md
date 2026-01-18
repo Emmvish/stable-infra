@@ -275,7 +275,7 @@ responses.forEach((resp, i) => {
 Phased array-based workflows with sequential/concurrent phases, mixed items, and non-linear control flow.
 
 ```typescript
-import { stableWorkflow, PHASE_DECISION_ACTIONS, RequestOrFunction } from '@emmvish/stable-request';
+import { stableWorkflow, PHASE_DECISION_ACTIONS, RequestOrFunction, REQUEST_METHODS } from '@emmvish/stable-request';
 import type { STABLE_WORKFLOW_PHASE, API_GATEWAY_ITEM } from '@emmvish/stable-request';
 
 // Define types for requests
@@ -363,7 +363,7 @@ const phases: STABLE_WORKFLOW_PHASE<FetchRequestData, FetchResponse, ProcessArgs
           reqData: {
             hostname: 'api.example.com',
             path: '/store',
-            method: 'POST'
+            method: REQUEST_METHODS.POST
           },
           resReq: false
         }

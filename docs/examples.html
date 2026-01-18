@@ -1,0 +1,2827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stable Request - Examples</title>
+  <link rel="icon" type="image/svg+xml" href="img/favicon.svg">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="navbar-container">
+      <a href="index.html" class="navbar-brand">
+        <img src="img/icon.svg" alt="Stable Request Logo" class="navbar-logo">
+        <span class="navbar-title">Stable Request</span>
+      </a>
+      <ul class="navbar-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="examples.html" class="active">Examples</a></li>
+        <li><a href="https://github.com/emmvish/stable-request" target="_blank">GitHub</a></li>
+        <li><a href="https://www.npmjs.com/package/@emmvish/stable-request" target="_blank">NPM</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="page-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-content">
+        <h3>Examples</h3>
+        <ul class="sidebar-links">
+          <li><a href="#example-1">Basic Request</a></li>
+          <li><a href="#example-2">Stable Function</a></li>
+          <li><a href="#example-3">API Gateway</a></li>
+          <li><a href="#example-4">Workflow</a></li>
+          <li><a href="#example-5">Workflow Graph</a></li>
+          <li><a href="#example-6">Circuit Breaker</a></li>
+          <li><a href="#example-7">Caching</a></li>
+          <li><a href="#example-8">Non-Linear Flow</a></li>
+          <li><a href="#example-9">Rate Limiting</a></li>
+          <li><a href="#example-10">Trial Mode</a></li>
+          <li><a href="#example-11">Config Cascading</a></li>
+          <li><a href="#example-12">State Buffers</a></li>
+          <li><a href="#example-13">State Persistence</a></li>
+          <li><a href="#example-14">Pre-Execution Hooks</a></li>
+          <li><a href="#example-15">Branched Workflows</a></li>
+          <li><a href="#example-16">Observability Hooks</a></li>
+          <li><a href="#example-17">Metrics & Performance</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <section class="hero">
+        <div class="hero-content">
+          <h1>Interactive Examples</h1>
+          <p>Explore @emmvish/stable-request with executable simulations.</p>
+        </div>
+      </section>
+
+      <!-- Example 1: Basic Stable Request -->
+      <section id="example-1" class="section">
+        <h2>Example 1: Stable Request – Single Resilient API Call</h2>
+        <p>Execute a single API request with automatic retries, circuit breaking, and caching.</p>
+        
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>import { stableRequest, RETRY_STRATEGIES, REQUEST_METHODS } from '@emmvish/stable-request';
+
+interface GetUserRequest {
+  hostname: string;
+  path: string;
+  method: REQUEST_METHODS;
+}
+
+interface User {
+  id: number;
+  name: string;
+  email?: string;
+}
+
+const result = await stableRequest&lt;GetUserRequest, User&gt;({
+  reqData: {
+    hostname: 'jsonplaceholder.typicode.com',
+    path: '/users/1',
+    method: REQUEST_METHODS.GET
+  },
+  resReq: true,
+  attempts: 3,
+  wait: 500,
+  retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+  jitter: 100,
+  cache: { enabled: true, ttl: 5000 },
+  responseAnalyzer: ({ data }) => {
+    return data?.id && data?.name;
+  }
+});
+
+if (result.success) {
+  console.log('User:', result.data); // Typed as User | null
+}</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample1()">Run Simulation</button>
+            </div>
+            <div id="example1-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Example 2: Stable Function – Type-Safe Function Execution -->
+      <section id="example-2" class="section">
+        <h2>Example 2: Stable Function – Type-Safe Function Execution</h2>
+        <p>Execute any async function with resilience guards: retries, caching, circuit breaker, rate limiting.</p>
+
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>import { stableFunction, RETRY_STRATEGIES } from '@emmvish/stable-request';
+
+// Type-safe function with arguments and return type
+const multiply = async (a: number, b: number): Promise<number> => {
+  if (Math.random() < 0.4) throw new Error('Random failure');
+  return a * b;
+};
+
+const result = await stableFunction&lt;[number, number], number&gt;({
+  function: { fn: multiply, args: [5, 3] },
+  attempts: 3,
+  wait: 300,
+  retryStrategy: RETRY_STRATEGIES.LINEAR,
+  cache: { 
+    enabled: true, 
+    ttl: 10000,
+    keyGenerator: (args) => `multiply_${args[0]}_${args[1]}`
+  },
+  rateLimit: { maxRequests: 10, windowMs: 1000 }
+});
+
+if (result.success) {
+  console.log('Result:', result.data); // Typed as number
+}</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample2()">Run Simulation</button>
+            </div>
+            <div id="example2-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Example 3: Stable API Gateway – Batch Orchestration -->
+      <section id="example-3" class="section">
+        <h2>Example 3: Stable API Gateway – Mixed Batch Orchestration</h2>
+        <p>Execute a batch of requests and functions concurrently with config cascading and shared state.</p>
+
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>import { stableApiGateway, REQUEST_METHODS, RequestOrFunction } from '@emmvish/stable-request';
+
+interface GatewayRequest {
+  path: string;
+  method: REQUEST_METHODS;
+}
+
+interface GatewayResponse {
+  items: Array<{ type: RequestOrFunction; success: boolean; data: any }>;
+}
+
+interface User { id: number; name: string; }
+interface Post { id: number; title: string; userId: number; }
+interface ProcessedUser { displayName: string; }
+interface ValidationResult { count: number; valid: boolean; }
+
+// Shared buffer to pass data between items
+const sharedBuffer: Record&lt;string, any&gt; = {};
+
+const items = [
+  {
+    type: RequestOrFunction.REQUEST,
+    request: {
+      id: 'fetch-user',
+      requestOptions: {
+        reqData: { path: '/users/1', method: REQUEST_METHODS.GET },
+        resReq: true,
+        attempts: 2,
+        handleSuccessfulAttemptData: ({ data, commonBuffer }) => {
+          // Store user data in buffer for functions to access
+          commonBuffer!.userData = data;
+        }
+      }
+    }
+  },
+  {
+    type: RequestOrFunction.REQUEST,
+    request: {
+      id: 'fetch-posts',
+      requestOptions: {
+        reqData: { path: '/posts?userId=1', method: REQUEST_METHODS.GET },
+        resReq: true,
+        attempts: 2,
+        handleSuccessfulAttemptData: ({ data, commonBuffer }) => {
+          // Store posts data in buffer for functions to access
+          commonBuffer!.postsData = data;
+        }
+      }
+    }
+  },
+  {
+    type: RequestOrFunction.FUNCTION,
+    function: {
+      id: 'process-user',
+      functionOptions: {
+        fn: (userData: User): ProcessedUser => ({ 
+          displayName: userData.name.toUpperCase() 
+        }),
+        args: [{ id: 0, name: '' }], // Placeholder
+        preExecution: {
+          preExecutionHook: ({ commonBuffer }) => {
+            // Pull userData from buffer and inject into args
+            const userData = commonBuffer?.userData || { id: 0, name: '' };
+            return { args: [userData] };
+          }
+        }
+      }
+    }
+  },
+  {
+    type: RequestOrFunction.FUNCTION,
+    function: {
+      id: 'validate-posts',
+      functionOptions: {
+        fn: (postsData: Post[]): ValidationResult => ({ 
+          count: postsData.length, 
+          valid: postsData.length > 0 
+        }),
+        args: [[]], // Placeholder
+        preExecution: {
+          preExecutionHook: ({ commonBuffer }) => {
+            // Pull postsData from buffer and inject into args
+            const postsData = commonBuffer?.postsData || [];
+            return { args: [postsData] };
+          }
+        }
+      }
+    }
+  }
+];
+
+const result = await stableApiGateway&lt;GatewayRequest, GatewayResponse&gt;(items, {
+  concurrentExecution: true,
+  sharedBuffer,
+  rateLimit: { maxRequests: 5, windowMs: 1000 }
+});
+
+console.log('User:', result.responses.find(r => r.id === 'fetch-user')?.data as User);
+console.log('Posts:', result.responses.find(r => r.id === 'fetch-posts')?.data as Post[]);
+console.log('Processed:', result.responses.find(r => r.id === 'process-user')?.data as ProcessedUser);
+console.log('Validated:', result.responses.find(r => r.id === 'validate-posts')?.data as ValidationResult);</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample3()">Run Simulation</button>
+            </div>
+            <div id="example3-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Example 4: Stable Workflow – Phased Execution -->
+      <section id="example-4" class="section">
+        <h2>Example 4: Stable Workflow – Phased Sequential & Concurrent Execution</h2>
+        <p>Orchestrate multi-phase workflows with sequential and concurrent phases for complex pipelines.</p>
+
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>const phases = [
+  {
+    id: 'fetch-user',
+    items: [{
+      type: RequestOrFunction.REQUEST,
+      request: {
+        id: 'user-api',
+        requestOptions: {
+          reqData: { path: '/users/1' },
+          resReq: true,
+          attempts: 2,
+          handleSuccessfulAttemptData: ({ data, commonBuffer }) => {
+            commonBuffer!.fetchedUser = data;
+          }
+        }
+      }
+    }]
+  },
+  {
+    id: 'process-concurrent',
+    markConcurrentPhase: true,
+    items: [
+      {
+        type: RequestOrFunction.FUNCTION,
+        function: {
+          id: 'transform',
+          functionOptions: {
+            fn: (data: User): TransformResult => ({ 
+              name: data.name.toUpperCase() 
+            }),
+            args: [{ id: 0, name: '' }], // Placeholder
+            preExecution: {
+              preExecutionHook: ({ commonBuffer }) => {
+                const userData = commonBuffer?.fetchedUser || { id: 0, name: '' };
+                return { args: [userData] };
+              }
+            }
+          }
+        }
+      },
+      {
+        type: RequestOrFunction.FUNCTION,
+        function: {
+          id: 'cache',
+          functionOptions: {
+            fn: (data: User): CacheResult => ({ 
+              cached: true, 
+              userId: data.id 
+            }),
+            args: [{ id: 0, name: '' }], // Placeholder
+            preExecution: {
+              preExecutionHook: ({ commonBuffer }) => {
+                const userData = commonBuffer?.fetchedUser || { id: 0, name: '' };
+                return { args: [userData] };
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+];
+
+const result = await stableWorkflow&lt;FetchUserRequest, WorkflowResponse&gt;(phases, {
+  workflowId: 'user-pipeline',
+  sharedBuffer: {},
+  concurrentPhaseExecution: false
+});</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample4()">Run Simulation</button>
+            </div>
+            <div id="example4-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Example 5: Stable Workflow Graph – DAG-Based Optimization -->
+      <section id="example-5" class="section">
+        <h2>Example 5: Stable Workflow Graph – DAG-Based Workflow with Parallelism</h2>
+        <p>Define explicit dependency graphs with parallel groups and merge points for optimal execution.</p>
+
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>import { stableWorkflowGraph, WorkflowGraphBuilder, REQUEST_METHODS } from '@emmvish/stable-request';
+
+interface GraphRequest {
+  method: REQUEST_METHODS;
+  path: string;
+}
+
+interface GraphResponse {
+  nodes: { user: User; posts: Post[]; comments: Comment[]; aggregated: AggregatedData };
+}
+
+interface User { id: number; name: string; }
+interface Post { id: number; title: string; }
+interface Comment { id: number; text: string; }
+interface AggregatedData { users: User[]; posts: Post[]; comments: Comment[]; }
+
+const graph = new WorkflowGraphBuilder()
+  .addNode('fetch-user', {
+    requests: [{
+      id: 'user',
+      requestOptions: { reqData: { method: REQUEST_METHODS.GET, path: '/users/1' } }
+    }]
+  })
+  .addNode('fetch-posts', {
+    requests: [{
+      id: 'posts',
+      requestOptions: { reqData: { method: REQUEST_METHODS.GET, path: '/posts?userId=1' } }
+    }]
+  })
+  .addNode('fetch-comments', {
+    requests: [{
+      id: 'comments',
+      requestOptions: { reqData: { method: REQUEST_METHODS.GET, path: '/comments?userId=1' } }
+    }]
+  })
+  .addParallelGroup(['fetch-posts', 'fetch-comments'], 'fetch-user')
+  .addNode('aggregate', {
+    requests: [{
+      id: 'aggregate',
+      requestOptions: { reqData: { method: REQUEST_METHODS.GET, path: '/aggregate' } }
+    }]
+  })
+  .addEdge('fetch-posts', 'aggregate')
+  .addEdge('fetch-comments', 'aggregate')
+  .build();
+
+const result = await stableWorkflowGraph&lt;GraphRequest, GraphResponse&gt;(graph, {
+  workflowId: 'complex-pipeline'
+});</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample5()">Run Simulation</button>
+            </div>
+            <div id="example5-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Example 6: Circuit Breaker Protection -->
+      <section id="example-6" class="section">
+        <h2>Example 6: Circuit Breaker – Preventing Cascading Failures</h2>
+        <p>Automatically fail fast and prevent cascading failures when a service becomes unhealthy.</p>
+
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>import { CircuitBreaker, stableRequest, REQUEST_METHODS } from '@emmvish/stable-request';
+
+interface ServiceRequest {
+  method: REQUEST_METHODS;
+  path: string;
+}
+
+interface ServiceResponse {
+  status: string;
+  data: unknown;
+}
+
+const breaker = new CircuitBreaker({
+  failureThresholdPercentage: 50,
+  minimumRequests: 5,
+  recoveryTimeoutMs: 5000
+});
+
+const result = await stableRequest&lt;ServiceRequest, ServiceResponse&gt;({
+  reqData: { method: REQUEST_METHODS.GET, path: '/flaky-service' },
+  resReq: true,
+  attempts: 2,
+  circuitBreaker: breaker,
+  handleErrors: ({ attempt, error, circuitBreakerState }) => {
+    console.log(`Attempt ${attempt} failed. CB State: ${circuitBreakerState}`);
+  }
+});
+
+// Circuit breaker tracks failures across calls
+// After 50% failure rate, opens circuit (OPEN)
+// Subsequent calls fail fast without retrying
+// Recovers after timeout (transitions to HALF_OPEN)</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample6()">Run Simulation</button>
+            </div>
+            <div id="example6-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Example 7: Response Caching -->
+      <section id="example-7" class="section">
+        <h2>Example 7: Response Caching – Optimize Latency with Smart Caching</h2>
+        <p>Cache successful responses and avoid redundant requests for identical queries.</p>
+
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>import { stableRequest, REQUEST_METHODS } from '@emmvish/stable-request';
+
+interface CacheRequest {
+  method: REQUEST_METHODS;
+  path: string;
+}
+
+interface CachedUser {
+  id: number;
+  name: string;
+  email: string;
+}
+
+const result1 = await stableRequest&lt;CacheRequest, CachedUser&gt;({
+  reqData: { method: REQUEST_METHODS.GET, path: '/users/1' },
+  resReq: true,
+  attempts: 2,
+  cache: {
+    enabled: true,
+    ttl: 5000, // 5 second TTL
+    // Cache hits show in metrics
+    // Useful for idempotent read operations
+  }
+});
+
+// Identical request within 5s returns cached response
+// No actual network call, metrics show cache hit
+const result2 = await stableRequest&lt;CacheRequest, CachedUser&gt;({
+  reqData: { method: REQUEST_METHODS.GET, path: '/users/1' },
+  resReq: true,
+  attempts: 2,
+  cache: { enabled: true, ttl: 5000 }
+});
+
+console.log('Result 2 from cache:', result2.data); // Typed as CachedUser | null
+// Check result2.metrics.cacheHit for cache hit indicator</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample7()">Run Simulation</button>
+            </div>
+            <div id="example7-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Example 8: Non-Linear Workflows (REPLAY, SKIP, JUMP) -->
+      <section id="example-8" class="section">
+        <h2>Example 8: Non-Linear Workflows – Decision-Driven Control Flow</h2>
+        <p>Use decision hooks to dynamically control workflow: CONTINUE, SKIP, REPLAY, JUMP, TERMINATE.</p>
+
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
+
+interface AdaptiveRequest {
+  needsRetry?: boolean;
+  failed?: boolean;
+}
+
+interface AdaptiveResponse {
+  phase: string;
+  status: 'success' | 'retry' | 'jump';
+}
+
+interface PhaseData { needsRetry?: boolean; failed?: boolean; }
+
+const phases = [
+  { id: 'phase1', requests: [{ ... }] },
+  { id: 'phase2', requests: [{ ... }] },
+  { id: 'phase3', requests: [{ ... }] },
+  { id: 'retry-logic', requests: [{ ... }] }
+];
+
+const result = await stableWorkflow&lt;AdaptiveRequest, AdaptiveResponse&gt;(phases, {
+  workflowId: 'adaptive-workflow',
+  phaseDecisionHook: async ({
+    phaseId,
+    phaseResults,
+    executionHistory,
+    sharedBuffer
+  }): Promise<string | { action: string; targetPhaseId?: string }> => {
+    if (phaseId === 'phase1' && (phaseResults[0]?.data as PhaseData)?.needsRetry) {
+      // REPLAY: re-execute phase1 (with max replay count)
+      return PHASE_DECISION_ACTIONS.REPLAY;
+    }
+    if (phaseId === 'phase2' && (phaseResults[0]?.data as PhaseData)?.failed) {
+      // JUMP: skip to phase3 or retry-logic
+      return { action: PHASE_DECISION_ACTIONS.JUMP, targetPhaseId: 'retry-logic' };
+    }
+    // CONTINUE: default next phase
+    return PHASE_DECISION_ACTIONS.CONTINUE;
+  }
+});</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample8()">Run Simulation</button>
+            </div>
+            <div id="example8-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Example 9: Rate Limiting & Concurrency Control -->
+      <section id="example-9" class="section">
+        <h2>Example 9: Rate Limiting & Concurrency – Control Request Throughput</h2>
+        <p>Respect external API limits and manage concurrent in-flight requests.</p>
+
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>import { stableApiGateway, REQUEST_METHODS } from '@emmvish/stable-request';
+
+interface ItemRequest {
+  method: REQUEST_METHODS;
+  path: string;
+}
+
+interface ItemResponse {
+  id: number;
+  data: unknown;
+}
+
+const requests = Array.from({ length: 20 }, (_, i) => ({
+  id: `req-${i}`,
+  requestOptions: {
+    reqData: { method: REQUEST_METHODS.GET, path: `/items/${i}` },
+    resReq: true,
+    attempts: 1
+  }
+}));
+
+const result = await stableApiGateway&lt;ItemRequest, ItemResponse&gt;(requests, {
+  concurrentExecution: true,
+  rateLimit: {
+    maxRequests: 5,     // Max 5 requests
+    windowMs: 1000      // per 1 second
+  },
+  maxConcurrentRequests: 3,  // Max 3 in-flight
+  
+  // Results: requests queued and processed respecting:
+  // - Rate limit: 5 per second
+  // - Concurrency: max 3 in-flight at a time
+  // - Slower external APIs won't be overwhelmed
+  // - Utilization metrics track usage
+});
+
+console.log(result.metrics?.rateLimiterStats);</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample9()">Run Simulation</button>
+            </div>
+            <div id="example9-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Example 10: Trial Mode – Safe Testing -->
+      <section id="example-10" class="section">
+        <h2>Example 10: Trial Mode – Dry-Run Without Side Effects</h2>
+        <p>Test workflows and retry logic safely without making actual API calls or state changes.</p>
+
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>import { stableRequest, REQUEST_METHODS } from '@emmvish/stable-request';
+
+interface CriticalOpRequest {
+  method: REQUEST_METHODS;
+  path: string;
+}
+
+interface OperationResult {
+  success: boolean;
+  transactionId: string;
+}
+
+const result = await stableRequest&lt;CriticalOpRequest, OperationResult&gt;({
+  reqData: { method: REQUEST_METHODS.POST, path: '/critical-operation' },
+  resReq: true,
+  attempts: 3,
+  wait: 500,
+  
+  // Enable trial mode for dry-run
+  trialMode: {
+    enabled: true,
+    // Simulate failure on 40% of calls
+    reqFailureProbability: 0.4,
+    // Simulate failure on 90% retries
+    retryFailureProbability: 0.9
+  },
+  
+  handleSuccessfulAttemptData: ({ attempt, data }: { attempt: number; data: OperationResult }) => {
+    console.log(`[TRIAL] Attempt ${attempt} would succeed`);
+  },
+  
+  handleErrors: ({ attempt, error }: { attempt: number; error: Error }) => {
+    console.log(`[TRIAL] Attempt ${attempt} would fail`);
+  }
+});
+
+// Trial mode:
+// - No actual API calls made
+// - Simulates successes/failures
+// - Tests retry logic and decision hooks
+// - Validates workflow behavior safely
+// - Useful before production deployment</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample10()">Run Simulation</button>
+            </div>
+            <div id="example10-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Example 11: Config Cascading -->
+      <section id="example-11" class="section">
+        <h2>Example 11: Config Cascading – Multi-Level Configuration</h2>
+        <p>Apply configuration at global, group, and individual request levels with intelligent cascading.</p>
+
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>import { stableApiGateway, REQUEST_METHODS, RETRY_STRATEGIES } from '@emmvish/stable-request';
+
+interface CascadeRequest {
+  method: REQUEST_METHODS;
+  path: string;
+}
+
+interface CascadeResponse {
+  id: number;
+  data: any;
+}
+
+// Define request groups with specific configurations
+const requestGroups = [
+  {
+    id: 'critical-group',
+    commonConfig: {
+      commonAttempts: 5,              // Critical requests get 5 attempts
+      commonWait: 1000,
+      commonRetryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
+      commonCircuitBreaker: {
+        failureThresholdPercentage: 30,
+        minimumRequests: 3,
+        recoveryTimeoutMs: 10000
+      }
+    }
+  },
+  {
+    id: 'normal-group',
+    commonConfig: {
+      commonAttempts: 2,              // Normal requests get 2 attempts
+      commonWait: 500
+    }
+  }
+];
+
+const requests = [
+  {
+    id: 'critical-req-1',
+    groupId: 'critical-group',        // Inherits critical-group config
+    requestOptions: {
+      reqData: { method: REQUEST_METHODS.GET, path: '/critical/data' },
+      resReq: true
+      // Inherits: 5 attempts, 1000ms wait, circuit breaker
+    }
+  },
+  {
+    id: 'critical-req-2',
+    groupId: 'critical-group',
+    requestOptions: {
+      reqData: { method: REQUEST_METHODS.GET, path: '/critical/backup' },
+      resReq: true,
+      attempts: 3                     // Override: only 3 attempts for this one
+      // Inherits: 1000ms wait, circuit breaker
+    }
+  },
+  {
+    id: 'normal-req-1',
+    groupId: 'normal-group',          // Inherits normal-group config
+    requestOptions: {
+      reqData: { method: REQUEST_METHODS.GET, path: '/data/1' },
+      resReq: true
+      // Inherits: 2 attempts, 500ms wait
+    }
+  },
+  {
+    id: 'standalone-req',
+    // No groupId - uses only global config
+    requestOptions: {
+      reqData: { method: REQUEST_METHODS.GET, path: '/standalone' },
+      resReq: true,
+      attempts: 1                     // Override global config
+    }
+  }
+];
+
+const result = await stableApiGateway&lt;CascadeRequest, CascadeResponse&gt;(requests, {
+  // Global configuration (lowest priority)
+  commonAttempts: 2,
+  commonWait: 300,
+  commonRetryStrategy: RETRY_STRATEGIES.LINEAR,
+  commonRateLimit: { maxRequests: 10, windowMs: 1000 },
+  
+  // Request groups (medium priority)
+  requestGroups,
+  
+  concurrentExecution: true,
+  sharedBuffer: {},
+  
+  // Individual request configs have highest priority
+  // Priority: Individual > Group > Global
+});
+
+// Config cascade demonstration:
+// critical-req-1: 5 attempts (group), 1000ms wait (group), circuit breaker (group)
+// critical-req-2: 3 attempts (override), 1000ms wait (group), circuit breaker (group)
+// normal-req-1: 2 attempts (group), 500ms wait (group)
+// standalone-req: 1 attempt (override), 300ms wait (global)
+
+console.log('Execution completed with cascaded configurations');
+console.log('Metrics:', result.metrics);</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample11()">Run Simulation</button>
+            </div>
+            <div id="example11-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Example 12: State Buffers -->
+      <section id="example-12" class="section">
+        <h2>Example 12: State Buffers – Shared State Across Workflow</h2>
+        <p>Share data between requests, phases, and hooks using sharedBuffer for complex workflows.</p>
+
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>import { stableWorkflow, REQUEST_METHODS, RequestOrFunction } from '@emmvish/stable-request';
+
+interface BufferRequest {
+  method: REQUEST_METHODS;
+  path: string;
+}
+
+interface User { id: number; name: string; email: string; }
+interface UserPosts { userId: number; posts: any[]; }
+interface Analytics { totalPosts: number; userActivity: string; }
+
+// SharedBuffer allows data sharing across phases
+const sharedBuffer: Record&lt;string, any&gt; = {
+  config: { threshold: 5 },
+  analytics: { totalRequests: 0 }
+};
+
+const phases = [
+  {
+    id: 'fetch-user',
+    items: [{
+      type: RequestOrFunction.REQUEST,
+      request: {
+        id: 'user-data',
+        requestOptions: {
+          reqData: { method: REQUEST_METHODS.GET, path: '/users/1' },
+          resReq: true,
+          // Access buffer in hooks
+          handleSuccessfulAttemptData: ({ data, commonBuffer }) => {
+            // Store user data in buffer
+            commonBuffer!.userData = data;
+            commonBuffer!.analytics.totalRequests++;
+            console.log('Stored user in buffer:', data);
+          }
+        }
+      }
+    }]
+  },
+  {
+    id: 'fetch-posts',
+    items: [{
+      type: RequestOrFunction.FUNCTION,
+      function: {
+        id: 'get-posts',
+        functionOptions: {
+          fn: async (userId: number): Promise&lt;UserPosts&gt; => {
+            // Simulate API call
+            return { userId, posts: Array(3).fill({ title: 'Post' }) };
+          },
+          args: [1],
+          // Read from buffer
+          preExecution: {
+            preExecutionHook: ({ commonBuffer }) => {
+              const userId = commonBuffer?.userData?.id || 1;
+              console.log('Retrieved userId from buffer:', userId);
+              // Modify function args based on buffer
+              return { args: [userId] };
+            }
+          },
+          handleSuccessfulAttemptData: ({ data, commonBuffer }) => {
+            // Store posts in buffer
+            commonBuffer!.userPosts = data;
+            commonBuffer!.analytics.totalRequests++;
+          }
+        }
+      }
+    }]
+  },
+  {
+    id: 'analyze',
+    items: [{
+      type: RequestOrFunction.FUNCTION,
+      function: {
+        id: 'analyze-activity',
+        functionOptions: {
+          fn: async (userData: User, postsData: UserPosts): Promise&lt;Analytics&gt; => {
+            return {
+              totalPosts: postsData.posts.length,
+              userActivity: postsData.posts.length > 5 ? 'High' : 'Normal'
+            };
+          },
+          args: [],
+          // Read multiple values from buffer
+          preExecution: {
+            preExecutionHook: ({ commonBuffer }) => {
+              const userData = commonBuffer?.userData;
+              const postsData = commonBuffer?.userPosts;
+              console.log('Analyzing with buffer data');
+              return { args: [userData, postsData] };
+            }
+          },
+          handleSuccessfulAttemptData: ({ data, commonBuffer }) => {
+            commonBuffer!.analytics = { ...commonBuffer!.analytics, ...data };
+            console.log('Final analytics:', commonBuffer!.analytics);
+          }
+        }
+      }
+    }]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'stateful-pipeline',
+  sharedBuffer,
+  logPhaseResults: true,
+  handlePhaseCompletion: ({ phaseId, sharedBuffer }) => {
+    console.log(`Phase ${phaseId} completed. Buffer state:`, sharedBuffer);
+  }
+});
+
+// Access final buffer state
+console.log('Final buffer:', sharedBuffer);
+console.log('Total requests made:', sharedBuffer.analytics.totalRequests);
+console.log('User activity level:', sharedBuffer.analytics.userActivity);</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample12()">Run Simulation</button>
+            </div>
+            <div id="example12-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Example 13: State Persistence -->
+      <section id="example-13" class="section">
+        <h2>Example 13: State Persistence – Resume Workflows Across Restarts</h2>
+        <p>Persist workflow state to external storage and resume execution after failures or restarts.</p>
+
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>import { stableWorkflow, REQUEST_METHODS, RequestOrFunction } from '@emmvish/stable-request';
+
+interface PersistRequest {
+  method: REQUEST_METHODS;
+  path: string;
+}
+
+interface ProcessingState {
+  processedItems: number;
+  lastCheckpoint: string;
+  partialResults: any[];
+}
+
+// Simulated external storage (database, Redis, file system, etc.)
+const externalStorage: Map&lt;string, any&gt; = new Map();
+
+// State persistence configuration
+const statePersistence = {
+  // Load state before hooks
+  loadBeforeHooks: true,
+  // Store state after hooks
+  storeAfterHooks: true,
+  
+  // Persistence function to save/load state
+  persistenceFunction: async ({ 
+    executionContext, 
+    buffer, 
+    params 
+  }) => {
+    const key = `workflow_${executionContext.workflowId}_${executionContext.phaseId}`;
+    
+    if (params?.operation === 'save') {
+      // Save current state
+      const state = {
+        buffer,
+        timestamp: new Date().toISOString(),
+        executionContext
+      };
+      externalStorage.set(key, state);
+      console.log(`[PERSIST] Saved state for ${key}`);
+      return buffer;
+    } else {
+      // Load previous state
+      const savedState = externalStorage.get(key);
+      if (savedState) {
+        console.log(`[PERSIST] Loaded state from ${savedState.timestamp}`);
+        return savedState.buffer;
+      }
+      console.log(`[PERSIST] No saved state found for ${key}`);
+      return buffer;
+    }
+  },
+  
+  persistenceParams: { operation: 'save' }
+};
+
+const phases = [
+  {
+    id: 'data-ingestion',
+    items: [{
+      type: RequestOrFunction.FUNCTION,
+      function: {
+        id: 'ingest-data',
+        functionOptions: {
+          fn: async (batchSize: number): Promise&lt;any[]&gt; => {
+            // Simulate data ingestion
+            return Array.from({ length: batchSize }, (_, i) => ({ 
+              id: i, 
+              data: `item-${i}` 
+            }));
+          },
+          args: [10],
+          handleSuccessfulAttemptData: ({ data, commonBuffer }) => {
+            commonBuffer!.ingestedData = data;
+            commonBuffer!.processedItems = 0;
+            console.log(`Ingested ${data.length} items`);
+          }
+        }
+      }
+    }],
+    // Phase-level state persistence
+    statePersistence
+  },
+  {
+    id: 'process-batch',
+    items: [{
+      type: RequestOrFunction.FUNCTION,
+      function: {
+        id: 'process-items',
+        functionOptions: {
+          fn: async (items: any[]): Promise&lt;ProcessingState&gt; => {
+            // Simulate processing that might fail
+            if (Math.random() < 0.3) {
+              throw new Error('Processing failed - will resume from checkpoint');
+            }
+            return {
+              processedItems: items.length,
+              lastCheckpoint: new Date().toISOString(),
+              partialResults: items.map(i => ({ ...i, processed: true }))
+            };
+          },
+          args: [],
+          attempts: 5,
+          wait: 2000,
+          preExecution: {
+            preExecutionHook: ({ commonBuffer }) => {
+              // Resume from buffer state
+              const items = commonBuffer?.ingestedData || [];
+              const processed = commonBuffer?.processedItems || 0;
+              console.log(`Resuming processing from item ${processed}`);
+              return { args: [items.slice(processed)] };
+            }
+          },
+          handleSuccessfulAttemptData: ({ data, commonBuffer }) => {
+            commonBuffer!.processedItems = data.processedItems;
+            commonBuffer!.lastCheckpoint = data.lastCheckpoint;
+            console.log(`Checkpoint: ${data.processedItems} items processed`);
+          }
+        }
+      }
+    }],
+    statePersistence
+  },
+  {
+    id: 'finalize',
+    items: [{
+      type: RequestOrFunction.FUNCTION,
+      function: {
+        id: 'finalize-processing',
+        functionOptions: {
+          fn: async (state: ProcessingState): Promise&lt;string&gt; => {
+            return `Completed: ${state.processedItems} items at ${state.lastCheckpoint}`;
+          },
+          args: [],
+          preExecution: {
+            preExecutionHook: ({ commonBuffer }) => {
+              const state = {
+                processedItems: commonBuffer?.processedItems,
+                lastCheckpoint: commonBuffer?.lastCheckpoint,
+                partialResults: []
+              };
+              return { args: [state] };
+            }
+          }
+        }
+      }
+    }],
+    statePersistence
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'resilient-pipeline',
+  sharedBuffer: {},
+  // Global state persistence
+  statePersistence,
+  logPhaseResults: true,
+  handlePhaseError: ({ phaseId, error, sharedBuffer }) => {
+    console.log(`[ERROR] Phase ${phaseId} failed. State persisted for recovery.`);
+    console.log('Buffer at failure:', sharedBuffer);
+  }
+});
+
+// State is automatically persisted at each phase
+// If workflow crashes, restart will resume from last checkpoint
+// External storage maintains state across process restarts
+
+console.log('Workflow result:', result.success);
+console.log('Persisted states:', Array.from(externalStorage.keys()));</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample13()">Run Simulation</button>
+            </div>
+            <div id="example13-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Example 14: Pre-Execution Hooks -->
+      <section id="example-14" class="section">
+        <h2>Example 14: Pre-Execution Hooks – Dynamic Configuration</h2>
+        <p>Modify request configuration dynamically before execution based on runtime conditions.</p>
+
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>import { stableRequest, REQUEST_METHODS, RETRY_STRATEGIES } from '@emmvish/stable-request';
+
+interface DynamicRequest {
+  method: REQUEST_METHODS;
+  path: string;
+  headers?: Record&lt;string, string&gt;;
+}
+
+interface ApiResponse {
+  data: any;
+  timestamp: string;
+}
+
+// Simulated token provider
+const getAuthToken = async (): Promise&lt;string&gt; => {
+  return `Bearer token-${Date.now()}`;
+};
+
+// Simulated environment checker
+const checkEnvironment = (): { isProd: boolean; region: string } => {
+  return { 
+    isProd: process.env.NODE_ENV === 'production',
+    region: process.env.AWS_REGION || 'us-east-1'
+  };
+};
+
+const result = await stableRequest&lt;DynamicRequest, ApiResponse&gt;({
+  reqData: {
+    method: REQUEST_METHODS.GET,
+    hostname: 'api.example.com',
+    path: '/data',
+    headers: {}
+  },
+  resReq: true,
+  attempts: 3,
+  wait: 500,
+  
+  // Pre-execution hook for dynamic configuration
+  preExecution: {
+    preExecutionHook: async ({ stableRequestOptions, commonBuffer, inputParams }) => {
+      console.log('[PRE-EXEC] Preparing request configuration...');
+      
+      // 1. Fetch authentication token dynamically
+      const authToken = await getAuthToken();
+      console.log('[PRE-EXEC] Auth token acquired');
+      
+      // 2. Check environment and adjust configuration
+      const env = checkEnvironment();
+      console.log(`[PRE-EXEC] Environment: ${env.isProd ? 'PROD' : 'DEV'}`);
+      
+      // 3. Read from shared buffer
+      const priority = commonBuffer?.requestPriority || 'normal';
+      
+      // 4. Modify request configuration
+      const modifiedConfig = {
+        ...stableRequestOptions,
+        reqData: {
+          ...stableRequestOptions.reqData,
+          hostname: env.isProd ? 'api.example.com' : 'api-staging.example.com',
+          headers: {
+            ...stableRequestOptions.reqData.headers,
+            'Authorization': authToken,
+            'X-Region': env.region,
+            'X-Priority': priority,
+            'X-Client-Id': inputParams?.clientId || 'default'
+          }
+        },
+        // Adjust retry strategy based on environment
+        retryStrategy: env.isProd ? RETRY_STRATEGIES.EXPONENTIAL : RETRY_STRATEGIES.LINEAR,
+        attempts: env.isProd ? 5 : 2,
+        wait: env.isProd ? 1000 : 300
+      };
+      
+      console.log('[PRE-EXEC] Configuration adjusted for environment');
+      
+      // Return modified configuration
+      return modifiedConfig;
+    },
+    
+    // Parameters passed to pre-execution hook
+    preExecutionHookParams: { clientId: 'client-123' },
+    
+    // Apply the config override from pre-execution hook
+    applyPreExecutionConfigOverride: true,
+    
+    // Continue even if pre-execution hook fails
+    continueOnPreExecutionHookFailure: false
+  },
+  
+  commonBuffer: { requestPriority: 'high' },
+  
+  handleSuccessfulAttemptData: ({ data, reqData }) => {
+    console.log('Request completed with dynamic headers:', reqData.headers);
+    console.log('Response:', data);
+  }
+});
+
+// Pre-execution hooks enable:
+// - Dynamic authentication
+// - Environment-based configuration
+// - Request modification based on buffer state
+// - Runtime parameter injection
+// - Conditional retry strategies
+
+console.log('Result:', result.data);</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample14()">Run Simulation</button>
+            </div>
+            <div id="example14-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Example 15: Branched Workflows -->
+      <section id="example-15" class="section">
+        <h2>Example 15: Branched Workflows – Parallel Execution Paths</h2>
+        <p>Execute multiple independent workflow branches concurrently with branch-level control flow.</p>
+
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>import { stableWorkflow, REQUEST_METHODS, PHASE_DECISION_ACTIONS, RequestOrFunction } from '@emmvish/stable-request';
+
+interface BranchRequest {
+  method: REQUEST_METHODS;
+  path: string;
+}
+
+interface DataSource { source: string; data: any; }
+interface ProcessedResult { branch: string; result: any; }
+
+// Define branches - independent execution paths
+const branches = [
+  {
+    id: 'data-source-A',
+    // Branch-specific configuration
+    markConcurrentBranch: true,
+    phases: [
+      {
+        id: 'fetch-A',
+        items: [{
+          type: RequestOrFunction.REQUEST,
+          request: {
+            id: 'source-a-data',
+            requestOptions: {
+              reqData: { method: REQUEST_METHODS.GET, path: '/source-a/data' },
+              resReq: true,
+              handleSuccessfulAttemptData: ({ data, commonBuffer }) => {
+                commonBuffer!.sourceA = data;
+                console.log('[Branch A] Data fetched from source A');
+              }
+            }
+          }
+        }]
+      },
+      {
+        id: 'process-A',
+        items: [{
+          type: RequestOrFunction.FUNCTION,
+          function: {
+            id: 'process-a',
+            functionOptions: {
+              fn: async (data: DataSource): Promise&lt;ProcessedResult&gt; => {
+                return { branch: 'A', result: `Processed: ${data.data}` };
+              },
+              args: [],
+              preExecution: {
+                preExecutionHook: ({ commonBuffer }) => {
+                  return { args: [commonBuffer?.sourceA] };
+                }
+              },
+              handleSuccessfulAttemptData: ({ data, commonBuffer }) => {
+                commonBuffer!.resultA = data;
+                console.log('[Branch A] Processing complete');
+              }
+            }
+          }
+        }]
+      }
+    ],
+    // Branch decision hook for control flow
+    branchDecisionHook: ({ branchResults, commonBuffer }) => {
+      const success = branchResults.every(phase => phase.success);
+      if (success) {
+        console.log('[Branch A] All phases successful, continuing');
+        return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+      } else {
+        console.log('[Branch A] Failure detected, replaying branch');
+        return { action: PHASE_DECISION_ACTIONS.REPLAY };
+      }
+    },
+    maxReplayCount: 2,
+    allowSkip: false
+  },
+  {
+    id: 'data-source-B',
+    markConcurrentBranch: true,
+    phases: [
+      {
+        id: 'fetch-B',
+        items: [{
+          type: RequestOrFunction.REQUEST,
+          request: {
+            id: 'source-b-data',
+            requestOptions: {
+              reqData: { method: REQUEST_METHODS.GET, path: '/source-b/data' },
+              resReq: true,
+              handleSuccessfulAttemptData: ({ data, commonBuffer }) => {
+                commonBuffer!.sourceB = data;
+                console.log('[Branch B] Data fetched from source B');
+              }
+            }
+          }
+        }]
+      },
+      {
+        id: 'process-B',
+        items: [{
+          type: RequestOrFunction.FUNCTION,
+          function: {
+            id: 'process-b',
+            functionOptions: {
+              fn: async (data: DataSource): Promise&lt;ProcessedResult&gt; => {
+                return { branch: 'B', result: `Processed: ${data.data}` };
+              },
+              args: [],
+              preExecution: {
+                preExecutionHook: ({ commonBuffer }) => {
+                  return { args: [commonBuffer?.sourceB] };
+                }
+              },
+              handleSuccessfulAttemptData: ({ data, commonBuffer }) => {
+                commonBuffer!.resultB = data;
+                console.log('[Branch B] Processing complete');
+              }
+            }
+          }
+        }]
+      }
+    ],
+    branchDecisionHook: ({ branchResults }) => {
+      return { action: PHASE_DECISION_ACTIONS.CONTINUE };
+    }
+  },
+  {
+    id: 'aggregation',
+    // Sequential branch that runs after concurrent branches
+    markConcurrentBranch: false,
+    phases: [
+      {
+        id: 'aggregate-results',
+        items: [{
+          type: RequestOrFunction.FUNCTION,
+          function: {
+            id: 'aggregate',
+            functionOptions: {
+              fn: async (resultA: ProcessedResult, resultB: ProcessedResult) => {
+                return {
+                  combined: [resultA, resultB],
+                  summary: `Aggregated ${resultA.branch} and ${resultB.branch}`
+                };
+              },
+              args: [],
+              preExecution: {
+                preExecutionHook: ({ commonBuffer }) => {
+                  // Access results from both branches
+                  return { 
+                    args: [commonBuffer?.resultA, commonBuffer?.resultB] 
+                  };
+                }
+              }
+            }
+          }
+        }]
+      }
+    ]
+  }
+];
+
+const result = await stableWorkflow([], {
+  workflowId: 'branched-pipeline',
+  
+  // Enable branch execution
+  enableBranchExecution: true,
+  branches,
+  
+  sharedBuffer: {},
+  
+  // Handle branch completion
+  handleBranchCompletion: ({ branchId, branchResults, success }) => {
+    console.log(`[WORKFLOW] Branch ${branchId} completed. Success: ${success}`);
+    console.log(`[WORKFLOW] Completed ${branchResults.length} phases`);
+  },
+  
+  // Handle branch decisions
+  handleBranchDecision: (decision, branchResult) => {
+    console.log(`[WORKFLOW] Branch ${branchResult.branchId} decision: ${decision.action}`);
+  },
+  
+  logPhaseResults: true
+});
+
+// Branched workflows enable:
+// - Parallel execution of independent paths
+// - Branch-level replay and skip logic
+// - Aggregation of results from multiple branches
+// - Complex multi-path workflows
+
+console.log('Workflow completed:', result.success);
+console.log('Branches executed:', result.branches?.length);
+console.log('Total phases:', result.totalPhases);</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample15()">Run Simulation</button>
+            </div>
+            <div id="example15-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Example 16: Observability Hooks -->
+      <section id="example-16" class="section">
+        <h2>Example 16: Observability Hooks – Monitor & Debug Workflows</h2>
+        <p>Implement comprehensive logging, monitoring, and debugging with observability hooks.</p>
+
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>import { stableWorkflow, REQUEST_METHODS, RequestOrFunction } from '@emmvish/stable-request';
+
+interface MonitoredRequest {
+  method: REQUEST_METHODS;
+  path: string;
+}
+
+// Simulated monitoring systems
+const metricsCollector = {
+  recordAttempt: (context: any) => {
+    console.log('[METRICS] Attempt recorded:', context);
+  },
+  recordSuccess: (context: any) => {
+    console.log('[METRICS] Success recorded:', context);
+  },
+  recordError: (context: any) => {
+    console.error('[METRICS] Error recorded:', context);
+  }
+};
+
+const logger = {
+  info: (msg: string, data?: any) => console.log(`[LOG] ${msg}`, data || ''),
+  error: (msg: string, error?: any) => console.error(`[LOG] ${msg}`, error || '')
+};
+
+const phases = [
+  {
+    id: 'monitored-phase',
+    items: [{
+      type: RequestOrFunction.REQUEST,
+      request: {
+        id: 'api-call',
+        requestOptions: {
+          reqData: {
+            method: REQUEST_METHODS.GET,
+            hostname: 'api.example.com',
+            path: '/data'
+          },
+          resReq: true,
+          attempts: 3,
+          wait: 500,
+          
+          // Hook: Before any attempt
+          preExecution: {
+            preExecutionHook: ({ stableRequestOptions, commonBuffer }) => {
+              logger.info('Pre-execution check', {
+                path: stableRequestOptions.reqData.path,
+                bufferId: commonBuffer?.requestId
+              });
+              
+              // Can modify config here
+              return stableRequestOptions;
+            }
+          },
+          
+          // Hook: On every error
+          logAllErrors: true,
+          handleErrors: ({ errorLog, reqData, params, executionContext }) => {
+            // Send to monitoring system
+            metricsCollector.recordError({
+              workflowId: executionContext?.workflowId,
+              phaseId: executionContext?.phaseId,
+              requestId: executionContext?.requestId,
+              attempt: errorLog.attempt,
+              error: errorLog.error,
+              timestamp: errorLog.timestamp,
+              executionTime: errorLog.executionTime,
+              isRetryable: errorLog.isRetryable
+            });
+            
+            // Log to external system
+            logger.error('Request failed', {
+              attempt: errorLog.attempt,
+              statusCode: errorLog.statusCode,
+              error: errorLog.error,
+              path: reqData.path
+            });
+            
+            // Could trigger alerts for critical errors
+            if (errorLog.statusCode === 500) {
+              console.log('[ALERT] Critical error - page team');
+            }
+          },
+          
+          // Hook: On every successful attempt
+          logAllSuccessfulAttempts: true,
+          handleSuccessfulAttemptData: ({ 
+            successfulAttemptData, 
+            reqData, 
+            params,
+            executionContext 
+          }) => {
+            // Record success metrics
+            metricsCollector.recordSuccess({
+              workflowId: executionContext?.workflowId,
+              phaseId: executionContext?.phaseId,
+              requestId: executionContext?.requestId,
+              attempt: successfulAttemptData.attempt,
+              timestamp: successfulAttemptData.timestamp,
+              executionTime: successfulAttemptData.executionTime,
+              statusCode: successfulAttemptData.statusCode
+            });
+            
+            logger.info('Request succeeded', {
+              attempt: successfulAttemptData.attempt,
+              executionTime: successfulAttemptData.executionTime,
+              dataSize: JSON.stringify(successfulAttemptData.data).length
+            });
+          },
+          
+          // Hook: Analyze response to determine success
+          responseAnalyzer: ({ data, reqData, params, executionContext }) => {
+            logger.info('Analyzing response', {
+              requestId: executionContext?.requestId,
+              hasData: !!data
+            });
+            
+            // Custom success criteria
+            const isValid = data && typeof data === 'object';
+            
+            if (!isValid) {
+              logger.error('Response validation failed');
+            }
+            
+            return isValid;
+          },
+          
+          // Hook: Final error analysis after all retries
+          finalErrorAnalyzer: ({ error, reqData, executionContext }) => {
+            logger.error('All attempts exhausted', {
+              requestId: executionContext?.requestId,
+              finalError: error,
+              path: reqData.path
+            });
+            
+            // Decide if this is acceptable or should fail workflow
+            // Return true to treat as success, false to fail
+            return false;
+          },
+          
+          // Hook parameters for additional context
+          hookParams: {
+            responseAnalyzerParams: { strictMode: true },
+            handleErrorsParams: { alertThreshold: 500 },
+            handleSuccessfulAttemptDataParams: { trackMetrics: true }
+          }
+        }
+      }
+    }]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'monitored-workflow',
+  sharedBuffer: { requestId: 'req-123' },
+  
+  // Workflow-level observability hooks
+  handlePhaseCompletion: ({ phaseId, phaseResult, sharedBuffer }) => {
+    logger.info(`Phase ${phaseId} completed`, {
+      success: phaseResult.success,
+      executionTime: phaseResult.executionTime,
+      totalRequests: phaseResult.totalRequests,
+      successfulRequests: phaseResult.successfulRequests
+    });
+    
+    // Track in monitoring system
+    metricsCollector.recordAttempt({
+      phase: phaseId,
+      result: phaseResult
+    });
+  },
+  
+  handlePhaseError: ({ phaseId, error, phaseResult }) => {
+    logger.error(`Phase ${phaseId} failed`, {
+      error: error.message,
+      phaseResult
+    });
+    
+    // Could trigger recovery logic
+  },
+  
+  prePhaseExecutionHook: ({ phaseId, phaseIndex, sharedBuffer }) => {
+    logger.info(`Starting phase ${phaseId}`, {
+      index: phaseIndex,
+      bufferKeys: Object.keys(sharedBuffer || {})
+    });
+    
+    // Can modify phase configuration
+    return { id: phaseId };
+  },
+  
+  logPhaseResults: true,
+  maxSerializableChars: 1000
+});
+
+// Observability hooks provide:
+// - Request-level monitoring
+// - Error tracking and alerting
+// - Performance metrics
+// - Custom logging integration
+// - Response validation
+// - Debugging capabilities
+
+console.log('Workflow metrics:', result.metrics);</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample16()">Run Simulation</button>
+            </div>
+            <div id="example16-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Example 17: Metrics & Performance Tracking -->
+      <section id="example-17" class="section">
+        <h2>Example 17: Metrics & Performance – Comprehensive Analytics</h2>
+        <p>Track detailed performance metrics, infrastructure stats, and workflow analytics.</p>
+
+        <div class="example-container">
+          <div class="example-code">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <pre><code>import { 
+  stableWorkflow, 
+  REQUEST_METHODS, 
+  RequestOrFunction,
+  CircuitBreaker 
+} from '@emmvish/stable-request';
+
+interface PerformanceRequest {
+  method: REQUEST_METHODS;
+  path: string;
+}
+
+// Setup infrastructure components
+const circuitBreaker = new CircuitBreaker({
+  failureThresholdPercentage: 50,
+  minimumRequests: 5,
+  recoveryTimeoutMs: 5000
+});
+
+const phases = [
+  {
+    id: 'data-fetch',
+    concurrentExecution: true,
+    maxConcurrentRequests: 5,
+    rateLimit: { maxRequests: 10, windowMs: 1000 },
+    circuitBreaker,
+    items: Array.from({ length: 15 }, (_, i) => ({
+      type: RequestOrFunction.REQUEST,
+      request: {
+        id: `request-${i}`,
+        requestOptions: {
+          reqData: { 
+            method: REQUEST_METHODS.GET, 
+            path: `/data/${i}` 
+          },
+          resReq: true,
+          attempts: 3,
+          cache: {
+            enabled: true,
+            ttl: 5000
+          }
+        }
+      }
+    }))
+  },
+  {
+    id: 'process-data',
+    items: [{
+      type: RequestOrFunction.FUNCTION,
+      function: {
+        id: 'process',
+        functionOptions: {
+          fn: async (data: any[]) => {
+            return data.map(d => ({ ...d, processed: true }));
+          },
+          args: [[]],
+          cache: {
+            enabled: true,
+            ttl: 3000
+          }
+        }
+      }
+    }]
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'performance-workflow',
+  sharedBuffer: {},
+  logPhaseResults: true,
+  
+  handlePhaseCompletion: ({ phaseResult }) => {
+    // Access phase-level metrics
+    const metrics = phaseResult.metrics;
+    if (metrics) {
+      console.log(`[METRICS] Phase: ${phaseResult.phaseId}`);
+      console.log(`  Total Requests: ${metrics.totalRequests}`);
+      console.log(`  Success Rate: ${(metrics.successRate * 100).toFixed(2)}%`);
+      console.log(`  Avg Execution Time: ${metrics.averageExecutionTime}ms`);
+    }
+    
+    // Infrastructure metrics
+    const infra = phaseResult.infrastructureMetrics;
+    if (infra) {
+      // Circuit Breaker stats
+      if (infra.circuitBreaker) {
+        console.log('[CIRCUIT BREAKER]');
+        console.log(`  State: ${infra.circuitBreaker.state}`);
+        console.log(`  Total Requests: ${infra.circuitBreaker.totalRequests}`);
+        console.log(`  Failures: ${infra.circuitBreaker.failures}`);
+        console.log(`  Success Rate: ${infra.circuitBreaker.successRate.toFixed(2)}%`);
+      }
+      
+      // Cache stats
+      if (infra.cache) {
+        console.log('[CACHE]');
+        console.log(`  Hits: ${infra.cache.hits}`);
+        console.log(`  Misses: ${infra.cache.misses}`);
+        console.log(`  Hit Rate: ${infra.cache.hitRate.toFixed(2)}%`);
+        console.log(`  Size: ${infra.cache.size}/${infra.cache.maxSize}`);
+      }
+      
+      // Rate Limiter stats
+      if (infra.rateLimiter) {
+        console.log('[RATE LIMITER]');
+        console.log(`  Allowed: ${infra.rateLimiter.allowedRequests}`);
+        console.log(`  Rejected: ${infra.rateLimiter.rejectedRequests}`);
+        console.log(`  Queue Size: ${infra.rateLimiter.queueSize}`);
+      }
+      
+      // Concurrency Limiter stats
+      if (infra.concurrencyLimiter) {
+        console.log('[CONCURRENCY]');
+        console.log(`  In Flight: ${infra.concurrencyLimiter.currentInFlight}`);
+        console.log(`  Max: ${infra.concurrencyLimiter.maxConcurrent}`);
+        console.log(`  Queued: ${infra.concurrencyLimiter.queued}`);
+      }
+    }
+  }
+});
+
+// Workflow-level comprehensive metrics
+const workflowMetrics = result.metrics;
+if (workflowMetrics) {
+  console.log('\n[WORKFLOW METRICS]');
+  console.log(`Workflow ID: ${workflowMetrics.workflowId}`);
+  console.log(`Success: ${workflowMetrics.success}`);
+  console.log(`Total Execution Time: ${workflowMetrics.executionTime}ms`);
+  console.log(`Phases: ${workflowMetrics.completedPhases}/${workflowMetrics.totalPhases}`);
+  console.log(`Phase Completion Rate: ${(workflowMetrics.phaseCompletionRate * 100).toFixed(2)}%`);
+  console.log(`Avg Phase Time: ${workflowMetrics.averagePhaseExecutionTime}ms`);
+  
+  console.log('\n[REQUEST METRICS]');
+  console.log(`Total Requests: ${workflowMetrics.totalRequests}`);
+  console.log(`Successful: ${workflowMetrics.successfulRequests}`);
+  console.log(`Failed: ${workflowMetrics.failedRequests}`);
+  console.log(`Success Rate: ${(workflowMetrics.requestSuccessRate * 100).toFixed(2)}%`);
+  
+  // Infrastructure metrics at workflow level
+  const infraMetrics = result.infrastructureMetrics;
+  if (infraMetrics) {
+    console.log('\n[INFRASTRUCTURE SUMMARY]');
+    
+    if (infraMetrics.circuitBreaker) {
+      console.log('Circuit Breaker:');
+      console.log(`  Total Opened: ${infraMetrics.circuitBreaker.totalOpened}`);
+      console.log(`  Current State: ${infraMetrics.circuitBreaker.state}`);
+      console.log(`  Last State Change: ${infraMetrics.circuitBreaker.lastStateChange}`);
+    }
+    
+    if (infraMetrics.cache) {
+      console.log('Cache:');
+      console.log(`  Total Hits: ${infraMetrics.cache.hits}`);
+      console.log(`  Total Misses: ${infraMetrics.cache.misses}`);
+      console.log(`  Overall Hit Rate: ${infraMetrics.cache.hitRate.toFixed(2)}%`);
+      console.log(`  Evictions: ${infraMetrics.cache.evictions}`);
+    }
+    
+    if (infraMetrics.rateLimiter) {
+      console.log('Rate Limiter:');
+      console.log(`  Total Requests: ${infraMetrics.rateLimiter.totalRequests}`);
+      console.log(`  Allowed: ${infraMetrics.rateLimiter.allowedRequests}`);
+      console.log(`  Rejected: ${infraMetrics.rateLimiter.rejectedRequests}`);
+    }
+  }
+}
+
+// Request Group Metrics
+if (result.requestGroupMetrics) {
+  console.log('\n[REQUEST GROUP METRICS]');
+  result.requestGroupMetrics.forEach(group => {
+    console.log(`Group: ${group.groupId}`);
+    console.log(`  Requests: ${group.totalRequests}`);
+    console.log(`  Success Rate: ${(group.successRate * 100).toFixed(2)}%`);
+  });
+}
+
+// Metrics provide insights into:
+// - Overall workflow performance
+// - Request success/failure rates
+// - Infrastructure component utilization
+// - Cache effectiveness
+// - Rate limiting behavior
+// - Circuit breaker health
+// - Concurrency patterns
+// - Performance bottlenecks</code></pre>
+          </div>
+
+          <div class="example-demo">
+            <div class="demo-header">
+              <h3>Simulation</h3>
+              <button class="btn btn-primary" onclick="runExample17()">Run Simulation</button>
+            </div>
+            <div id="example17-output" class="demo-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Understanding These Examples</h2>
+        <p>These interactive examples demonstrate the core capabilities of @emmvish/stable-request:</p>
+        <ul class="info-list">
+          <li><strong>Example 1:</strong> Single resilient requests with retries, exponential backoff, caching, and response validation.</li>
+          <li><strong>Example 2:</strong> Type-safe function execution with generics, automatic retries, function-result caching, and resilience.</li>
+          <li><strong>Example 3:</strong> Batch orchestration of mixed requests and functions with concurrent execution and rate limiting.</li>
+          <li><strong>Example 4:</strong> Multi-phase workflows with sequential and concurrent phases, shared state across phases.</li>
+          <li><strong>Example 5:</strong> DAG-based workflows with explicit dependency graphs, parallel groups, and merge points for optimal parallelism.</li>
+          <li><strong>Example 6:</strong> Circuit breaker protection to fail fast and prevent cascading failures across requests.</li>
+          <li><strong>Example 7:</strong> Response caching with TTL to avoid redundant API calls and improve latency.</li>
+          <li><strong>Example 8:</strong> Non-linear execution using decision hooks (REPLAY, SKIP, JUMP, TERMINATE) for adaptive workflows.</li>
+          <li><strong>Example 9:</strong> Rate limiting and concurrency control to respect external API constraints.</li>
+          <li><strong>Example 10:</strong> Trial mode for safe testing of workflows without making actual API calls.</li>
+          <li><strong>Example 11:</strong> Config cascading with global, group-level, and request-level configurations for flexible orchestration.</li>
+          <li><strong>Example 12:</strong> State buffers for sharing data between phases, requests, and hooks across complex workflows.</li>
+          <li><strong>Example 13:</strong> State persistence to save and resume workflow state across restarts and failures.</li>
+          <li><strong>Example 14:</strong> Pre-execution hooks for dynamic configuration, authentication, and runtime request modification.</li>
+          <li><strong>Example 15:</strong> Branched workflows with parallel execution paths, branch-level control flow, and result aggregation.</li>
+          <li><strong>Example 16:</strong> Observability hooks for comprehensive logging, monitoring, error tracking, and debugging.</li>
+          <li><strong>Example 17:</strong> Metrics and performance tracking with detailed analytics on infrastructure components and workflow execution.</li>
+        </ul>
+      </section>
+
+      <!-- Next Steps -->
+      <section class="cta-section">
+        <h2>Ready to use Stable Request?</h2>
+        <p>Install the package and start building resilient systems.</p>
+        <div style="margin: 20px 0;">
+          <div class="code-block-wrapper">
+            <button class="copy-button" onclick="copyToClipboard(this)">Copy</button>
+            <div class="code-block">
+              <pre><code>npm install @emmvish/stable-request</code></pre>
+            </div>
+          </div>
+        </div>
+        <a href="https://github.com/emmvish/stable-request#readme" class="btn btn-primary">View Full Documentation</a>
+      </section>
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-content">
+      <div class="footer-section">
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="index.html">Introduction</a></li>
+          <li><a href="examples.html">Examples</a></li>
+          <li><a href="https://github.com/emmvish/stable-request#readme" target="_blank">API Reference</a></li>
+        </ul>
+      </div>
+      <div class="footer-section">
+        <h4>Community</h4>
+        <ul>
+          <li><a href="https://github.com/emmvish/stable-request" target="_blank">GitHub</a></li>
+          <li><a href="https://www.npmjs.com/package/@emmvish/stable-request" target="_blank">NPM Package</a></li>
+          <li><a href="https://github.com/emmvish/stable-request/issues" target="_blank">Issues</a></li>
+        </ul>
+      </div>
+      <div class="footer-section">
+        <h4>About</h4>
+        <ul>
+          <li><a href="https://github.com/emmvish" target="_blank">Author</a></li>
+          <li><a href="https://github.com/emmvish/stable-request/blob/main/LICENSE" target="_blank">License</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 @emmvish/stable-request. Built with resilience in mind.</p>
+    </div>
+  </footer>
+
+  <script>
+    function copyToClipboard(button) {
+      const codeBlock = button.nextElementSibling;
+      const code = codeBlock.innerText;
+      
+      navigator.clipboard.writeText(code).then(() => {
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        button.classList.add('copied');
+        
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.classList.remove('copied');
+        }, 2000);
+      }).catch(err => {
+        console.error('Failed to copy:', err);
+      });
+    }
+
+    // Example 1: Stable Request with Retries
+    function runExample1() {
+      const output = document.getElementById('example1-output');
+      output.innerHTML = '';
+      
+      output.innerHTML += `<div class="log-info">Executing stableRequest with exponential backoff...</div>`;
+      
+      let attempt = 1;
+      const maxAttempts = 3;
+      
+      function executeAttempt() {
+        if (attempt > maxAttempts) {
+          output.innerHTML += `<div class="log-success">✓ Success on attempt 3 | Data: { id: 1, name: 'John', email: 'john@example.com' }</div>`;
+          output.innerHTML += `<div class="log-info">Cache enabled: true | TTL: 5000ms | Result cached for subsequent calls</div>`;
+          return;
+        }
+        
+        const delay = attempt === 1 ? 0 : Math.pow(2, attempt - 2) * 500;
+        const jitter = Math.floor(Math.random() * 100);
+        const willSucceed = attempt >= 3;
+        
+        output.innerHTML += `<div class="log-attempt">Attempt ${attempt}</div>`;
+        if (attempt > 1) output.innerHTML += `<div class="log-info">Wait ${delay}ms + ${jitter}ms jitter</div>`;
+        
+        setTimeout(() => {
+          if (willSucceed) {
+            output.innerHTML += `<div class="log-success">✓ Response valid | Status: 200</div>`;
+          } else {
+            output.innerHTML += `<div class="log-error">✗ HTTP 503 Service Unavailable (retryable)</div>`;
+          }
+          attempt++;
+          executeAttempt();
+        }, delay + jitter);
+      }
+      
+      executeAttempt();
+    }
+
+    // Example 2: Stable Function
+    function runExample2() {
+      const output = document.getElementById('example2-output');
+      output.innerHTML = '';
+      
+      output.innerHTML += `<div class="log-info">Executing stableFunction: multiply(5, 3)</div>`;
+      
+      let attempt = 1;
+      
+      function tryExecution() {
+        output.innerHTML += `<div class="log-attempt">Attempt ${attempt}</div>`;
+        
+        setTimeout(() => {
+          if (Math.random() < 0.4) {
+            output.innerHTML += `<div class="log-error">✗ Random failure | Retrying...</div>`;
+            attempt++;
+            if (attempt <= 3) tryExecution();
+          } else {
+            output.innerHTML += `<div class="log-success">✓ Function executed successfully</div>`;
+            output.innerHTML += `<div class="log-success">Result: 15 (5 × 3)</div>`;
+            output.innerHTML += `<div class="log-info">Type-safe: args=[5,3] (number[]), return=15 (number)</div>`;
+            output.innerHTML += `<div class="log-info">Cache key: multiply_5_3 | Cached for 10000ms</div>`;
+          }
+        }, 200 + Math.random() * 300);
+      }
+      
+      tryExecution();
+    }
+
+    // Example 3: API Gateway
+    function runExample3() {
+      const output = document.getElementById('example3-output');
+      output.innerHTML = '';
+      
+      output.innerHTML += `<div class="log-info">Executing batch: 2 requests + 2 functions concurrently</div>`;
+      output.innerHTML += `<div class="log-info">Rate limit: 5 req/sec | Concurrency: unlimited</div>`;
+      
+      // Requests execute
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-attempt">Request: fetch-user</div>`;
+        output.innerHTML += `<div class="log-info">  GET /users/1</div>`;
+      }, 50);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-attempt">Request: fetch-posts</div>`;
+        output.innerHTML += `<div class="log-info">  GET /posts?userId=1</div>`;
+      }, 80);
+      
+      // Requests complete
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">✓ fetch-user completed | { id: 1, name: 'John' } [250ms]</div>`;
+      }, 300);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">✓ fetch-posts completed | [5 items] [280ms]</div>`;
+      }, 330);
+      
+      // Functions execute (with request results available)
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-attempt">Function: process-user (concurrent)</div>`;
+        output.innerHTML += `<div class="log-info">  Processing userData.name</div>`;
+      }, 350);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-attempt">Function: validate-posts (concurrent)</div>`;
+        output.innerHTML += `<div class="log-info">  Validating posts array</div>`;
+      }, 370);
+      
+      // Functions complete
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">✓ process-user | { displayName: 'JOHN' } [150ms]</div>`;
+      }, 500);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">✓ validate-posts | { count: 5, valid: true } [180ms]</div>`;
+      }, 530);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">✓ All items completed (4 total: 2 requests + 2 functions)</div>`;
+        output.innerHTML += `<div class="log-info">Batch time: ~530ms | Shared state enabled for cross-item data passing</div>`;
+      }, 600);
+    }
+
+    // Example 4: Workflow
+    function runExample4() {
+      const output = document.getElementById('example4-output');
+      output.innerHTML = '';
+      
+      output.innerHTML += `<div class="log-info">Starting workflow: user-pipeline</div>`;
+      output.innerHTML += `<div class="log-info">Phases: sequential | Phase 2 items: concurrent</div>`;
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-attempt">Phase 1: fetch-user (sequential)</div>`;
+        output.innerHTML += `<div class="log-info">  → Executing request to /users/1</div>`;
+      }, 100);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">  ✓ Complete | { id: 1, name: 'John Doe' }</div>`;
+      }, 500);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-attempt">Phase 2: process-concurrent (markConcurrentPhase: true)</div>`;
+        output.innerHTML += `<div class="log-info">  Starting 2 concurrent items...</div>`;
+      }, 600);
+      
+      // Both items start at the same time (concurrent)
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-attempt">  → Item: transform (concurrently)</div>`;
+        output.innerHTML += `<div class="log-info">      Processing data.name.toUpperCase()</div>`;
+      }, 700);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-attempt">  → Item: cache (concurrently)</div>`;
+        output.innerHTML += `<div class="log-info">      Storing userId in buffer</div>`;
+      }, 720);
+      
+      // Both complete at similar times
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">  ✓ transform | Result: { name: 'JOHN DOE' } [750ms]</div>`;
+      }, 750);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">  ✓ cache | Result: { cached: true, userId: 1 } [770ms]</div>`;
+      }, 770);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">✓ Workflow complete</div>`;
+        output.innerHTML += `<div class="log-info">Phase 1: 400ms (sequential) → Phase 2: 170ms (concurrent items)</div>`;
+        output.innerHTML += `<div class="log-info">Total: 570ms | Shared buffer: { userId: 1, cached: true }</div>`;
+      }, 850);
+    }
+
+    // Example 5: Workflow Graph
+    function runExample5() {
+      const output = document.getElementById('example5-output');
+      output.innerHTML = '';
+      
+      output.innerHTML += `<div class="log-info">Building DAG workflow: complex-pipeline</div>`;
+      output.innerHTML += `<div class="log-info">Graph structure: 4 nodes + 1 parallel group + 1 merge</div>`;
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-attempt">Level 1: fetch-user (dependency root)</div>`;
+        output.innerHTML += `<div class="log-info">  → GET /users/1</div>`;
+      }, 100);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">  ✓ User fetched: { id: 1, name: 'John' }</div>`;
+      }, 400);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-attempt">Level 2: Parallel [fetch-posts, fetch-comments]</div>`;
+        output.innerHTML += `<div class="log-info">  → GET /posts?userId=1</div>`;
+        output.innerHTML += `<div class="log-info">  → GET /comments?userId=1</div>`;
+      }, 500);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">  ✓ Posts: 5 items | Comments: 12 items</div>`;
+      }, 800);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-attempt">Level 3: aggregate (merge point)</div>`;
+      }, 900);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">✓ DAG execution complete | Total: 900ms</div>`;
+        output.innerHTML += `<div class="log-info">Parallelism: 2 concurrent requests | Sequential: 3 levels</div>`;
+      }, 1200);
+    }
+
+    // Example 6: Circuit Breaker
+    function runExample6() {
+      const output = document.getElementById('example6-output');
+      output.innerHTML = '';
+      
+      output.innerHTML += `<div class="log-info">Circuit Breaker: threshold=50% | minRequests=5 | timeout=5000ms</div>`;
+      
+      let state = 'CLOSED';
+      let failures = 0;
+      let successes = 0;
+      
+      for (let i = 1; i <= 12; i++) {
+        setTimeout(() => {
+          const willFail = i <= 3 || (i >= 6 && i <= 8);
+          
+          if (state === 'OPEN') {
+            output.innerHTML += `<div class="log-error">Request ${i}: REJECTED (circuit OPEN, fail-fast)</div>`;
+            return;
+          }
+          
+          if (willFail) {
+            failures++;
+            output.innerHTML += `<div class="log-error">Request ${i}: Failed | Failures: ${failures}</div>`;
+          } else {
+            successes++;
+            output.innerHTML += `<div class="log-success">Request ${i}: Success | Successes: ${successes}</div>`;
+          }
+          
+          const total = failures + successes;
+          if (total >= 5) {
+            const failureRate = (failures / total) * 100;
+            if (failureRate > 50 && state === 'CLOSED') {
+              state = 'OPEN';
+              output.innerHTML += `<div class="log-warning">⚡ Circuit OPENED (${failureRate.toFixed(0)}% failure rate)</div>`;
+            }
+          }
+        }, i * 250);
+      }
+    }
+
+    // Example 7: Caching
+    function runExample7() {
+      const output = document.getElementById('example7-output');
+      output.innerHTML = '';
+      
+      output.innerHTML += `<div class="log-info">Request 1: GET /users/1 (cache disabled initially)</div>`;
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-attempt">Request 1</div>`;
+        output.innerHTML += `<div class="log-info">  Cache: MISS</div>`;
+      }, 100);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">  ✓ Response received | { id: 1, name: 'John' }</div>`;
+        output.innerHTML += `<div class="log-info">  Cached for 5000ms</div>`;
+      }, 400);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-attempt">Request 2: Identical request within TTL</div>`;
+        output.innerHTML += `<div class="log-info">  GET /users/1</div>`;
+      }, 500);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">  ✓ Cache HIT (no network call)</div>`;
+        output.innerHTML += `<div class="log-success">  Response: { id: 1, name: 'John' } (from cache)</div>`;
+        output.innerHTML += `<div class="log-info">  Latency: <1ms (cached vs 300ms network)</div>`;
+      }, 550);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-info">Cache stats: hits=1 | misses=1 | utilization=50%</div>`;
+      }, 700);
+    }
+
+    // Example 8: Non-Linear Workflows
+    function runExample8() {
+      const output = document.getElementById('example8-output');
+      output.innerHTML = '';
+      
+      output.innerHTML += `<div class="log-info">Non-linear workflow with decision hooks</div>`;
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-attempt">Phase 1: Initial request</div>`;
+      }, 100);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">  ✓ Complete | needsRetry: true</div>`;
+      }, 300);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-warning">Decision: REPLAY phase1 (detected needsRetry flag)</div>`;
+      }, 400);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-attempt">Phase 1 (Replay #1)</div>`;
+      }, 500);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">  ✓ Success on retry</div>`;
+      }, 700);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-attempt">Phase 2: Subsequent processing</div>`;
+      }, 800);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">  ✓ Complete</div>`;
+      }, 1000);
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">✓ Workflow complete with adaptive control flow</div>`;
+      }, 1100);
+    }
+
+    // Example 9: Rate Limiting
+    function runExample9() {
+      const output = document.getElementById('example9-output');
+      output.innerHTML = '';
+      
+      output.innerHTML += `<div class="log-info">Processing 20 requests with constraints:</div>`;
+      output.innerHTML += `<div class="log-info">Rate limit: 5 req/sec | Concurrency: max 3 in-flight</div>`;
+      
+      let sent = 0;
+      let completed = 0;
+      let inFlight = 0;
+      
+      function schedule() {
+        if (sent >= 20) return;
+        
+        // Send 5 requests per second
+        for (let i = 0; i < 5 && sent < 20; i++) {
+          const reqNum = ++sent;
+          setTimeout(() => {
+            // Check concurrency limit
+            while (inFlight >= 3) {
+              return; // Wait for slot
+            }
+            inFlight++;
+            output.innerHTML += `<div class="log-info">Sent req-${reqNum} (in-flight: ${inFlight})</div>`;
+          }, 0);
+        }
+        
+        // Complete requests
+        setTimeout(() => {
+          for (let i = 0; i < 3; i++) {
+            if (inFlight > 0) {
+              inFlight--;
+              completed++;
+              output.innerHTML += `<div class="log-success">✓ req-${completed} completed (in-flight: ${inFlight})</div>`;
+            }
+          }
+          if (completed < 20) schedule();
+          else {
+            output.innerHTML += `<div class="log-success">✓ All 20 requests completed</div>`;
+            output.innerHTML += `<div class="log-info">Total time: ~4s | Rate: 5 req/sec | Max concurrent: 3</div>`;
+          }
+        }, 1000);
+      }
+      
+      schedule();
+    }
+
+    // Example 10: Trial Mode
+    function runExample10() {
+      const output = document.getElementById('example10-output');
+      output.innerHTML = '';
+      
+      output.innerHTML += `<div class="log-info">[TRIAL MODE] Testing workflow safely</div>`;
+      output.innerHTML += `<div class="log-info">Config: failureProbability=40% | delay=100ms</div>`;
+      output.innerHTML += `<div class="log-info">No actual API calls will be made</div>`;
+      
+      let attempt = 1;
+      const maxAttempts = 3;
+      
+      function simulate() {
+        if (attempt > maxAttempts) {
+          output.innerHTML += `<div class="log-success">✓ [TRIAL] All simulations complete</div>`;
+          output.innerHTML += `<div class="log-info">Workflow validated safely | No side effects</div>`;
+          return;
+        }
+        
+        const willFail = Math.random() < 0.4;
+        
+        output.innerHTML += `<div class="log-attempt">[TRIAL] Attempt ${attempt}</div>`;
+        
+        setTimeout(() => {
+          if (willFail) {
+            output.innerHTML += `<div class="log-error">[TRIAL] Simulated failure (40% probability)</div>`;
+          } else {
+            output.innerHTML += `<div class="log-success">[TRIAL] Simulated success</div>`;
+          }
+          attempt++;
+          setTimeout(simulate, 200);
+        }, 100);
+      }
+      
+      simulate();
+    }
+
+    // Example 11: Config Cascading
+    function runExample11() {
+      const output = document.getElementById('example11-output');
+      output.innerHTML = '';
+      
+      output.innerHTML += `<div class="log-info">[CONFIG] Initializing with cascading configuration</div>`;
+      output.innerHTML += `<div class="log-info">Global: attempts=2, wait=300ms</div>`;
+      output.innerHTML += `<div class="log-info">Critical Group: attempts=5, wait=1000ms</div>`;
+      output.innerHTML += `<div class="log-info">Normal Group: attempts=2, wait=500ms</div>`;
+      
+      const requests = [
+        { id: 'critical-req-1', group: 'critical-group', attempts: 5, wait: 1000 },
+        { id: 'critical-req-2', group: 'critical-group', attempts: 3, wait: 1000 },
+        { id: 'normal-req-1', group: 'normal-group', attempts: 2, wait: 500 },
+        { id: 'standalone-req', group: 'none', attempts: 1, wait: 300 }
+      ];
+      
+      let current = 0;
+      
+      function processNext() {
+        if (current >= requests.length) {
+          output.innerHTML += `<div class="log-success">✓ All requests completed with cascaded config</div>`;
+          output.innerHTML += `<div class="log-info">Priority: Individual > Group > Global</div>`;
+          return;
+        }
+        
+        const req = requests[current];
+        output.innerHTML += `<div class="log-attempt">[${req.id}] Using config from ${req.group}</div>`;
+        output.innerHTML += `<div class="log-info">  attempts=${req.attempts}, wait=${req.wait}ms</div>`;
+        
+        setTimeout(() => {
+          output.innerHTML += `<div class="log-success">✓ ${req.id} completed</div>`;
+          current++;
+          setTimeout(processNext, 300);
+        }, 200);
+      }
+      
+      processNext();
+    }
+
+    // Example 12: State Buffers
+    function runExample12() {
+      const output = document.getElementById('example12-output');
+      output.innerHTML = '';
+      
+      const buffer = { analytics: { totalRequests: 0 } };
+      
+      output.innerHTML += `<div class="log-info">[BUFFER] Initialized shared buffer</div>`;
+      output.innerHTML += `<div class="log-info">Buffer: ${JSON.stringify(buffer)}</div>`;
+      
+      // Phase 1: Fetch user
+      output.innerHTML += `<div class="log-phase">[PHASE 1] fetch-user</div>`;
+      setTimeout(() => {
+        buffer.userData = { id: 1, name: 'John Doe', email: 'john@example.com' };
+        buffer.analytics.totalRequests++;
+        output.innerHTML += `<div class="log-success">✓ Stored user in buffer</div>`;
+        output.innerHTML += `<div class="log-info">Buffer.userData: ${JSON.stringify(buffer.userData)}</div>`;
+        
+        // Phase 2: Fetch posts
+        setTimeout(() => {
+          output.innerHTML += `<div class="log-phase">[PHASE 2] fetch-posts</div>`;
+          output.innerHTML += `<div class="log-info">Retrieved userId from buffer: ${buffer.userData.id}</div>`;
+          buffer.userPosts = { userId: 1, posts: [{ title: 'Post 1' }, { title: 'Post 2' }] };
+          buffer.analytics.totalRequests++;
+          output.innerHTML += `<div class="log-success">✓ Stored posts in buffer</div>`;
+          output.innerHTML += `<div class="log-info">Buffer.userPosts: ${buffer.userPosts.posts.length} posts</div>`;
+          
+          // Phase 3: Analyze
+          setTimeout(() => {
+            output.innerHTML += `<div class="log-phase">[PHASE 3] analyze</div>`;
+            output.innerHTML += `<div class="log-info">Analyzing with buffer data</div>`;
+            buffer.analytics.totalPosts = buffer.userPosts.posts.length;
+            buffer.analytics.userActivity = buffer.analytics.totalPosts > 5 ? 'High' : 'Normal';
+            output.innerHTML += `<div class="log-success">✓ Analysis complete</div>`;
+            output.innerHTML += `<div class="log-info">Final buffer: ${JSON.stringify(buffer.analytics)}</div>`;
+            output.innerHTML += `<div class="log-success">✓ Workflow completed with shared state</div>`;
+          }, 500);
+        }, 500);
+      }, 500);
+    }
+
+    // Example 13: State Persistence
+    function runExample13() {
+      const output = document.getElementById('example13-output');
+      output.innerHTML = '';
+      
+      const storage = new Map();
+      let processedItems = 0;
+      const totalItems = 10;
+      
+      output.innerHTML += `<div class="log-info">[PERSIST] State persistence enabled</div>`;
+      output.innerHTML += `<div class="log-info">Processing ${totalItems} items with checkpoints</div>`;
+      
+      // Phase 1: Data ingestion
+      output.innerHTML += `<div class="log-phase">[PHASE 1] data-ingestion</div>`;
+      setTimeout(() => {
+        storage.set('workflow_phase1', { ingestedData: totalItems, timestamp: new Date().toISOString() });
+        output.innerHTML += `<div class="log-success">✓ Ingested ${totalItems} items</div>`;
+        output.innerHTML += `<div class="log-info">[PERSIST] Saved state for phase1</div>`;
+        
+        // Phase 2: Processing with failure simulation
+        setTimeout(() => {
+          output.innerHTML += `<div class="log-phase">[PHASE 2] process-batch</div>`;
+          
+          function processWithRetry(attempt) {
+            if (attempt > 3) {
+              output.innerHTML += `<div class="log-success">✓ All items processed</div>`;
+              storage.set('workflow_phase2', { processedItems: totalItems });
+              output.innerHTML += `<div class="log-info">[PERSIST] Saved final state</div>`;
+              
+              // Phase 3: Finalize
+              setTimeout(() => {
+                output.innerHTML += `<div class="log-phase">[PHASE 3] finalize</div>`;
+                const state = storage.get('workflow_phase2');
+                output.innerHTML += `<div class="log-info">[PERSIST] Loaded state: ${state.processedItems} items</div>`;
+                output.innerHTML += `<div class="log-success">✓ Finalized: ${state.processedItems} items processed</div>`;
+                output.innerHTML += `<div class="log-info">Persisted states: ${storage.size} checkpoints</div>`;
+              }, 500);
+              return;
+            }
+            
+            const willFail = Math.random() < 0.4;
+            output.innerHTML += `<div class="log-attempt">Attempt ${attempt} - Processing from item ${processedItems}</div>`;
+            
+            setTimeout(() => {
+              if (willFail) {
+                output.innerHTML += `<div class="log-error">✗ Processing failed - resuming from checkpoint</div>`;
+                output.innerHTML += `<div class="log-info">[PERSIST] Loading state from checkpoint</div>`;
+                setTimeout(() => processWithRetry(attempt + 1), 1000);
+              } else {
+                processedItems += 3;
+                storage.set('workflow_phase2', { processedItems });
+                output.innerHTML += `<div class="log-success">✓ Checkpoint: ${processedItems} items processed</div>`;
+                output.innerHTML += `<div class="log-info">[PERSIST] Saved checkpoint</div>`;
+                if (processedItems < totalItems) {
+                  setTimeout(() => processWithRetry(attempt + 1), 500);
+                } else {
+                  setTimeout(() => processWithRetry(4), 500);
+                }
+              }
+            }, 300);
+          }
+          
+          processWithRetry(1);
+        }, 500);
+      }, 500);
+    }
+
+    // Example 14: Pre-Execution Hooks
+    function runExample14() {
+      const output = document.getElementById('example14-output');
+      output.innerHTML = '';
+      
+      output.innerHTML += `<div class="log-info">[PRE-EXEC] Preparing request configuration</div>`;
+      
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-success">✓ Auth token acquired: Bearer token-${Date.now()}</div>`;
+        
+        setTimeout(() => {
+          const isProd = Math.random() > 0.5;
+          output.innerHTML += `<div class="log-info">[PRE-EXEC] Environment: ${isProd ? 'PROD' : 'DEV'}</div>`;
+          
+          setTimeout(() => {
+            const hostname = isProd ? 'api.example.com' : 'api-staging.example.com';
+            output.innerHTML += `<div class="log-info">[PRE-EXEC] Hostname set to: ${hostname}</div>`;
+            output.innerHTML += `<div class="log-info">[PRE-EXEC] Headers injected:</div>`;
+            output.innerHTML += `<div class="log-info">  - Authorization: Bearer token-***</div>`;
+            output.innerHTML += `<div class="log-info">  - X-Region: us-east-1</div>`;
+            output.innerHTML += `<div class="log-info">  - X-Priority: high</div>`;
+            output.innerHTML += `<div class="log-info">  - X-Client-Id: client-123</div>`;
+            
+            setTimeout(() => {
+              output.innerHTML += `<div class="log-info">[PRE-EXEC] Retry strategy: ${isProd ? 'EXPONENTIAL' : 'LINEAR'}</div>`;
+              output.innerHTML += `<div class="log-info">[PRE-EXEC] Attempts: ${isProd ? 5 : 2}</div>`;
+              output.innerHTML += `<div class="log-success">✓ Configuration adjusted for environment</div>`;
+              
+              setTimeout(() => {
+                output.innerHTML += `<div class="log-attempt">Executing request with dynamic config</div>`;
+                
+                setTimeout(() => {
+                  output.innerHTML += `<div class="log-success">✓ Request completed successfully</div>`;
+                  output.innerHTML += `<div class="log-info">Response: { data: "success", timestamp: "${new Date().toISOString()}" }</div>`;
+                }, 300);
+              }, 200);
+            }, 200);
+          }, 200);
+        }, 200);
+      }, 300);
+    }
+
+    // Example 15: Branched Workflows
+    function runExample15() {
+      const output = document.getElementById('example15-output');
+      output.innerHTML = '';
+      
+      output.innerHTML += `<div class="log-info">[WORKFLOW] Branched execution started</div>`;
+      output.innerHTML += `<div class="log-info">Concurrent branches: data-source-A, data-source-B</div>`;
+      
+      // Branch A
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-phase">[Branch A] Phase: fetch-A</div>`;
+        setTimeout(() => {
+          output.innerHTML += `<div class="log-success">✓ [Branch A] Data fetched from source A</div>`;
+          
+          setTimeout(() => {
+            output.innerHTML += `<div class="log-phase">[Branch A] Phase: process-A</div>`;
+            setTimeout(() => {
+              output.innerHTML += `<div class="log-success">✓ [Branch A] Processing complete</div>`;
+              output.innerHTML += `<div class="log-info">[WORKFLOW] Branch data-source-A completed. Success: true</div>`;
+            }, 300);
+          }, 200);
+        }, 300);
+      }, 200);
+      
+      // Branch B (concurrent)
+      setTimeout(() => {
+        output.innerHTML += `<div class="log-phase">[Branch B] Phase: fetch-B</div>`;
+        setTimeout(() => {
+          output.innerHTML += `<div class="log-success">✓ [Branch B] Data fetched from source B</div>`;
+          
+          setTimeout(() => {
+            output.innerHTML += `<div class="log-phase">[Branch B] Phase: process-B</div>`;
+            setTimeout(() => {
+              output.innerHTML += `<div class="log-success">✓ [Branch B] Processing complete</div>`;
+              output.innerHTML += `<div class="log-info">[WORKFLOW] Branch data-source-B completed. Success: true</div>`;
+              
+              // Aggregation branch (sequential after A & B)
+              setTimeout(() => {
+                output.innerHTML += `<div class="log-phase">[Branch aggregation] Phase: aggregate-results</div>`;
+                output.innerHTML += `<div class="log-info">Aggregating results from branches A and B</div>`;
+                
+                setTimeout(() => {
+                  output.innerHTML += `<div class="log-success">✓ Aggregation complete</div>`;
+                  output.innerHTML += `<div class="log-info">[WORKFLOW] Branch aggregation completed. Success: true</div>`;
+                  output.innerHTML += `<div class="log-success">✓ Workflow completed: true</div>`;
+                  output.innerHTML += `<div class="log-info">Branches executed: 3 | Total phases: 5</div>`;
+                }, 400);
+              }, 300);
+            }, 300);
+          }, 200);
+        }, 350);
+      }, 200);
+    }
+
+    // Example 16: Observability Hooks
+    function runExample16() {
+      const output = document.getElementById('example16-output');
+      output.innerHTML = '';
+      
+      output.innerHTML += `<div class="log-info">[LOG] Pre-execution check</div>`;
+      output.innerHTML += `<div class="log-info">  path: /data | bufferId: req-123</div>`;
+      output.innerHTML += `<div class="log-info">[WORKFLOW] Starting phase monitored-phase</div>`;
+      
+      let attempt = 1;
+      
+      function tryRequest() {
+        output.innerHTML += `<div class="log-attempt">[METRICS] Attempt ${attempt} recorded</div>`;
+        
+        setTimeout(() => {
+          const willFail = Math.random() < 0.4;
+          
+          if (willFail && attempt < 3) {
+            output.innerHTML += `<div class="log-error">[METRICS] Error recorded:</div>`;
+            output.innerHTML += `<div class="log-error">  workflowId: monitored-workflow</div>`;
+            output.innerHTML += `<div class="log-error">  phaseId: monitored-phase</div>`;
+            output.innerHTML += `<div class="log-error">  attempt: ${attempt}</div>`;
+            output.innerHTML += `<div class="log-error">  statusCode: 500</div>`;
+            output.innerHTML += `<div class="log-error">  isRetryable: true</div>`;
+            output.innerHTML += `<div class="log-error">[LOG] Request failed</div>`;
+            output.innerHTML += `<div class="log-error">[ALERT] Critical error - page team</div>`;
+            attempt++;
+            setTimeout(tryRequest, 500);
+          } else {
+            output.innerHTML += `<div class="log-info">[LOG] Analyzing response</div>`;
+            output.innerHTML += `<div class="log-success">✓ Response validation passed</div>`;
+            output.innerHTML += `<div class="log-success">[METRICS] Success recorded:</div>`;
+            output.innerHTML += `<div class="log-success">  attempt: ${attempt}</div>`;
+            output.innerHTML += `<div class="log-success">  executionTime: 245ms</div>`;
+            output.innerHTML += `<div class="log-success">  statusCode: 200</div>`;
+            output.innerHTML += `<div class="log-info">[LOG] Request succeeded</div>`;
+            output.innerHTML += `<div class="log-info">  executionTime: 245ms | dataSize: 1024 bytes</div>`;
+            
+            setTimeout(() => {
+              output.innerHTML += `<div class="log-info">[LOG] Phase monitored-phase completed</div>`;
+              output.innerHTML += `<div class="log-info">  success: true | executionTime: ${245 + (attempt - 1) * 500}ms</div>`;
+              output.innerHTML += `<div class="log-info">  totalRequests: 1 | successfulRequests: 1</div>`;
+              output.innerHTML += `<div class="log-success">✓ Workflow completed with full observability</div>`;
+            }, 300);
+          }
+        }, 300);
+      }
+      
+      tryRequest();
+    }
+
+    // Example 17: Metrics & Performance Tracking
+    function runExample17() {
+      const output = document.getElementById('example17-output');
+      output.innerHTML = '';
+      
+      output.innerHTML += `<div class="log-info">[WORKFLOW] Starting performance-workflow</div>`;
+      output.innerHTML += `<div class="log-info">Phase: data-fetch (15 requests)</div>`;
+      output.innerHTML += `<div class="log-info">Rate limit: 10 req/s | Concurrency: 5 | Cache: enabled</div>`;
+      
+      let completed = 0;
+      let cacheHits = 0;
+      let failures = 0;
+      const total = 15;
+      
+      function processRequests() {
+        if (completed >= total) {
+          // Phase metrics
+          output.innerHTML += `<div class="log-info">[METRICS] Phase: data-fetch</div>`;
+          output.innerHTML += `<div class="log-info">  Total Requests: ${total}</div>`;
+          output.innerHTML += `<div class="log-info">  Success Rate: ${((total - failures) / total * 100).toFixed(2)}%</div>`;
+          output.innerHTML += `<div class="log-info">  Avg Execution Time: 234ms</div>`;
+          
+          // Circuit breaker
+          output.innerHTML += `<div class="log-info">[CIRCUIT BREAKER]</div>`;
+          output.innerHTML += `<div class="log-info">  State: CLOSED</div>`;
+          output.innerHTML += `<div class="log-info">  Total Requests: ${total}</div>`;
+          output.innerHTML += `<div class="log-info">  Failures: ${failures}</div>`;
+          output.innerHTML += `<div class="log-info">  Success Rate: ${((total - failures) / total * 100).toFixed(2)}%</div>`;
+          
+          // Cache
+          output.innerHTML += `<div class="log-info">[CACHE]</div>`;
+          output.innerHTML += `<div class="log-info">  Hits: ${cacheHits}</div>`;
+          output.innerHTML += `<div class="log-info">  Misses: ${total - cacheHits}</div>`;
+          output.innerHTML += `<div class="log-info">  Hit Rate: ${(cacheHits / total * 100).toFixed(2)}%</div>`;
+          output.innerHTML += `<div class="log-info">  Size: ${cacheHits}/100</div>`;
+          
+          // Rate limiter
+          output.innerHTML += `<div class="log-info">[RATE LIMITER]</div>`;
+          output.innerHTML += `<div class="log-info">  Allowed: ${total}</div>`;
+          output.innerHTML += `<div class="log-info">  Rejected: 0</div>`;
+          output.innerHTML += `<div class="log-info">  Queue Size: 0</div>`;
+          
+          // Concurrency
+          output.innerHTML += `<div class="log-info">[CONCURRENCY]</div>`;
+          output.innerHTML += `<div class="log-info">  Max: 5</div>`;
+          output.innerHTML += `<div class="log-info">  Peak In Flight: 5</div>`;
+          output.innerHTML += `<div class="log-info">  Queued: 0</div>`;
+          
+          setTimeout(() => {
+            output.innerHTML += `<div class="log-phase">[PHASE 2] process-data</div>`;
+            
+            setTimeout(() => {
+              output.innerHTML += `<div class="log-success">✓ Processing complete</div>`;
+              
+              // Workflow metrics
+              setTimeout(() => {
+                output.innerHTML += `<div class="log-info">[WORKFLOW METRICS]</div>`;
+                output.innerHTML += `<div class="log-info">Workflow ID: performance-workflow</div>`;
+                output.innerHTML += `<div class="log-info">Success: true</div>`;
+                output.innerHTML += `<div class="log-info">Total Execution Time: 3245ms</div>`;
+                output.innerHTML += `<div class="log-info">Phases: 2/2</div>`;
+                output.innerHTML += `<div class="log-info">Phase Completion Rate: 100.00%</div>`;
+                output.innerHTML += `<div class="log-info">Avg Phase Time: 1622ms</div>`;
+                
+                output.innerHTML += `<div class="log-info">[REQUEST METRICS]</div>`;
+                output.innerHTML += `<div class="log-info">Total Requests: ${total}</div>`;
+                output.innerHTML += `<div class="log-info">Successful: ${total - failures}</div>`;
+                output.innerHTML += `<div class="log-info">Failed: ${failures}</div>`;
+                output.innerHTML += `<div class="log-info">Success Rate: ${((total - failures) / total * 100).toFixed(2)}%</div>`;
+                
+                output.innerHTML += `<div class="log-success">✓ Comprehensive metrics collected</div>`;
+              }, 300);
+            }, 500);
+          }, 300);
+          return;
+        }
+        
+        const fromCache = completed > 5 && Math.random() < 0.3;
+        if (fromCache) {
+          cacheHits++;
+          output.innerHTML += `<div class="log-success">✓ request-${completed} (cached)</div>`;
+        } else {
+          const failed = Math.random() < 0.1;
+          if (failed) {
+            failures++;
+            output.innerHTML += `<div class="log-error">✗ request-${completed} failed</div>`;
+          } else {
+            output.innerHTML += `<div class="log-success">✓ request-${completed} completed</div>`;
+          }
+        }
+        
+        completed++;
+        setTimeout(processRequests, 200);
+      }
+      
+      processRequests();
+    }
+  </script>
+</body>
+</html>
