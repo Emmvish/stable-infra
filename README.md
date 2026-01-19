@@ -22,7 +22,10 @@ A production-grade TypeScript library for resilient API integrations, batch proc
   - [Sequential & Concurrent Phases](#sequential--concurrent-phases)
   - [Non-Linear Workflows](#non-linear-workflows)
   - [Branched Workflows](#branched-workflows)
-  - [Graph-Based Workflows](#graph-based-workflows)
+- [Graph-based Workflow Patterns](#graph-based-workflow-patterns)
+  - [Graph-Based Workflows with Mixed Items](#graph-based-workflows-with-mixed-items)
+  - [Parallel Phase Execution](#parallel-phase-execution)
+  - [Linear Helper](#linear-helper)
 - [Configuration & State](#configuration--state)
   - [Config Cascading](#config-cascading)
   - [Shared & State Buffers](#shared--state-buffers)
@@ -1011,6 +1014,16 @@ const result = await stableWorkflow([], {
 // Both branches access/modify sharedBuffer
 ```
 
+## Graph-based Workflow Patterns
+
+**Key responsibilities:**
+- Define phases as DAG nodes with explicit dependency edges
+- Execute independent phases in parallel automatically
+- Support parallel groups, merge points, and conditional routing
+- Validate graph structure (cycle detection, reachability, orphan detection)
+- Provide deterministic execution order
+- Offer higher parallelism than phased workflows for complex topologies
+
 ### Graph-Based Workflows with Mixed Items
 
 For complex topologies with explicit dependencies, use DAG execution mixing requests and functions.
@@ -1101,17 +1114,7 @@ const result = await stableWorkflowGraph(graph, {
 console.log(`Graph workflow success: ${result.success}`);
 ```
 
-**Key responsibilities:**
-- Define phases as DAG nodes with explicit dependency edges
-- Execute independent phases in parallel automatically
-- Support parallel groups, merge points, and conditional routing
-- Validate graph structure (cycle detection, reachability, orphan detection)
-- Provide deterministic execution order
-- Offer higher parallelism than phased workflows for complex topologies
-
----
-
-## Workflow Patterns
+### Parallel Phase Execution
 
 Execute multiple phases concurrently within a group.
 
@@ -1148,7 +1151,7 @@ const result = await stableWorkflowGraph(graph, {
 // All 3 phases run concurrently
 ```
 
-#### Merge Points
+### Merge Points
 
 Synchronize multiple predecessor phases.
 
@@ -1185,7 +1188,7 @@ const result = await stableWorkflowGraph(graph, {
 // aggregate waits for both to complete
 ```
 
-#### Linear Helper
+### Linear Helper
 
 Convenience function for sequential phase chains.
 
