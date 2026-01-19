@@ -25,6 +25,7 @@ A production-grade TypeScript library for resilient API integrations, batch proc
 - [Graph-based Workflow Patterns](#graph-based-workflow-patterns)
   - [Graph-Based Workflows with Mixed Items](#graph-based-workflows-with-mixed-items)
   - [Parallel Phase Execution](#parallel-phase-execution)
+  - [Merge Points](#merge-points)
   - [Linear Helper](#linear-helper)
 - [Configuration & State](#configuration--state)
   - [Config Cascading](#config-cascading)
