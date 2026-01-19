@@ -640,7 +640,7 @@ export interface CacheConfig {
   respectCacheControl?: boolean;
   cacheableStatusCodes?: number[];
   maxSize?: number;
-  excludeMethods?: string[];
+  excludeMethods?: REQUEST_METHODS[];
   keyGenerator?: (config: AxiosRequestConfig) => string;
 }
 

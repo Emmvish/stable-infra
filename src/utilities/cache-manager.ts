@@ -1,5 +1,6 @@
 import * as crypto from 'crypto';
 import { AxiosRequestConfig } from 'axios';
+import { REQUEST_METHODS } from '../enums/index.js';
 import { CachedResponse, CacheConfig } from '../types/index.js';
 
 export class CacheManager {
@@ -22,7 +23,7 @@ export class CacheManager {
             respectCacheControl: config.respectCacheControl ?? true,
             cacheableStatusCodes: config.cacheableStatusCodes ?? [200, 203, 204, 206, 300, 301, 404, 405, 410, 414, 501],
             maxSize: config.maxSize ?? 100,
-            excludeMethods: config.excludeMethods ?? ['POST', 'PUT', 'PATCH', 'DELETE'],
+            excludeMethods: config.excludeMethods ?? [REQUEST_METHODS.POST, REQUEST_METHODS.PUT, REQUEST_METHODS.PATCH, REQUEST_METHODS.DELETE],
             keyGenerator: config.keyGenerator
         };
     }
@@ -32,7 +33,7 @@ export class CacheManager {
             return this.config.keyGenerator(reqConfig);
         }
 
-        const method = (reqConfig.method || 'GET').toUpperCase();
+        const method = (reqConfig.method || REQUEST_METHODS.GET).toUpperCase();
         const url = reqConfig.url || '';
         const params = reqConfig.params ? JSON.stringify(reqConfig.params) : '';
         
@@ -50,7 +51,7 @@ export class CacheManager {
 
     private shouldCacheMethod(method?: string): boolean {
         if (!method) return true;
-        return !this.config.excludeMethods.includes(method.toUpperCase());
+        return !this.config.excludeMethods.includes(method.toUpperCase() as REQUEST_METHODS);
     }
 
     private shouldCacheStatus(status: number): boolean {
