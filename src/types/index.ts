@@ -122,6 +122,10 @@ export interface API_GATEWAY_RESULT<ResponseDataType = any> extends Array<API_GA
     failedRequests: number;
     successRate: number;
     failureRate: number;
+    executionTime: number;
+    timestamp: string;
+    throughput: number;
+    averageRequestDuration: number;
     requestGroups?: RequestGroupMetrics[];
     infrastructureMetrics?: {
       circuitBreaker?: CircuitBreakerDashboardMetrics;

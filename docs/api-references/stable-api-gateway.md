@@ -337,6 +337,10 @@ interface API_GATEWAY_RESULT<ResponseDataType = any> extends Array<API_GATEWAY_R
     failedRequests: number;
     successRate: number;
     failureRate: number;
+    executionTime: number;
+    timestamp: string;
+    throughput: number;
+    averageRequestDuration: number;
     requestGroups?: RequestGroupMetrics[];
     infrastructureMetrics?: {
       circuitBreaker?: CircuitBreakerDashboardMetrics;
@@ -390,6 +394,10 @@ const userResponse = result.find(r => r.requestId === 'fetch-user');
 | `failedRequests` | `number` | Number that failed. |
 | `successRate` | `number` | Success percentage (0-100). |
 | `failureRate` | `number` | Failure percentage (0-100). |
+| `executionTime` | `number` | Total execution time in milliseconds for all requests/functions. |
+| `timestamp` | `string` | ISO 8601 timestamp when execution completed. |
+| `throughput` | `number` | Throughput in requests per second (totalRequests / seconds). |
+| `averageRequestDuration` | `number` | Average execution time per request/function in milliseconds. |
 | `requestGroups` | `RequestGroupMetrics[]?` | Per-group metrics breakdown. |
 | `infrastructureMetrics` | `Object?` | Circuit breaker, cache, rate limiter, concurrency stats. |
 
@@ -409,6 +417,12 @@ interface RequestGroupMetrics {
 ```typescript
 console.log(`Success rate: ${result.metrics.successRate.toFixed(2)}%`);
 console.log(`Failed: ${result.metrics.failedRequests}/${result.metrics.totalRequests}`);
+
+// Execution performance metrics
+console.log(`Execution time: ${result.metrics.executionTime}ms`);
+console.log(`Throughput: ${result.metrics.throughput.toFixed(2)} req/s`);
+console.log(`Avg request duration: ${result.metrics.averageRequestDuration.toFixed(2)}ms`);
+console.log(`Completed at: ${result.metrics.timestamp}`);
 
 // Per-group analysis
 result.metrics.requestGroups?.forEach(group => {

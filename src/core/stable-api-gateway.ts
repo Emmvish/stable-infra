@@ -41,6 +41,8 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
     functionsOrOptions?: API_GATEWAY_FUNCTION<FunctionArgsType, FunctionReturnType>[] | API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
     options?: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
 ): Promise<API_GATEWAY_RESULT<ResponseDataType | FunctionReturnType>> {
+    const startTime = Date.now();
+    
     let functions: API_GATEWAY_FUNCTION<FunctionArgsType, FunctionReturnType>[] = [];
     let finalOptions: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {};
     
@@ -77,13 +79,18 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
     }
 
     if (items.length === 0) {
+        const executionTime = Date.now() - startTime;
         const emptyResult = [] as API_GATEWAY_RESULT<ResponseDataType | FunctionReturnType>;
         emptyResult.metrics = {
             totalRequests: 0,
             successfulRequests: 0,
             failedRequests: 0,
             successRate: 0,
-            failureRate: 0
+            failureRate: 0,
+            executionTime,
+            timestamp: new Date().toISOString(),
+            throughput: 0,
+            averageRequestDuration: 0
         };
         return emptyResult;
     }
@@ -109,6 +116,9 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
     const successfulRequests = responses.filter(r => r.success).length;
     const failedRequests = responses.filter(r => !r.success).length;
     const totalRequests = responses.length;
+    const executionTime = Date.now() - startTime;
+    const throughput = executionTime > 0 ? (totalRequests / (executionTime / 1000)) : 0;
+    const averageRequestDuration = totalRequests > 0 ? executionTime / totalRequests : 0;
 
     const result = responses as API_GATEWAY_RESULT<ResponseDataType | FunctionReturnType>;
     result.metrics = {
@@ -117,6 +127,10 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
         failedRequests,
         successRate: totalRequests > 0 ? (successfulRequests / totalRequests) * 100 : 0,
         failureRate: totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0,
+        executionTime,
+        timestamp: new Date().toISOString(),
+        throughput,
+        averageRequestDuration,
         requestGroups: MetricsAggregator.extractRequestGroupMetrics(responses)
     };
 

@@ -261,9 +261,16 @@ const responses = await stableApiGateway<ApiRequestData, ApiResponse>(items, {
   maxConcurrentRequests: 3
 });
 
+// Access individual responses
 responses.forEach((resp, i) => {
   console.log(`Item ${i}: success=${resp.success}`);
 });
+
+// Access aggregate metrics
+console.log(`Success rate: ${responses.metrics.successRate.toFixed(2)}%`);
+console.log(`Execution time: ${responses.metrics.executionTime}ms`);
+console.log(`Throughput: ${responses.metrics.throughput.toFixed(2)} req/s`);
+console.log(`Average duration: ${responses.metrics.averageRequestDuration.toFixed(2)}ms`);
 ```
 
 **Key responsibilities:**
@@ -271,8 +278,9 @@ responses.forEach((resp, i) => {
 - Apply global, group-level, and item-level config overrides
 - Maintain shared buffer across items for state passing
 - Stop on first error or continue despite failures
-- Collect per-item and aggregate metrics
+- Collect per-item and aggregate metrics (success rates, execution time, throughput)
 - Support request grouping with group-specific config
+- Track infrastructure metrics (circuit breaker, cache, rate limiter, concurrency)
 
 ### stableWorkflow
 
@@ -1576,6 +1584,46 @@ console.log(result.metrics); // {
 //     cache: { /* hits, misses, size */ },
 //     rateLimiter: { /* limit, current rate */ },
 //     concurrencyLimiter: { /* limit, in-flight */ }
+//   }
+// }
+```
+
+#### API Gateway Metrics
+
+```typescript
+import { stableApiGateway } from '@emmvish/stable-request';
+import type { API_GATEWAY_REQUEST } from '@emmvish/stable-request';
+
+interface ApiRequest {}
+interface ApiResponse { data: any; }
+
+const requests: API_GATEWAY_REQUEST<ApiRequest, ApiResponse>[] = [
+  { id: 'req-1', requestOptions: { reqData: { path: '/data/1' }, resReq: true } },
+  { id: 'req-2', requestOptions: { reqData: { path: '/data/2' }, resReq: true } },
+  { id: 'req-3', requestOptions: { reqData: { path: '/data/3' }, resReq: true } }
+];
+
+const result = await stableApiGateway<ApiRequest, ApiResponse>(requests, {
+  concurrentExecution: true,
+  maxConcurrentRequests: 5
+});
+
+console.log(result.metrics); // {
+//   totalRequests: 3,
+//   successfulRequests: 3,
+//   failedRequests: 0,
+//   successRate: 100,
+//   failureRate: 0,
+//   executionTime: 450,              // Total execution time in ms
+//   timestamp: '2026-01-20T...',     // ISO 8601 completion timestamp
+//   throughput: 6.67,                // Requests per second
+//   averageRequestDuration: 150,     // Average time per request in ms
+//   requestGroups: [/* per-group stats */],
+//   infrastructureMetrics: {
+//     circuitBreaker: { /* state, stats, config */ },
+//     cache: { /* hit rate, size, utilization */ },
+//     rateLimiter: { /* throttle rate, queue length */ },
+//     concurrencyLimiter: { /* utilization, queue */ }
 //   }
 // }
 ```
