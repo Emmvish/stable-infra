@@ -102,6 +102,7 @@ interface STABLE_WORKFLOW_PHASE<
 | `phaseDecisionHook` | `Function?` | `undefined` | Hook to make dynamic control flow decisions after phase execution. |
 | `commonConfig` | `Object?` | `{}` | Common configuration for all items in this phase (extends API_GATEWAY_OPTIONS). |
 | `statePersistence` | `StatePersistenceConfig?` | `undefined` | Phase-specific state persistence. |
+| `metricsGuardrails` | `MetricsGuardrails?` | `undefined` | Phase-specific metrics validation guardrails. |
 
 **Note:** Only one of `requests`, `functions`, or `items` should be provided. If multiple are present, `items` takes precedence.
 
@@ -135,6 +136,7 @@ interface STABLE_WORKFLOW_OPTIONS<
   preBranchExecutionHook?: (options: PreBranchExecutionHookOptions<RequestDataType, ResponseDataType>) => STABLE_WORKFLOW_BRANCH | Promise<STABLE_WORKFLOW_BRANCH>;
   maxSerializableChars?: number;
   workflowHookParams?: WorkflowHookParams;
+  metricsGuardrails?: MetricsGuardrails;
   // Plus all API_GATEWAY_OPTIONS fields (commonAttempts, commonWait, etc.)
 }
 ```
@@ -162,6 +164,7 @@ interface STABLE_WORKFLOW_OPTIONS<
 | `preBranchExecutionHook` | `Function?` | `undefined` | Hook called before each branch executes (can modify branch config). |
 | `maxSerializableChars` | `number?` | `1000` | Maximum characters for serializing objects in logs. |
 | `workflowHookParams` | `WorkflowHookParams?` | `{}` | Parameters passed to workflow hooks. |
+| `metricsGuardrails` | `MetricsGuardrails?` | `undefined` | Metrics validation guardrails for workflow execution. |
 
 **Inherited from API_GATEWAY_OPTIONS:**
 - All `common*` configuration fields (commonAttempts, commonWait, commonRetryStrategy, etc.)
@@ -856,6 +859,7 @@ interface STABLE_WORKFLOW_RESULT<ResponseDataType = any> {
   terminatedEarly?: boolean;
   terminationReason?: string;
   error?: string;
+  validation?: MetricsValidationResult;
   metrics?: WorkflowMetrics;
   requestGroupMetrics?: RequestGroupMetrics[];
   infrastructureMetrics?: {
@@ -876,6 +880,7 @@ interface STABLE_WORKFLOW_RESULT<ResponseDataType = any> {
 - `branches`: Array of branch execution results (only present in branched mode)
 - `branchExecutionHistory`: Ordered record of branch executions with decisions (only in branched mode)
 - `terminatedEarly`: True if workflow stopped via TERMINATE decision
+- `validation`: Metrics validation results when `metricsGuardrails` are configured
 - `metrics`: Aggregated workflow-level statistics
 
 ### BranchExecutionResult
@@ -2043,6 +2048,219 @@ console.log(`Successful variants: ${successfulVariants.join(', ')}`);
       console.log(`${record.phaseId}: ${record.decision?.action}`);
     });
     ```
+
+11. **Configure Metrics Guardrails** for validation
+    ```typescript
+    metricsGuardrails: {
+      workflow: {
+        phaseCompletionRate: { min: 90 },
+        requestSuccessRate: { min: 95 },
+        executionTime: { max: 30000 }
+      },
+      phase: {
+        requestSuccessRate: { min: 90 },
+        executionTime: { max: 5000 }
+      }
+    }
+    ```
+
+---
+
+## Metrics Guardrails and Validation
+
+Metrics guardrails allow you to define validation rules at both workflow and phase levels. Validation results are included when guardrails are configured.
+
+### Workflow-Level Guardrails
+
+Configure guardrails for overall workflow metrics:
+
+```typescript
+const result = await stableWorkflow(phases, {
+  workflowId: 'data-pipeline',
+  metricsGuardrails: {
+    workflow: {
+      phaseCompletionRate: { min: 90 },
+      requestSuccessRate: { min: 95 },
+      executionTime: { max: 30000 },
+      totalRequests: { expected: 100, tolerance: 10 }
+    }
+  }
+});
+
+if (result.validation && !result.validation.isValid) {
+  console.error('Workflow validation failed:', result.validation.anomalies);
+}
+```
+
+### Available Workflow Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `totalPhases` | `number` | Total number of phases defined |
+| `completedPhases` | `number` | Number of phases executed |
+| `failedPhases` | `number` | Number of failed phases |
+| `phaseCompletionRate` | `number` | Percentage of phases completed (0-100) |
+| `totalRequests` | `number` | Total requests across all phases |
+| `successfulRequests` | `number` | Total successful requests |
+| `failedRequests` | `number` | Total failed requests |
+| `requestSuccessRate` | `number` | Overall request success rate (0-100) |
+| `requestFailureRate` | `number` | Overall request failure rate (0-100) |
+| `executionTime` | `number` | Total workflow execution time in milliseconds |
+| `averagePhaseExecutionTime` | `number` | Average time per phase in milliseconds |
+
+### Phase-Level Guardrails
+
+Configure guardrails for individual phases:
+
+```typescript
+const phases: STABLE_WORKFLOW_PHASE[] = [
+  {
+    id: 'critical-phase',
+    requests: [...],
+    metricsGuardrails: {
+      phase: {
+        requestSuccessRate: { min: 100 },  // Must succeed 100%
+        executionTime: { max: 5000 },
+        failedRequests: { max: 0 }
+      }
+    }
+  },
+  {
+    id: 'best-effort-phase',
+    requests: [...],
+    metricsGuardrails: {
+      phase: {
+        requestSuccessRate: { min: 80 },  // More lenient
+        executionTime: { max: 10000 }
+      }
+    }
+  }
+];
+```
+
+### Available Phase Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `totalRequests` | `number` | Number of requests in phase |
+| `successfulRequests` | `number` | Number of successful requests |
+| `failedRequests` | `number` | Number of failed requests |
+| `requestSuccessRate` | `number` | Phase success rate (0-100) |
+| `requestFailureRate` | `number` | Phase failure rate (0-100) |
+| `executionTime` | `number` | Phase execution time in milliseconds |
+
+### Branch-Level Guardrails
+
+Configure guardrails for branches in branched workflows:
+
+```typescript
+const result = await stableWorkflow([], {
+  enableBranchExecution: true,
+  branches: [
+    {
+      id: 'tenant-a',
+      phases: [...],
+      metricsGuardrails: {
+        branch: {
+          phaseCompletionRate: { min: 100 },
+          requestSuccessRate: { min: 95 }
+        }
+      }
+    }
+  ],
+  metricsGuardrails: {
+    workflow: {
+      phaseCompletionRate: { min: 90 }
+    }
+  }
+});
+```
+
+### Multi-Level Validation
+
+Validation occurs at all configured levels:
+
+```typescript
+const result = await stableWorkflow(phases, {
+  // Workflow-level guardrails
+  metricsGuardrails: {
+    workflow: {
+      requestSuccessRate: { min: 95 }
+    }
+  }
+});
+
+// Check workflow-level validation
+if (result.validation && !result.validation.isValid) {
+  console.error('Workflow validation failed');
+}
+
+// Check phase-level validation
+result.phases?.forEach(phase => {
+  if (phase.validation && !phase.validation.isValid) {
+    console.error(`Phase ${phase.phaseId} validation failed:`, 
+      phase.validation.anomalies);
+  }
+});
+
+// Check branch-level validation (if branched mode)
+result.branches?.forEach(branch => {
+  if (branch.validation && !branch.validation.isValid) {
+    console.error(`Branch ${branch.branchId} validation failed:`,
+      branch.validation.anomalies);
+  }
+});
+```
+
+### Use Cases
+
+1. **Data Pipeline Validation**: Ensure all phases complete successfully
+   ```typescript
+   metricsGuardrails: {
+     workflow: {
+       phaseCompletionRate: { min: 100 },
+       requestSuccessRate: { min: 100 }
+     }
+   }
+   ```
+
+2. **SLA Monitoring**: Track workflow execution time
+   ```typescript
+   metricsGuardrails: {
+     workflow: {
+       executionTime: { max: 60000 }  // 1-minute SLA
+     },
+     phase: {
+       executionTime: { max: 10000 }  // 10-second per phase
+     }
+   }
+   ```
+
+3. **Quality Gates**: Validate critical phases strictly
+   ```typescript
+   {
+     id: 'validation-phase',
+     requests: [...],
+     metricsGuardrails: {
+       phase: {
+         requestSuccessRate: { min: 100 },
+         failedRequests: { max: 0 }
+       }
+     }
+   }
+   ```
+
+4. **Performance Baselines**: Detect degradation
+   ```typescript
+   metricsGuardrails: {
+     workflow: {
+       averagePhaseExecutionTime: { expected: 2000, tolerance: 25 },
+       executionTime: { expected: 10000, tolerance: 20 }
+     }
+   }
+   ```
+
+For detailed information on the validation result structure and severity levels, see the [stable-request documentation](./stable-request.md#metrics-guardrails-and-validation).
 
 ---
 

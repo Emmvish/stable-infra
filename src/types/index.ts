@@ -8,10 +8,118 @@ import {
   VALID_REQUEST_PROTOCOLS,
   WorkflowEdgeConditionTypes,
   WorkflowNodeTypes,
-  RequestOrFunction
+  RequestOrFunction,
+  AnomalySeverity,
+  ViolationType,
 } from '../enums/index.js';
 
-import { CircuitBreaker } from '../utilities/index.js'
+import { CircuitBreaker } from '../utilities/index.js';
+
+export interface MetricGuardrail {
+  min?: number;
+  max?: number;
+  expected?: number;
+  tolerance?: number;
+}
+
+export interface MetricsGuardrails {
+  request?: {
+    totalAttempts?: MetricGuardrail;
+    successfulAttempts?: MetricGuardrail;
+    failedAttempts?: MetricGuardrail;
+    totalExecutionTime?: MetricGuardrail;
+    averageAttemptTime?: MetricGuardrail;
+  };
+  apiGateway?: {
+    totalRequests?: MetricGuardrail;
+    successfulRequests?: MetricGuardrail;
+    failedRequests?: MetricGuardrail;
+    successRate?: MetricGuardrail;
+    failureRate?: MetricGuardrail;
+    executionTime?: MetricGuardrail;
+    throughput?: MetricGuardrail;
+    averageRequestDuration?: MetricGuardrail;
+  };
+  workflow?: {
+    totalPhases?: MetricGuardrail;
+    completedPhases?: MetricGuardrail;
+    failedPhases?: MetricGuardrail;
+    totalRequests?: MetricGuardrail;
+    successfulRequests?: MetricGuardrail;
+    failedRequests?: MetricGuardrail;
+    requestSuccessRate?: MetricGuardrail;
+    requestFailureRate?: MetricGuardrail;
+    executionTime?: MetricGuardrail;
+    averagePhaseExecutionTime?: MetricGuardrail;
+    throughput?: MetricGuardrail;
+    phaseCompletionRate?: MetricGuardrail;
+  };
+  phase?: {
+    totalRequests?: MetricGuardrail;
+    successfulRequests?: MetricGuardrail;
+    failedRequests?: MetricGuardrail;
+    requestSuccessRate?: MetricGuardrail;
+    requestFailureRate?: MetricGuardrail;
+    executionTime?: MetricGuardrail;
+  };
+  branch?: {
+    totalPhases?: MetricGuardrail;
+    completedPhases?: MetricGuardrail;
+    failedPhases?: MetricGuardrail;
+    totalRequests?: MetricGuardrail;
+    successfulRequests?: MetricGuardrail;
+    failedRequests?: MetricGuardrail;
+    requestSuccessRate?: MetricGuardrail;
+    requestFailureRate?: MetricGuardrail;
+    executionTime?: MetricGuardrail;
+    phaseCompletionRate?: MetricGuardrail;
+  };
+  infrastructure?: {
+    circuitBreaker?: {
+      failureRate?: MetricGuardrail;
+      totalRequests?: MetricGuardrail;
+      failedRequests?: MetricGuardrail;
+    };
+    cache?: {
+      hitRate?: MetricGuardrail;
+      missRate?: MetricGuardrail;
+      utilizationPercentage?: MetricGuardrail;
+      evictionRate?: MetricGuardrail;
+    };
+    rateLimiter?: {
+      throttleRate?: MetricGuardrail;
+      queueLength?: MetricGuardrail;
+      utilizationPercentage?: MetricGuardrail;
+      averageQueueWaitTime?: MetricGuardrail;
+    };
+    concurrencyLimiter?: {
+      utilizationPercentage?: MetricGuardrail;
+      queueLength?: MetricGuardrail;
+      averageQueueWaitTime?: MetricGuardrail;
+    };
+  };
+  common?: {
+    successRate?: MetricGuardrail;
+    failureRate?: MetricGuardrail;
+    executionTime?: MetricGuardrail;
+    throughput?: MetricGuardrail;
+  };
+}
+
+export interface MetricAnomaly {
+  metricName: string;
+  metricValue: number;
+  guardrail: MetricGuardrail;
+  severity: AnomalySeverity;
+  reason: string;
+  violationType: ViolationType;
+}
+
+export interface MetricsValidationResult {
+  isValid: boolean;
+  anomalies: MetricAnomaly[];
+  validatedAt: string;
+}
 
 export interface ExecutionContext {
   workflowId?: string;
@@ -65,6 +173,7 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
   rateLimit?: RateLimitConfig;
   circuitBreaker?: CircuitBreakerConfig;
   executionContext?: Partial<ExecutionContext>;
+  metricsGuardrails?: MetricsGuardrails;
 }
 
 export interface RequestGroup<RequestDataType = any, ResponseDataType = any> {
@@ -133,6 +242,7 @@ export interface API_GATEWAY_RESULT<ResponseDataType = any> extends Array<API_GA
       rateLimiter?: RateLimiterDashboardMetrics;
       concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
     };
+    validation?: MetricsValidationResult;
   };
 }
 
@@ -373,6 +483,7 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   executionContext?: ExecutionContext;
   circuitBreaker?: CircuitBreakerConfig | CircuitBreaker;
   statePersistence?: StatePersistenceConfig;
+  metricsGuardrails?: MetricsGuardrails;
 }
 
 export interface STABLE_FUNCTION<TArgs extends any[] = any[], TReturn = any> {
@@ -406,6 +517,7 @@ export interface STABLE_FUNCTION<TArgs extends any[] = any[], TReturn = any> {
   statePersistence?: StatePersistenceConfig;
   rateLimit?: RateLimitConfig;
   maxConcurrentRequests?: number;
+  metricsGuardrails?: MetricsGuardrails;
 }
 
 export interface STABLE_REQUEST_RESULT<ResponseDataType = any> {
@@ -424,6 +536,7 @@ export interface STABLE_REQUEST_RESULT<ResponseDataType = any> {
       circuitBreaker?: CircuitBreakerDashboardMetrics;
       cache?: CacheDashboardMetrics;
     };
+    validation?: MetricsValidationResult;
   };
 }
 
@@ -445,6 +558,7 @@ export interface STABLE_FUNCTION_RESULT<TReturn = any> {
       rateLimiter?: RateLimiterDashboardMetrics;
       concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
     };
+    validation?: MetricsValidationResult;
   };
 }
 
@@ -502,6 +616,7 @@ export interface STABLE_WORKFLOW_PHASE<RequestDataType = any, ResponseDataType =
     'concurrentExecution' | 'stopOnFirstError' | 'requestGroups' | "maxConcurrentRequests" | "rateLimit" | "circuitBreaker">;
   branchId?: string;
   statePersistence?: StatePersistenceConfig;
+  metricsGuardrails?: MetricsGuardrails;
 }
 
 export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>
@@ -542,6 +657,7 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   ) => STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType> | Promise<STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>>;
   maxSerializableChars?: number;
   workflowHookParams?: WorkflowHookParams;
+  metricsGuardrails?: MetricsGuardrails;
 }
 
 export interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any> {
@@ -561,6 +677,7 @@ export interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any> {
   decision?: PhaseExecutionDecision;
   error?: string;
   metrics?: PhaseMetrics;
+  validation?: MetricsValidationResult;
   infrastructureMetrics?: {
     circuitBreaker?: CircuitBreakerDashboardMetrics;
     cache?: CacheDashboardMetrics;
@@ -587,6 +704,7 @@ export interface STABLE_WORKFLOW_RESULT<ResponseDataType = any> {
   terminationReason?: string;
   error?: string;
   metrics?: WorkflowMetrics;
+  validation?: MetricsValidationResult;
   requestGroupMetrics?: RequestGroupMetrics[];
   infrastructureMetrics?: {
     circuitBreaker?: CircuitBreakerDashboardMetrics;
@@ -743,6 +861,7 @@ export interface STABLE_WORKFLOW_BRANCH<RequestDataType = any, ResponseDataType 
   statePersistence?: StatePersistenceConfig;
   commonConfig?: Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>, 
     'concurrentExecution' | 'stopOnFirstError' | 'requestGroups' | 'maxConcurrentRequests' | 'rateLimit' | 'circuitBreaker'>;
+  metricsGuardrails?: MetricsGuardrails;
 }
 
 export interface BranchDecisionHookOptions<ResponseDataType = any> {
@@ -779,6 +898,7 @@ export interface BranchExecutionResult<ResponseDataType = any> {
   skipped?: boolean;
   error?: string;
   metrics?: BranchMetrics;
+  validation?: MetricsValidationResult;
 }
 
 export interface BranchExecutionRecord {

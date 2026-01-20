@@ -24,6 +24,7 @@ import {
   safelyStringify,
   validateTrialModeProbabilities,
   MetricsAggregator,
+  MetricsValidator,
   RateLimiter,
   ConcurrencyLimiter
 } from '../utilities/index.js';
@@ -116,13 +117,13 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
   const errorLogs: FUNCTION_ERROR_LOG[] = [];
   const successfulAttemptsList: SUCCESSFUL_FUNCTION_ATTEMPT_DATA<TReturn>[] = [];
   let totalAttemptsMade = 0;
+  let successfulAttemptsCount = 0;
   
   const buildResult = (success: boolean, data?: TReturn, error?: string): STABLE_FUNCTION_RESULT<TReturn> => {
     const totalExecutionTime = Date.now() - functionStartTime;
-    const successfulAttemptsCount = successfulAttemptsList.length;
     const failedAttemptsCount = totalAttemptsMade - successfulAttemptsCount;
     
-    return {
+    const result: STABLE_FUNCTION_RESULT<TReturn> = {
       success,
       ...(data !== undefined && { data }),
       ...(error && { error }),
@@ -142,6 +143,15 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
         }
       }
     };
+    
+    if (options.metricsGuardrails && result.metrics) {
+      result.metrics.validation = MetricsValidator.validateRequestMetrics(
+        result.metrics,
+        options.metricsGuardrails
+      );
+    }
+    
+    return result;
   };
   
   let circuitBreakerInstance: CircuitBreaker | null = null;
@@ -328,6 +338,7 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
       if (res.ok && !performNextAttempt) {
         hadAtLeastOneSuccess = true;
         lastSuccessfulAttemptData = res?.data as TReturn;
+        successfulAttemptsCount++;
 
         if (logAllSuccessfulAttempts) {
           const successfulAttemptLog: SUCCESSFUL_FUNCTION_ATTEMPT_DATA<TReturn> = {

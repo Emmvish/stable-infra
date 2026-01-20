@@ -80,8 +80,8 @@
           </div>
           <div class="feature-card">
             <div class="feature-icon">📊</div>
-            <h3>Metrics & Observability</h3>
-            <p>Automatic metrics collection, structured logging, execution context propagation, and infrastructure dashboards for complete visibility.</p>
+            <h3>Metrics & Validation</h3>
+            <p>Automatic metrics collection with configurable guardrails. Validate execution against thresholds (min/max/tolerance) at request, workflow, and phase levels with anomaly detection and severity classification.</p>
           </div>
           <div class="feature-card">
             <div class="feature-icon">🔒</div>
@@ -134,6 +134,10 @@
           <div class="feature-item">
             <h4>✓ State Persistence</h4>
             <p>Persist state across retry attempts for distributed tracing, audit logs, and external state management.</p>
+          </div>
+          <div class="feature-item">
+            <h4>✓ Metrics Guardrails</h4>
+            <p>Define min/max/tolerance thresholds for execution metrics. Automatic validation with anomaly detection, severity classification (critical/warning/info), and detailed violation reporting at all levels.</p>
           </div>
         </div>
       </section>
@@ -216,6 +220,16 @@
               <li>Utilization metrics</li>
             </ul>
           </div>
+          <div class="resilience-item">
+            <h4>Metrics Guardrails</h4>
+            <ul>
+              <li>Define thresholds (min/max/tolerance)</li>
+              <li>Multi-level validation (request/workflow/phase)</li>
+              <li>Automatic anomaly detection</li>
+              <li>Severity classification</li>
+              <li>SLA monitoring & alerting</li>
+            </ul>
+          </div>
         </div>
       </section>
 
@@ -238,11 +252,22 @@ const result = await stableRequest({
   wait: 500,
   retryStrategy: RETRY_STRATEGIES.EXPONENTIAL,
   cache: { enabled: true, ttl: 5000 },
-  rateLimit: { maxRequests: 10, windowMs: 1000 }
+  rateLimit: { maxRequests: 10, windowMs: 1000 },
+  metricsGuardrails: {
+    request: {
+      totalAttempts: { max: 3 },
+      totalExecutionTime: { max: 5000 }
+    }
+  }
 });
 
 if (result.success) {
   console.log(result.data);
+  
+  // Check metrics validation
+  if (result.metrics?.validation && !result.metrics.validation.isValid) {
+    console.warn('Metrics validation failed:', result.metrics.validation.anomalies);
+  }
 }</code></pre>
           </div>
         </div>

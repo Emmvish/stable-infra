@@ -45,3 +45,84 @@ export const PrepareApiRequestOptionsMapping: ApiRequestOptionsMapping[] = [
     { localKey: 'commonBuffer', commonKey: 'sharedBuffer', groupCommonKey: 'sharedBuffer', targetKey: 'commonBuffer' },
     { localKey: 'statePersistence', commonKey: 'commonStatePersistence', groupCommonKey: 'commonStatePersistence', targetKey: 'statePersistence' },
 ];
+
+export const REQUEST_METRICS_TO_VALIDATE_KEYS = [
+    'totalAttempts',
+    'successfulAttempts',
+    'failedAttempts',
+    'totalExecutionTime',
+    'averageAttemptTime'
+] as const;
+
+export const API_GATEWAY_METRICS_TO_VALIDATE_KEYS = [
+    'totalRequests',
+    'successfulRequests',
+    'failedRequests',
+    'successRate',
+    'failureRate',
+    'executionTime',
+    'throughput',
+    'averageRequestDuration'
+] as const;
+
+export const WORKFLOW_METRICS_TO_VALIDATE_KEYS = [
+    'totalPhases',
+    'completedPhases',
+    'failedPhases',
+    'totalRequests',
+    'successfulRequests',
+    'failedRequests',
+    'requestSuccessRate',
+    'requestFailureRate',
+    'executionTime',
+    'averagePhaseExecutionTime',
+    'throughput',
+    'phaseCompletionRate'
+] as const;
+
+export const CIRCUIT_BREAKER_METRICS_TO_VALIDATE_KEYS = [
+    'failureRate',
+    'totalRequests',
+    'failedRequests'
+] as const;
+
+export const CACHE_METRICS_TO_VALIDATE_KEYS = [
+    'hitRate',
+    'missRate',
+    'utilizationPercentage',
+    'evictionRate'
+] as const;
+
+export const RATE_LIMITER_METRICS_TO_VALIDATE_KEYS = [
+    'throttleRate',
+    'queueLength',
+    'utilizationPercentage',
+    'averageQueueWaitTime'
+] as const;
+
+export const CONCURRENCY_LIMITER_METRICS_TO_VALIDATE_KEYS = [
+    'utilizationPercentage',
+    'queueLength',
+    'averageQueueWaitTime'
+] as const;
+
+export const PHASE_METRICS_TO_VALIDATE_KEYS = [
+  'totalRequests',
+  'successfulRequests',
+  'failedRequests',
+  'requestSuccessRate',
+  'requestFailureRate',
+  'executionTime'
+] as const;
+
+export const BRANCH_METRICS_TO_VALIDATE_KEYS = [
+  'totalPhases',
+  'completedPhases',
+  'failedPhases',
+  'phaseCompletionRate',
+  'totalRequests',
+  'successfulRequests',
+  'failedRequests',
+  'requestSuccessRate',
+  'executionTime'
+] as const;

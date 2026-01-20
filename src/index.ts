@@ -16,7 +16,9 @@ export {
     RETRY_STRATEGIES,
     VALID_REQUEST_PROTOCOLS,
     WorkflowEdgeConditionTypes,
-    WorkflowNodeTypes
+    WorkflowNodeTypes,
+    AnomalySeverity,
+    ViolationType,
 } from './enums/index.js';
 
 export type {
@@ -109,7 +111,11 @@ export type {
     WorkflowGraphOptions,
     WorkflowGraphValidationResult,
     WorkflowGraphExecutionPlan,
-    EdgeConditionType
+    EdgeConditionType,
+    MetricGuardrail,
+    MetricsGuardrails,
+    MetricAnomaly,
+    MetricsValidationResult
 } from './types/index.js';
 
 export {
@@ -155,5 +161,6 @@ export {
     detectUnreachableNodes,
     detectOrphanNodes,
     calculateGraphDepth,
-    executeWorkflowGraph
+    executeWorkflowGraph,
+    MetricsValidator
 } from './utilities/index.js';

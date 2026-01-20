@@ -596,6 +596,7 @@ interface WorkflowGraphOptions<
 - `prePhaseExecutionHook`
 - `sharedBuffer`, `statePersistence`
 - `maxWorkflowIterations` (for cycle protection)
+- `metricsGuardrails` (workflow-level and phase-level validation)
 - All `common*` configuration fields
 
 ---
@@ -1570,6 +1571,257 @@ const result = await stableWorkflowGraph(graph, {
     ```typescript
     builder.connectSequence('a', 'b', 'c', 'd');
     // Instead of multiple .connect() calls
+    ```
+
+13. **Configure Metrics Guardrails** for validation
+    ```typescript
+    const result = await stableWorkflowGraph(graph, {
+      metricsGuardrails: {
+        workflow: {
+          phaseCompletionRate: { min: 90 },
+          requestSuccessRate: { min: 95 }
+        }
+      }
+    });
+    ```
+
+---
+
+## Metrics Guardrails and Validation
+
+Workflow graphs support the same comprehensive metrics validation as `stableWorkflow`, allowing you to define guardrails at both workflow and phase levels.
+
+### Workflow-Level Guardrails
+
+Configure guardrails for overall graph execution metrics:
+
+```typescript
+const graph = new WorkflowGraphBuilder()
+  .addPhase('fetch', { id: 'fetch', requests: [...] })
+  .addPhase('process', { id: 'process', requests: [...] })
+  .connectSequence('fetch', 'process')
+  .setEntryPoint('fetch')
+  .build();
+
+const result = await stableWorkflowGraph(graph, {
+  workflowId: 'data-pipeline',
+  metricsGuardrails: {
+    workflow: {
+      phaseCompletionRate: { min: 100 },
+      requestSuccessRate: { min: 95 },
+      executionTime: { max: 30000 }
+    }
+  }
+});
+
+if (result.validation && !result.validation.isValid) {
+  console.error('Graph validation failed:', result.validation.anomalies);
+}
+```
+
+### Phase-Level Guardrails in Graph Nodes
+
+Each PHASE node can have its own metrics guardrails:
+
+```typescript
+const graph = new WorkflowGraphBuilder()
+  .addPhase('critical-validation', {
+    id: 'critical-validation',
+    requests: [...],
+    metricsGuardrails: {
+      phase: {
+        requestSuccessRate: { min: 100 },  // Must succeed 100%
+        executionTime: { max: 5000 },
+        failedRequests: { max: 0 }
+      }
+    }
+  })
+  .addPhase('best-effort-processing', {
+    id: 'best-effort-processing',
+    requests: [...],
+    metricsGuardrails: {
+      phase: {
+        requestSuccessRate: { min: 80 },  // More lenient
+        executionTime: { max: 10000 }
+      }
+    }
+  })
+  .connectSequence('critical-validation', 'best-effort-processing')
+  .setEntryPoint('critical-validation')
+  .build();
+
+const result = await stableWorkflowGraph(graph);
+
+// Check phase-level validation
+result.phases?.forEach(phase => {
+  if (phase.validation && !phase.validation.isValid) {
+    console.error(`Phase ${phase.phaseId} failed validation:`,
+      phase.validation.anomalies);
+  }
+});
+```
+
+### Validation in Complex Graphs
+
+Validation works seamlessly with all graph features:
+
+**Parallel Branches:**
+```typescript
+const graph = new WorkflowGraphBuilder()
+  .addPhase('start', { id: 'start', requests: [...] })
+  .addPhase('branch-a', {
+    id: 'branch-a',
+    requests: [...],
+    metricsGuardrails: {
+      phase: { executionTime: { max: 5000 } }
+    }
+  })
+  .addPhase('branch-b', {
+    id: 'branch-b',
+    requests: [...],
+    metricsGuardrails: {
+      phase: { executionTime: { max: 5000 } }
+    }
+  })
+  .addPhase('merge', { id: 'merge', requests: [...] })
+  .connectToMany('start', ['branch-a', 'branch-b'])
+  .connectManyTo(['branch-a', 'branch-b'], 'merge')
+  .setEntryPoint('start')
+  .build();
+
+const result = await stableWorkflowGraph(graph, {
+  metricsGuardrails: {
+    workflow: {
+      phaseCompletionRate: { min: 100 }  // All branches must complete
+    }
+  }
+});
+```
+
+**Conditional Paths:**
+```typescript
+const graph = new WorkflowGraphBuilder()
+  .addPhase('check', { id: 'check', requests: [...] })
+  .addPhase('path-a', {
+    id: 'path-a',
+    requests: [...],
+    metricsGuardrails: {
+      phase: { requestSuccessRate: { min: 90 } }
+    }
+  })
+  .addPhase('path-b', {
+    id: 'path-b',
+    requests: [...],
+    metricsGuardrails: {
+      phase: { requestSuccessRate: { min: 90 } }
+    }
+  })
+  .connect('check', 'path-a', {
+    condition: {
+      type: WorkflowEdgeConditionTypes.CUSTOM,
+      evaluate: (context) => {
+        const result = context.results.get('check');
+        return result?.responses?.[0]?.data?.value > 50;
+      }
+    }
+  })
+  .connect('check', 'path-b', {
+    condition: {
+      type: WorkflowEdgeConditionTypes.CUSTOM,
+      evaluate: (context) => {
+        const result = context.results.get('check');
+        return result?.responses?.[0]?.data?.value <= 50;
+      }
+    }
+  })
+  .setEntryPoint('check')
+  .build();
+
+const result = await stableWorkflowGraph(graph, {
+  metricsGuardrails: {
+    workflow: {
+      completedPhases: { min: 2 }  // Check + one conditional path
+    }
+  }
+});
+```
+
+### Available Metrics
+
+Same metrics as `stableWorkflow`:
+
+**Workflow-Level:**
+- `phaseCompletionRate`, `requestSuccessRate`, `executionTime`
+- `totalPhases`, `completedPhases`, `failedPhases`
+- `totalRequests`, `successfulRequests`, `failedRequests`
+- `averagePhaseExecutionTime`
+
+**Phase-Level:**
+- `requestSuccessRate`, `executionTime`
+- `totalRequests`, `successfulRequests`, `failedRequests`
+
+### Use Cases
+
+1. **Graph Execution Validation**: Ensure all nodes execute successfully
+   ```typescript
+   metricsGuardrails: {
+     workflow: {
+       phaseCompletionRate: { min: 100 },
+       requestSuccessRate: { min: 100 }
+     }
+   }
+   ```
+
+2. **Critical Path Monitoring**: Strict validation on critical nodes
+   ```typescript
+   {
+     id: 'payment-processing',
+     requests: [...],
+     metricsGuardrails: {
+       phase: {
+         requestSuccessRate: { min: 100 },
+         executionTime: { max: 3000 }
+       }
+     }
+   }
+   ```
+
+3. **Parallel Branch SLAs**: Ensure all parallel paths meet requirements
+   ```typescript
+   // Each parallel branch with same guardrails
+   metricsGuardrails: {
+     phase: {
+       executionTime: { max: 5000 },
+       requestSuccessRate: { min: 95 }
+     }
+   }
+   ```
+
+4. **Complex Workflow Validation**: Multi-level validation
+   ```typescript
+   const result = await stableWorkflowGraph(graph, {
+     metricsGuardrails: {
+       workflow: {
+         executionTime: { max: 60000 },
+         phaseCompletionRate: { min: 90 }
+       }
+     }
+   });
+   
+   // Workflow-level check
+   if (result.validation && !result.validation.isValid) {
+     // Handle workflow-level violations
+   }
+   
+   // Phase-level checks
+   result.phases?.forEach(phase => {
+     if (phase.validation && !phase.validation.isValid) {
+       // Handle phase-level violations
+     }
+   });
+   ```
+
+For detailed information on the validation result structure, severity levels, and guardrail configuration options, see the [stable-workflow documentation](./stable-workflow.md#metrics-guardrails-and-validation).
 
 ---
 

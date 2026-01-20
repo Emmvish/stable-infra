@@ -73,6 +73,7 @@ interface STABLE_FUNCTION<TArgs extends any[] = any[], TReturn = any> {
   statePersistence?: StatePersistenceConfig;
   rateLimit?: RateLimitConfig;
   maxConcurrentRequests?: number;
+  metricsGuardrails?: MetricsGuardrails;
 }
 ```
 
@@ -106,6 +107,7 @@ interface STABLE_FUNCTION<TArgs extends any[] = any[], TReturn = any> {
 | `statePersistence` | `StatePersistenceConfig` | No | `undefined` | State persistence configuration for external storage. |
 | `rateLimit` | `RateLimitConfig` | No | `undefined` | Rate limiting configuration (maxRequests, windowMs). |
 | `maxConcurrentRequests` | `number` | No | `undefined` | Maximum number of concurrent executions (semaphore). |
+| `metricsGuardrails` | `MetricsGuardrails` | No | `undefined` | Metrics validation guardrails with min/max thresholds for function metrics. |
 
 ---
 
@@ -128,6 +130,7 @@ interface STABLE_FUNCTION_RESULT<TReturn = any> {
     failedAttempts: number;
     totalExecutionTime: number;
     averageAttemptTime: number;
+    validation?: MetricsValidationResult;
     infrastructureMetrics?: {
       circuitBreaker?: CircuitBreakerDashboardMetrics;
       cache?: CacheDashboardMetrics;
@@ -147,7 +150,8 @@ interface STABLE_FUNCTION_RESULT<TReturn = any> {
 | `error` | `string?` | Error message if execution failed. |
 | `errorLogs` | `FUNCTION_ERROR_LOG[]?` | Array of all error logs from failed attempts. |
 | `successfulAttempts` | `SUCCESSFUL_FUNCTION_ATTEMPT_DATA<TReturn>[]?` | Array of all successful attempt data (if `logAllSuccessfulAttempts: true`). |
-| `metrics` | `Object?` | Execution metrics including attempts, timing, and infrastructure stats. |
+| `metrics` | `Object?` | Execution metrics including attempts, timing, infrastructure stats, and validation results. |
+| `metrics.validation` | `MetricsValidationResult?` | Validation results when `metricsGuardrails` are configured. |
 
 ### Supporting Interfaces
 
@@ -1116,6 +1120,114 @@ console.log('Success rate:',
       }
     }
     ```
+
+11. **Metrics Guardrails**: Validate execution metrics
+    ```typescript
+    {
+      metricsGuardrails: {
+        request: {
+          totalAttempts: { max: 5 },
+          failedAttempts: { max: 2 },
+          totalExecutionTime: { max: 3000 }
+        }
+      }
+    }
+    ```
+
+---
+
+## Metrics Guardrails and Validation
+
+Metrics guardrails allow you to define validation rules for function execution metrics. Validation results are included in the response when guardrails are configured.
+
+### Configuring Metrics Guardrails
+
+```typescript
+const result = await stableFunction({
+  fn: myAsyncFunction,
+  args: [param1, param2],
+  attempts: 5,
+  metricsGuardrails: {
+    request: {  // Note: Uses 'request' key for compatibility
+      totalAttempts: { max: 5 },
+      successfulAttempts: { min: 1 },
+      failedAttempts: { max: 3 },
+      totalExecutionTime: { max: 10000 },
+      averageAttemptTime: { max: 2000 }
+    }
+  }
+});
+```
+
+### Available Metrics
+
+The same metrics as `stableRequest` are available:
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `totalAttempts` | `number` | Total number of function execution attempts |
+| `successfulAttempts` | `number` | Number of successful executions |
+| `failedAttempts` | `number` | Number of failed executions |
+| `totalExecutionTime` | `number` | Total execution time in milliseconds |
+| `averageAttemptTime` | `number` | Average time per attempt in milliseconds |
+
+### Checking Validation Results
+
+```typescript
+const result = await stableFunction({
+  fn: async () => fetchData(),
+  args: [],
+  attempts: 3,
+  metricsGuardrails: {
+    request: {
+      totalExecutionTime: { max: 5000 },
+      failedAttempts: { max: 1 }
+    }
+  }
+});
+
+if (result.metrics?.validation) {
+  if (!result.metrics.validation.isValid) {
+    console.warn('Function metrics validation failed:');
+    result.metrics.validation.anomalies.forEach(anomaly => {
+      console.warn(`${anomaly.metricName}: ${anomaly.reason} (${anomaly.severity})`);
+    });
+  }
+}
+```
+
+### Use Cases
+
+1. **Performance Monitoring**: Track function execution performance
+   ```typescript
+   metricsGuardrails: {
+     request: {
+       totalExecutionTime: { max: 3000 },
+       averageAttemptTime: { max: 1000 }
+     }
+   }
+   ```
+
+2. **Reliability Tracking**: Ensure successful execution
+   ```typescript
+   metricsGuardrails: {
+     request: {
+       successfulAttempts: { min: 1 },
+       failedAttempts: { max: 2 }
+     }
+   }
+   ```
+
+3. **Retry Monitoring**: Alert on excessive retries
+   ```typescript
+   metricsGuardrails: {
+     request: {
+       totalAttempts: { expected: 1, tolerance: 50 }  // Expect 1, allow up to 1-2 attempts
+     }
+   }
+   ```
+
+For detailed information on the validation result structure and severity levels, see the [stable-request documentation](./stable-request.md#metrics-guardrails-and-validation).
 
 ---
 

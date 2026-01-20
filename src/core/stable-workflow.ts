@@ -11,7 +11,8 @@ import {
     safelyStringify,
     CircuitBreaker,
     formatLogContext,
-    MetricsAggregator
+    MetricsAggregator,
+    MetricsValidator
 } from '../utilities/index.js';
 
 export async function stableWorkflow<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
@@ -124,6 +125,13 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
 
             result.metrics = MetricsAggregator.extractWorkflowMetrics(result);
             
+            if (options.metricsGuardrails && result.metrics) {
+                result.validation = MetricsValidator.validateWorkflowMetrics(
+                    result.metrics,
+                    options.metricsGuardrails
+                );
+            }
+            
             const allResponses = phaseResults.flatMap(phase => phase.responses);
             result.requestGroupMetrics = MetricsAggregator.extractRequestGroupMetrics(allResponses);
 
@@ -180,6 +188,13 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
             };
 
             result.metrics = MetricsAggregator.extractWorkflowMetrics(result);
+            
+            if (options.metricsGuardrails && result.metrics) {
+                result.validation = MetricsValidator.validateWorkflowMetrics(
+                    result.metrics,
+                    options.metricsGuardrails
+                );
+            }
             
             const allResponses = phaseResults.flatMap(phase => phase.responses);
             result.requestGroupMetrics = MetricsAggregator.extractRequestGroupMetrics(allResponses);
@@ -474,6 +489,13 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
 
         result.metrics = MetricsAggregator.extractWorkflowMetrics(result);
         
+        if (options.metricsGuardrails && result.metrics) {
+            result.validation = MetricsValidator.validateWorkflowMetrics(
+                result.metrics,
+                options.metricsGuardrails
+            );
+        }
+        
         const allResponses = phaseResults.flatMap(phase => phase.responses);
         result.requestGroupMetrics = MetricsAggregator.extractRequestGroupMetrics(allResponses);
 
@@ -514,6 +536,13 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
         };
 
         errorResult.metrics = MetricsAggregator.extractWorkflowMetrics(errorResult);
+        
+        if (options.metricsGuardrails && errorResult.metrics) {
+            errorResult.validation = MetricsValidator.validateWorkflowMetrics(
+                errorResult.metrics,
+                options.metricsGuardrails
+            );
+        }
 
         return errorResult;
     }

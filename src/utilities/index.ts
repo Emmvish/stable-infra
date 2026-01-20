@@ -15,6 +15,7 @@ export { generateAxiosRequestConfig } from './generate-axios-request-config.js';
 export { getNewDelayTime } from './get-new-delay-time.js';
 export { isRetryableError } from './is-retryable-error.js';
 export { MetricsAggregator } from './metrics-aggregator.js';
+export { MetricsValidator } from './metrics-validator.js';
 export { prepareApiRequestData } from './prepare-api-request-data.js';
 export { prepareApiRequestOptions } from './prepare-api-request-options.js';
 export { prepareApiFunctionOptions } from './prepare-api-function-options.js';

@@ -9,9 +9,10 @@
 5. [Concurrency Limiter](#concurrency-limiter)
 6. [Function Cache Manager](#function-cache-manager)
 7. [Metrics Aggregator](#metrics-aggregator)
-8. [Configuration Examples](#configuration-examples)
-9. [Advanced Use Cases](#advanced-use-cases)
-10. [Best Practices](#best-practices)
+8. [Metrics Validator](#metrics-validator)
+9. [Configuration Examples](#configuration-examples)
+10. [Advanced Use Cases](#advanced-use-cases)
+11. [Best Practices](#best-practices)
 
 ---
 
@@ -27,6 +28,7 @@ The `@emmvish/stable-request` library provides a suite of infrastructure utiliti
 - **Concurrency Limiter**: Semaphore-based concurrency control with queuing
 - **Function Cache Manager**: Function result caching for expensive computations
 - **Metrics Aggregator**: Comprehensive metrics extraction and aggregation
+- **Metrics Validator**: Real-time metrics validation against configurable guardrails
 
 ### Common Features
 
@@ -865,6 +867,656 @@ const systemMetrics = MetricsAggregator.aggregateSystemMetrics(
 
 console.log('System Metrics:', systemMetrics);
 ```
+
+---
+
+## Metrics Validator
+
+Static utility class for validating metrics against configurable guardrails with automatic anomaly detection.
+
+### Overview
+
+The `MetricsValidator` class provides real-time validation of metrics against user-defined thresholds (guardrails). It automatically detects anomalies, calculates severity levels, and provides detailed violation information for monitoring and alerting.
+
+### Key Features
+
+- ✅ **Automatic Anomaly Detection**: Identifies metrics outside acceptable ranges
+- ✅ **Severity Classification**: CRITICAL, WARNING, INFO based on deviation
+- ✅ **Multi-Level Validation**: Request, Function, API Gateway, Workflow, Phase, Branch, Infrastructure
+- ✅ **Flexible Guardrails**: Min/max thresholds or expected value with tolerance
+- ✅ **Type-Safe Enums**: ViolationType and AnomalySeverity for consistent handling
+
+### Guardrails Configuration
+
+#### MetricsGuardrails Interface
+
+```typescript
+interface MetricsGuardrails {
+  request?: RequestMetricsGuardrails;
+  apiGateway?: ApiGatewayMetricsGuardrails;
+  workflow?: WorkflowMetricsGuardrails;
+  phase?: PhaseMetricsGuardrails;
+  branch?: BranchMetricsGuardrails;
+  infrastructure?: InfrastructureMetricsGuardrails;
+}
+```
+
+#### Guardrail Specification
+
+Each metric can have:
+- `min`: Minimum acceptable value
+- `max`: Maximum acceptable value
+- `expected`: Expected value (requires `tolerance`)
+- `tolerance`: Acceptable deviation percentage (0-100) from expected value
+
+```typescript
+interface MetricGuardrail {
+  min?: number;
+  max?: number;
+  expected?: number;
+  tolerance?: number;
+}
+```
+
+### Validation Result
+
+```typescript
+interface MetricsValidationResult {
+  isValid: boolean;
+  anomalies: MetricAnomaly[];
+  validatedAt: string; // ISO 8601 timestamp
+}
+
+interface MetricAnomaly {
+  metricName: string;
+  metricValue: number;
+  guardrail: MetricGuardrail;
+  severity: AnomalySeverity;
+  reason: string;
+  violationType: ViolationType;
+}
+```
+
+### Enums
+
+#### AnomalySeverity
+
+```typescript
+enum AnomalySeverity {
+  CRITICAL = 'critical',  // Deviation > 50%
+  WARNING = 'warning',    // Deviation > 20%
+  INFO = 'info'           // Deviation ≤ 20%
+}
+```
+
+#### ViolationType
+
+```typescript
+enum ViolationType {
+  BELOW_MIN = 'below_min',
+  ABOVE_MAX = 'above_max',
+  OUTSIDE_TOLERANCE = 'outside_tolerance'
+}
+```
+
+### Static Methods
+
+#### validateRequestMetrics(metrics, guardrails): MetricsValidationResult
+
+Validate request/function metrics against guardrails.
+
+```typescript
+const validation = MetricsValidator.validateRequestMetrics(
+  result.metrics,
+  {
+    request: {
+      totalAttempts: { max: 5 },
+      successfulAttempts: { min: 1 },
+      failedAttempts: { max: 2 },
+      totalExecutionTime: { max: 5000 }
+    }
+  }
+);
+
+if (!validation.isValid) {
+  validation.anomalies.forEach(anomaly => {
+    console.error(`${anomaly.severity.toUpperCase()}: ${anomaly.reason}`);
+  });
+}
+```
+
+**Validated Metrics:**
+- `totalAttempts`
+- `successfulAttempts`
+- `failedAttempts`
+- `totalExecutionTime`
+- `averageAttemptTime`
+
+#### validateApiGatewayMetrics(metrics, guardrails): MetricsValidationResult
+
+Validate API Gateway metrics.
+
+```typescript
+const validation = MetricsValidator.validateApiGatewayMetrics(
+  result.metrics,
+  {
+    apiGateway: {
+      totalRequests: { expected: 10, tolerance: 10 },
+      successRate: { min: 95 },
+      failureRate: { max: 5 },
+      executionTime: { max: 10000 },
+      throughput: { min: 10 },
+      averageRequestDuration: { max: 1000 }
+    }
+  }
+);
+```
+
+**Validated Metrics:**
+- `totalRequests`
+- `successfulRequests`
+- `failedRequests`
+- `successRate`
+- `failureRate`
+- `executionTime`
+- `throughput`
+- `averageRequestDuration`
+
+#### validateWorkflowMetrics(metrics, guardrails): MetricsValidationResult
+
+Validate workflow-level metrics.
+
+```typescript
+const validation = MetricsValidator.validateWorkflowMetrics(
+  workflowMetrics,
+  {
+    workflow: {
+      executionTime: { max: 30000 },
+      phaseCompletionRate: { min: 90 },
+      requestSuccessRate: { min: 95 },
+      throughput: { min: 5 }
+    }
+  }
+);
+```
+
+**Validated Metrics:**
+- `executionTime`
+- `totalPhases`
+- `completedPhases`
+- `failedPhases`
+- `skippedPhases`
+- `phaseCompletionRate`
+- `averagePhaseExecutionTime`
+- `totalRequests`
+- `successfulRequests`
+- `failedRequests`
+- `requestSuccessRate`
+- `requestFailureRate`
+- `throughput`
+
+#### validatePhaseMetrics(metrics, guardrails): MetricsValidationResult
+
+Validate phase-level metrics.
+
+```typescript
+const validation = MetricsValidator.validatePhaseMetrics(
+  phaseResult.metrics,
+  {
+    phase: {
+      executionTime: { max: 5000 },
+      totalRequests: { min: 1 },
+      requestSuccessRate: { min: 95 }
+    }
+  }
+);
+```
+
+**Validated Metrics:**
+- `phaseIndex`
+- `executionTime`
+- `totalRequests`
+- `successfulRequests`
+- `failedRequests`
+- `requestSuccessRate`
+- `requestFailureRate`
+
+#### validateBranchMetrics(metrics, guardrails): MetricsValidationResult
+
+Validate branch-level metrics.
+
+```typescript
+const validation = MetricsValidator.validateBranchMetrics(
+  branchMetrics,
+  {
+    branch: {
+      executionTime: { max: 15000 },
+      phaseCompletionRate: { min: 80 },
+      requestSuccessRate: { min: 90 }
+    }
+  }
+);
+```
+
+**Validated Metrics:**
+- `branchIndex`
+- `executionTime`
+- `completedPhases`
+- `totalPhases`
+- `phaseCompletionRate`
+- `totalRequests`
+- `successfulRequests`
+- `failedRequests`
+- `requestSuccessRate`
+- `requestFailureRate`
+
+#### validateInfrastructureMetrics(metrics, guardrails): MetricsValidationResult
+
+Validate infrastructure metrics (cache, circuit breaker, rate limiter, concurrency limiter).
+
+```typescript
+const validation = MetricsValidator.validateInfrastructureMetrics(
+  result.metrics.infrastructureMetrics,
+  {
+    infrastructure: {
+      cache: {
+        hitRate: { min: 70 },
+        utilizationPercentage: { expected: 80, tolerance: 20 }
+      },
+      circuitBreaker: {
+        failureRate: { max: 10 },
+        healthScore: { min: 80 }
+      },
+      rateLimiter: {
+        throttleRate: { max: 30 },
+        averageQueueWaitTime: { max: 1000 }
+      },
+      concurrencyLimiter: {
+        utilizationPercentage: { min: 50, max: 90 },
+        successRate: { min: 95 }
+      }
+    }
+  }
+);
+```
+
+### Severity Calculation
+
+Severity is automatically calculated based on deviation from threshold:
+
+```typescript
+// For min threshold violation
+const deviation = ((threshold - actualValue) / threshold) * 100;
+
+// For max threshold violation
+const deviation = ((actualValue - threshold) / threshold) * 100;
+
+if (deviation > 50) {
+  severity = AnomalySeverity.CRITICAL;
+} else if (deviation > 20) {
+  severity = AnomalySeverity.WARNING;
+} else {
+  severity = AnomalySeverity.INFO;
+}
+```
+
+### Usage Examples
+
+#### Example 1: Request Validation
+
+```typescript
+import { stableRequest, MetricsValidator } from '@emmvish/stable-request';
+
+const result = await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    path: '/data'
+  },
+  attempts: 3,
+  metricsGuardrails: {
+    request: {
+      totalAttempts: { max: 3 },
+      successfulAttempts: { min: 1 },
+      totalExecutionTime: { max: 5000 }
+    }
+  },
+  resReq: true
+});
+
+// Validation is automatically performed and included in result
+if (!result.metrics?.validation?.isValid) {
+  console.error('Metrics validation failed!');
+  result.metrics.validation.anomalies.forEach(anomaly => {
+    console.error(`[${anomaly.severity}] ${anomaly.reason}`);
+  });
+}
+```
+
+#### Example 2: API Gateway Validation
+
+```typescript
+import { stableApiGateway, MetricsValidator, AnomalySeverity } from '@emmvish/stable-request';
+
+const result = await stableApiGateway(
+  requests,
+  functions,
+  {
+    metricsGuardrails: {
+      apiGateway: {
+        successRate: { min: 95 },
+        failureRate: { max: 5 },
+        executionTime: { max: 10000 }
+      }
+    }
+  }
+);
+
+if (result.metrics?.validation) {
+  const criticalAnomalies = result.metrics.validation.anomalies
+    .filter(a => a.severity === AnomalySeverity.CRITICAL);
+  
+  if (criticalAnomalies.length > 0) {
+    alertOps('Critical metrics violations detected', criticalAnomalies);
+  }
+}
+```
+
+#### Example 3: Workflow Validation
+
+```typescript
+import { stableWorkflow, MetricsValidator } from '@emmvish/stable-request';
+
+const result = await stableWorkflow(
+  phases,
+  {
+    metricsGuardrails: {
+      workflow: {
+        executionTime: { max: 30000 },
+        phaseCompletionRate: { min: 90 },
+        requestSuccessRate: { min: 95 }
+      },
+      phase: {
+        executionTime: { max: 5000 },
+        requestSuccessRate: { min: 95 }
+      }
+    }
+  }
+);
+
+// Check workflow-level validation
+if (!result.metrics?.validation?.isValid) {
+  console.error('Workflow validation failed');
+}
+
+// Check phase-level validation
+result.phases?.forEach((phase, index) => {
+  if (!phase.metrics?.validation?.isValid) {
+    console.error(`Phase ${index} validation failed`);
+    phase.metrics.validation.anomalies.forEach(anomaly => {
+      console.error(`  ${anomaly.reason}`);
+    });
+  }
+});
+```
+
+#### Example 4: Tolerance-Based Validation
+
+```typescript
+// Expected value with tolerance
+const result = await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  metricsGuardrails: {
+    request: {
+      // Expect 3 attempts, allow 10% deviation (2.7 to 3.3)
+      totalAttempts: { expected: 3, tolerance: 10 },
+      
+      // Expect 1000ms execution time, allow 20% deviation (800-1200ms)
+      totalExecutionTime: { expected: 1000, tolerance: 20 }
+    }
+  },
+  resReq: true
+});
+
+if (result.metrics?.validation?.isValid) {
+  console.log('Metrics within expected tolerances');
+}
+```
+
+#### Example 5: Multi-Level Validation
+
+```typescript
+import { stableWorkflow, ViolationType } from '@emmvish/stable-request';
+
+const result = await stableWorkflow(
+  phases,
+  {
+    enableBranchExecution: true,
+    metricsGuardrails: {
+      workflow: {
+        executionTime: { max: 60000 },
+        phaseCompletionRate: { min: 85 }
+      },
+      phase: {
+        executionTime: { max: 10000 },
+        requestSuccessRate: { min: 90 }
+      },
+      branch: {
+        executionTime: { max: 20000 },
+        phaseCompletionRate: { min: 80 }
+      }
+    },
+    branches: [
+      {
+        id: 'critical-path',
+        phases: [...],
+        metricsGuardrails: {
+          branch: {
+            requestSuccessRate: { min: 99 } // Stricter for critical path
+          }
+        }
+      }
+    ]
+  }
+);
+
+// Check all validation levels
+function checkValidation(result: any, level: string) {
+  if (!result.metrics?.validation?.isValid) {
+    console.error(`${level} validation failed`);
+    
+    result.metrics.validation.anomalies.forEach(anomaly => {
+      const icon = anomaly.violationType === ViolationType.BELOW_MIN ? '📉' 
+                 : anomaly.violationType === ViolationType.ABOVE_MAX ? '📈' 
+                 : '⚠️';
+      
+      console.error(`  ${icon} [${anomaly.severity}] ${anomaly.reason}`);
+    });
+  }
+}
+
+checkValidation(result, 'Workflow');
+result.phases?.forEach((p, i) => checkValidation(p, `Phase ${i}`));
+result.branches?.forEach((b, i) => checkValidation(b, `Branch ${i}`));
+```
+
+#### Example 6: Infrastructure Metrics Validation
+
+```typescript
+import { 
+  stableRequest, 
+  getGlobalCacheManager, 
+  getGlobalCircuitBreaker,
+  MetricsValidator 
+} from '@emmvish/stable-request';
+
+const cache = getGlobalCacheManager({ enabled: true, ttl: 300000 });
+const breaker = getGlobalCircuitBreaker({
+  failureThresholdPercentage: 50,
+  minimumRequests: 10,
+  recoveryTimeoutMs: 60000
+});
+
+const result = await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  cache: cache,
+  circuitBreaker: breaker,
+  metricsGuardrails: {
+    infrastructure: {
+      cache: {
+        hitRate: { min: 60 },
+        utilizationPercentage: { min: 50, max: 90 }
+      },
+      circuitBreaker: {
+        failureRate: { max: 20 },
+        healthScore: { min: 70 }
+      }
+    }
+  },
+  resReq: true
+});
+
+// Check infrastructure validation
+if (result.metrics?.validation) {
+  const infraAnomalies = result.metrics.validation.anomalies
+    .filter(a => 
+      a.metricName.includes('hitRate') || 
+      a.metricName.includes('healthScore')
+    );
+  
+  if (infraAnomalies.length > 0) {
+    console.warn('Infrastructure metrics need attention:', infraAnomalies);
+  }
+}
+```
+
+### Integration with Monitoring
+
+```typescript
+import { MetricsValidator, AnomalySeverity, ViolationType } from '@emmvish/stable-request';
+
+function sendMetricsToMonitoring(result: any) {
+  if (!result.metrics?.validation) return;
+  
+  const validation = result.metrics.validation;
+  
+  // Send validation status
+  metrics.gauge('metrics.validation.status', validation.isValid ? 1 : 0);
+  metrics.gauge('metrics.validation.anomaly_count', validation.anomalies.length);
+  
+  // Count by severity
+  const criticalCount = validation.anomalies
+    .filter(a => a.severity === AnomalySeverity.CRITICAL).length;
+  const warningCount = validation.anomalies
+    .filter(a => a.severity === AnomalySeverity.WARNING).length;
+  const infoCount = validation.anomalies
+    .filter(a => a.severity === AnomalySeverity.INFO).length;
+  
+  metrics.gauge('metrics.validation.critical_anomalies', criticalCount);
+  metrics.gauge('metrics.validation.warning_anomalies', warningCount);
+  metrics.gauge('metrics.validation.info_anomalies', infoCount);
+  
+  // Alert on critical anomalies
+  if (criticalCount > 0) {
+    validation.anomalies
+      .filter(a => a.severity === AnomalySeverity.CRITICAL)
+      .forEach(anomaly => {
+        alerting.sendAlert({
+          level: 'critical',
+          title: `Critical Metrics Violation: ${anomaly.metricName}`,
+          description: anomaly.reason,
+          metadata: {
+            metricName: anomaly.metricName,
+            metricValue: anomaly.metricValue,
+            guardrail: anomaly.guardrail,
+            violationType: anomaly.violationType
+          }
+        });
+      });
+  }
+}
+```
+
+### Best Practices
+
+1. **Set Realistic Guardrails** based on historical data and SLOs
+   ```typescript
+   // Use percentiles from historical data
+   const guardrails = {
+     request: {
+       totalExecutionTime: { max: p95ExecutionTime * 1.2 },
+       successfulAttempts: { min: 1 }
+     }
+   };
+   ```
+
+2. **Use Tolerance for Expected Values** when you know the target
+   ```typescript
+   // For predictable workloads
+   {
+     apiGateway: {
+       totalRequests: { expected: 100, tolerance: 10 } // 90-110 requests
+     }
+   }
+   ```
+
+3. **Layer Guardrails** from strict to lenient at different levels
+   ```typescript
+   {
+     workflow: { requestSuccessRate: { min: 90 } },  // Lenient
+     phase: { requestSuccessRate: { min: 95 } },     // Strict
+     branch: { requestSuccessRate: { min: 99 } }     // Very strict for critical
+   }
+   ```
+
+4. **Monitor Anomaly Patterns** to tune guardrails
+   ```typescript
+   if (validation.anomalies.length > 0) {
+     const mostCommon = getMostCommonAnomaly(validation.anomalies);
+     if (mostCommon.count > 10) {
+       console.log(`Consider adjusting ${mostCommon.metricName} guardrail`);
+     }
+   }
+   ```
+
+5. **Handle Validation Failures Gracefully**
+   ```typescript
+   if (!result.metrics?.validation?.isValid) {
+     const hasCritical = result.metrics.validation.anomalies
+       .some(a => a.severity === AnomalySeverity.CRITICAL);
+     
+     if (hasCritical) {
+       // Critical: Take immediate action
+       await rollbackDeployment();
+     } else {
+       // Warning/Info: Log and monitor
+       logger.warn('Metrics validation warnings', result.metrics.validation);
+     }
+   }
+   ```
+
+6. **Combine with Circuit Breaker** for automatic protection
+   ```typescript
+   const breaker = new CircuitBreaker({
+     failureThresholdPercentage: 50,
+     minimumRequests: 10,
+     recoveryTimeoutMs: 60000
+   });
+   
+   const result = await stableRequest({
+     // ... config
+     circuitBreaker: breaker,
+     metricsGuardrails: {
+       request: {
+         failedAttempts: { max: 3 }
+       },
+       infrastructure: {
+         circuitBreaker: {
+           failureRate: { max: 50 }
+         }
+       }
+     }
+   });
+   ```
 
 ---
 

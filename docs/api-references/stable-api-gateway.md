@@ -104,6 +104,7 @@ interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any, Fun
   rateLimit?: RateLimitConfig;
   circuitBreaker?: CircuitBreakerConfig;
   executionContext?: Partial<ExecutionContext>;
+  metricsGuardrails?: MetricsGuardrails;
 }
 ```
 
@@ -159,6 +160,7 @@ interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any, Fun
 | `rateLimit` | `RateLimitConfig` | `undefined` | Global rate limiter config. |
 | `circuitBreaker` | `CircuitBreakerConfig` | `undefined` | Global circuit breaker config. |
 | `executionContext` | `Partial<ExecutionContext>` | `undefined` | Context metadata for tracing. |
+| `metricsGuardrails` | `MetricsGuardrails` | `undefined` | Metrics validation guardrails for API Gateway execution. |
 
 ### RequestGroup Interface
 
@@ -341,6 +343,7 @@ interface API_GATEWAY_RESULT<ResponseDataType = any> extends Array<API_GATEWAY_R
     timestamp: string;
     throughput: number;
     averageRequestDuration: number;
+    validation?: MetricsValidationResult;
     requestGroups?: RequestGroupMetrics[];
     infrastructureMetrics?: {
       circuitBreaker?: CircuitBreakerDashboardMetrics;
@@ -1391,6 +1394,141 @@ console.log('Cache warming complete:', result.metrics.successRate === 100);
       { type: RequestOrFunction.REQUEST, request: { /* save */ } }
     ];
     ```
+
+11. **Configure Metrics Guardrails** for validation
+    ```typescript
+    metricsGuardrails: {
+      apiGateway: {
+        successRate: { min: 95 },
+        failureRate: { max: 5 },
+        executionTime: { max: 10000 }
+      }
+    }
+    ```
+
+---
+
+## Metrics Guardrails and Validation
+
+Metrics guardrails allow you to define validation rules for API Gateway execution metrics. Validation results are included when guardrails are configured.
+
+### Configuring Metrics Guardrails
+
+```typescript
+const result = await stableApiGateway(requests, [], {
+  concurrentExecution: true,
+  metricsGuardrails: {
+    apiGateway: {
+      successRate: { min: 90 },
+      failureRate: { max: 10 },
+      executionTime: { max: 15000 },
+      totalRequests: { expected: 10, tolerance: 10 }
+    }
+  }
+});
+```
+
+### Available API Gateway Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `totalRequests` | `number` | Total number of requests/functions executed |
+| `successfulRequests` | `number` | Number of successful executions |
+| `failedRequests` | `number` | Number of failed executions |
+| `successRate` | `number` | Success rate percentage (0-100) |
+| `failureRate` | `number` | Failure rate percentage (0-100) |
+| `executionTime` | `number` | Total gateway execution time in milliseconds |
+| `throughput` | `number` | Requests per second |
+| `averageRequestDuration` | `number` | Average time per request in milliseconds |
+
+### Common Metrics
+
+You can also use `common` guardrails that apply as a fallback:
+
+```typescript
+metricsGuardrails: {
+  common: {
+    successRate: { min: 95 },
+    executionTime: { max: 10000 }
+  }
+}
+```
+
+### Checking Validation Results
+
+```typescript
+const result = await stableApiGateway(requests, [], {
+  metricsGuardrails: {
+    apiGateway: {
+      successRate: { min: 95 },
+      executionTime: { max: 5000 }
+    }
+  }
+});
+
+if (result.metrics?.validation) {
+  console.log('Validation Status:', result.metrics.validation.isValid);
+  
+  if (!result.metrics.validation.isValid) {
+    console.error('Gateway metrics validation failed:');
+    result.metrics.validation.anomalies.forEach(anomaly => {
+      console.error(`- ${anomaly.metricName}: ${anomaly.reason}`);
+      console.error(`  Severity: ${anomaly.severity}`);
+    });
+    
+    // Take action based on severity
+    const criticalAnomalies = result.metrics.validation.anomalies
+      .filter(a => a.severity === 'critical');
+    
+    if (criticalAnomalies.length > 0) {
+      // Alert, retry, or fallback logic
+    }
+  }
+}
+```
+
+### Use Cases
+
+1. **Batch Operation Validation**: Ensure batch success rates
+   ```typescript
+   metricsGuardrails: {
+     apiGateway: {
+       successRate: { min: 95 },
+       failedRequests: { max: 5 }
+     }
+   }
+   ```
+
+2. **Performance SLAs**: Monitor aggregate execution time
+   ```typescript
+   metricsGuardrails: {
+     apiGateway: {
+       executionTime: { max: 10000 },
+       averageRequestDuration: { max: 500 }
+     }
+   }
+   ```
+
+3. **Throughput Monitoring**: Track requests per second
+   ```typescript
+   metricsGuardrails: {
+     apiGateway: {
+       throughput: { min: 10 },  // At least 10 req/sec
+       executionTime: { max: 5000 }
+     }
+   }
+   ```
+
+4. **Request Count Validation**: Verify expected request volume
+   ```typescript
+   metricsGuardrails: {
+     apiGateway: {
+       totalRequests: { expected: 100, tolerance: 5 }  // 95-105 requests
+     }
+   }
+   ```
+
+For detailed information on the validation result structure and severity levels, see the [stable-request documentation](./stable-request.md#metrics-guardrails-and-validation).
 
 ---
 

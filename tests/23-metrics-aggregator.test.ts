@@ -1229,6 +1229,10 @@ describe('Metrics Hierarchy - Complete Metrics Flow Across All Levels', () => {
                         failedRequests: 1,
                         successRate: 66.67,
                         failureRate: 33.33,
+                        executionTime: 100,
+                        timestamp: new Date().toISOString(),
+                        throughput: 30,
+                        averageRequestDuration: 33.33,
                         requestGroups: [
                             {
                                 groupId: 'default',

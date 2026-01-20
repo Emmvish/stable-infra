@@ -68,6 +68,7 @@ Every execution—whether a single request, a pure function, or an entire workfl
 - **Circuit breaker** to fail fast and protect downstream systems
 - **Caching** for idempotent read operations
 - **Rate & concurrency limits** to respect external constraints
+- **Metrics guardrails** to validate execution against thresholds with automatic anomaly detection
 
 ### Type Safety
 
@@ -1584,6 +1585,11 @@ console.log(result.metrics); // {
 //     cache: { /* hits, misses, size */ },
 //     rateLimiter: { /* limit, current rate */ },
 //     concurrencyLimiter: { /* limit, in-flight */ }
+//   },
+//   validation: {
+//     isValid: true,
+//     anomalies: [],
+//     validatedAt: '2026-01-20T...'
 //   }
 // }
 ```
@@ -1624,6 +1630,11 @@ console.log(result.metrics); // {
 //     cache: { /* hit rate, size, utilization */ },
 //     rateLimiter: { /* throttle rate, queue length */ },
 //     concurrencyLimiter: { /* utilization, queue */ }
+//   },
+//   validation: {
+//     isValid: true,
+//     anomalies: [],
+//     validatedAt: '2026-01-20T...'
 //   }
 // }
 ```
@@ -1653,9 +1664,14 @@ console.log(result); // {
 //   failedRequests: 0,
 //   workflowExecutionTime: 1200,
 //   phases: [
-//     { phaseId: 'p1', success: true, responses: [...], ... },
-//     { phaseId: 'p2', success: true, responses: [...], ... }
-//   ]
+//     { phaseId: 'p1', success: true, responses: [...], validation: {...}, ... },
+//     { phaseId: 'p2', success: true, responses: [...], validation: {...}, ... }
+//   ],
+//   validation: {
+//     isValid: true,
+//     anomalies: [],
+//     validatedAt: '2026-01-20T...'
+//   }
 // }
 ```
 
@@ -1990,7 +2006,51 @@ await stableApiGateway<ServiceRequest, ServiceResponse>(requests, {
 });
 ```
 
-### 5. Apply Rate & Concurrency Limits
+### 6. Define Metrics Guardrails for SLA Monitoring
+
+Enforce performance and reliability SLAs with automatic validation.
+
+```typescript
+import { stableWorkflow, MetricsGuardrails } from '@emmvish/stable-request';
+import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-request';
+
+interface ApiRequest {}
+interface ApiResponse { data: any; }
+
+const phases: STABLE_WORKFLOW_PHASE<ApiRequest, ApiResponse>[] = [
+  {
+    id: 'critical-phase',
+    requests: [{ id: 'req-1', requestOptions: { reqData: { path: '/critical' }, resReq: true } }],
+    metricsGuardrails: {
+      phase: {
+        executionTime: { max: 3000 },        // SLA: <3s
+        requestSuccessRate: { min: 99.5 }    // SLA: 99.5% success
+      }
+    }
+  }
+];
+
+const result = await stableWorkflow(phases, {
+  workflowId: 'sla-monitored',
+  metricsGuardrails: {
+    workflow: {
+      executionTime: { max: 10000 },         // Workflow SLA: <10s
+      requestSuccessRate: { min: 99 }        // Workflow SLA: 99% success
+    }
+  }
+});
+
+// Automatic SLA violation detection
+if (result.validation && !result.validation.isValid) {
+  const criticalAnomalies = result.validation.anomalies.filter(a => a.severity === 'CRITICAL');
+  if (criticalAnomalies.length > 0) {
+    // Trigger alerts for SLA violations
+    console.error('SLA violated:', criticalAnomalies);
+  }
+}
+```
+
+### 6. Apply Rate & Concurrency Limits
 
 Respect external quotas and capacity.
 

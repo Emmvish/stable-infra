@@ -73,6 +73,7 @@ interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   executionContext?: ExecutionContext;
   circuitBreaker?: CircuitBreakerConfig | CircuitBreaker;
   statePersistence?: StatePersistenceConfig;
+  metricsGuardrails?: MetricsGuardrails;
 }
 ```
 
@@ -103,6 +104,7 @@ interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
 | `executionContext` | `ExecutionContext` | No | `undefined` | Context metadata (workflowId, phaseId, requestId) for tracing. |
 | `circuitBreaker` | `CircuitBreakerConfig \| CircuitBreaker` | No | `undefined` | Circuit breaker configuration or instance. |
 | `statePersistence` | `StatePersistenceConfig` | No | `undefined` | State persistence configuration for external storage. |
+| `metricsGuardrails` | `MetricsGuardrails` | No | `undefined` | Metrics validation guardrails with min/max thresholds for request metrics. |
 
 ### REQUEST_DATA Interface
 
@@ -144,6 +146,7 @@ interface STABLE_REQUEST_RESULT<ResponseDataType = any> {
     failedAttempts: number;
     totalExecutionTime: number;
     averageAttemptTime: number;
+    validation?: MetricsValidationResult;
     infrastructureMetrics?: {
       circuitBreaker?: CircuitBreakerDashboardMetrics;
       cache?: CacheDashboardMetrics;
@@ -161,7 +164,8 @@ interface STABLE_REQUEST_RESULT<ResponseDataType = any> {
 | `error` | `string?` | Error message if request failed. |
 | `errorLogs` | `ERROR_LOG[]?` | Array of all error logs from failed attempts. |
 | `successfulAttempts` | `SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>[]?` | Array of all successful attempt data (if `logAllSuccessfulAttempts: true`). |
-| `metrics` | `Object?` | Execution metrics including attempts, timing, and infrastructure stats. |
+| `metrics` | `Object?` | Execution metrics including attempts, timing, infrastructure stats, and validation results. |
+| `metrics.validation` | `MetricsValidationResult?` | Validation results when `metricsGuardrails` are configured. |
 
 ### Supporting Interfaces
 
@@ -1268,6 +1272,157 @@ const uploadFile = async (file: Buffer, filename: string) => {
       requestId: 'req-456'
     }
     ```
+
+11. **Configure Metrics Guardrails** for validation
+    ```typescript
+    metricsGuardrails: {
+      request: {
+        totalAttempts: { max: 5 },
+        failedAttempts: { max: 2 },
+        totalExecutionTime: { max: 5000 }
+      }
+    }
+    ```
+
+---
+
+## Metrics Guardrails and Validation
+
+Metrics guardrails allow you to define validation rules for request execution metrics. If metrics fall outside specified thresholds, validation results are included in the response.
+
+### Configuring Metrics Guardrails
+
+```typescript
+const result = await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    path: '/users'
+  },
+  attempts: 5,
+  metricsGuardrails: {
+    request: {
+      totalAttempts: { max: 5 },
+      successfulAttempts: { min: 1 },
+      failedAttempts: { max: 3 },
+      totalExecutionTime: { max: 10000 },
+      averageAttemptTime: { max: 2000 }
+    }
+  }
+});
+```
+
+### Available Request Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `totalAttempts` | `number` | Total number of attempts made |
+| `successfulAttempts` | `number` | Number of successful attempts |
+| `failedAttempts` | `number` | Number of failed attempts |
+| `totalExecutionTime` | `number` | Total execution time in milliseconds |
+| `averageAttemptTime` | `number` | Average time per attempt in milliseconds |
+
+### Guardrail Configuration
+
+Each metric can have:
+- **`min`**: Minimum acceptable value
+- **`max`**: Maximum acceptable value
+- **`expected`**: Expected value (requires `tolerance`)
+- **`tolerance`**: Acceptable deviation percentage from expected value
+
+```typescript
+metricsGuardrails: {
+  request: {
+    totalAttempts: { max: 5 },                    // Must not exceed 5
+    successfulAttempts: { min: 1 },               // Must be at least 1
+    totalExecutionTime: { expected: 1000, tolerance: 20 }  // 800-1200ms range
+  }
+}
+```
+
+### Checking Validation Results
+
+```typescript
+const result = await stableRequest({
+  reqData: { hostname: 'api.example.com', path: '/data' },
+  attempts: 3,
+  metricsGuardrails: {
+    request: {
+      totalAttempts: { max: 2 },
+      failedAttempts: { max: 0 }
+    }
+  }
+});
+
+if (result.metrics?.validation) {
+  console.log('Validation Status:', result.metrics.validation.isValid);
+  
+  if (!result.metrics.validation.isValid) {
+    console.log('Anomalies Detected:');
+    result.metrics.validation.anomalies.forEach(anomaly => {
+      console.log(`- ${anomaly.metricName}: ${anomaly.reason}`);
+      console.log(`  Value: ${anomaly.metricValue}, Severity: ${anomaly.severity}`);
+    });
+  }
+}
+```
+
+### MetricsValidationResult Interface
+
+```typescript
+interface MetricsValidationResult {
+  isValid: boolean;                    // Overall validation status
+  anomalies: MetricAnomaly[];          // Array of detected violations
+  validatedAt: string;                 // ISO 8601 timestamp
+}
+
+interface MetricAnomaly {
+  metricName: string;                  // Name of the metric
+  metricValue: number;                 // Actual value
+  guardrail: MetricGuardrail;          // Guardrail that was violated
+  severity: 'critical' | 'warning' | 'info';  // Anomaly severity
+  reason: string;                      // Human-readable explanation
+  violationType: 'above_max' | 'below_min' | 'outside_tolerance';
+}
+```
+
+### Severity Levels
+
+Anomalies are automatically classified by severity based on deviation magnitude:
+
+- **CRITICAL**: Deviation > 50% from threshold
+- **WARNING**: Deviation 10-50% from threshold  
+- **INFO**: Deviation < 10% from threshold
+
+### Use Cases
+
+1. **SLA Monitoring**: Ensure requests meet performance requirements
+   ```typescript
+   metricsGuardrails: {
+     request: {
+       totalExecutionTime: { max: 3000 },  // 3-second SLA
+       successfulAttempts: { min: 1 }
+     }
+   }
+   ```
+
+2. **Error Rate Tracking**: Alert on excessive failures
+   ```typescript
+   metricsGuardrails: {
+     request: {
+       failedAttempts: { max: 2 },         // Max 2 failures
+       successfulAttempts: { min: 1 }      // Must succeed at least once
+     }
+   }
+   ```
+
+3. **Performance Baselines**: Detect performance degradation
+   ```typescript
+   metricsGuardrails: {
+     request: {
+       averageAttemptTime: { expected: 500, tolerance: 30 }  // 350-650ms
+     }
+   }
+   ```
 
 ---
 

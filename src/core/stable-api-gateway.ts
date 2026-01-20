@@ -17,6 +17,7 @@ import {
     executeSequentially,
     extractCommonRequestConfigOptions as extractCommonOptions,
     MetricsAggregator,
+    MetricsValidator,
     CircuitBreaker, 
     getGlobalCircuitBreaker,
     getGlobalCacheManager,
@@ -171,6 +172,25 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
     
     if (Object.keys(infrastructureMetrics).length > 0) {
         result.metrics.infrastructureMetrics = infrastructureMetrics;
+    }
+
+    if (finalOptions.metricsGuardrails) {
+        const validation = MetricsValidator.validateApiGatewayMetrics(
+            result.metrics,
+            finalOptions.metricsGuardrails
+        );
+        
+        if (result.metrics.infrastructureMetrics) {
+            const infraValidation = MetricsValidator.validateInfrastructureMetrics(
+                result.metrics.infrastructureMetrics,
+                finalOptions.metricsGuardrails
+            );
+            
+            validation.anomalies.push(...infraValidation.anomalies);
+            validation.isValid = validation.isValid && infraValidation.isValid;
+        }
+        
+        result.metrics.validation = validation;
     }
 
     return result;

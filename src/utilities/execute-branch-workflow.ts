@@ -2,6 +2,7 @@ import { executeNonLinearWorkflow } from './execute-non-linear-workflow.js';
 import { executeWithPersistence } from './execute-with-persistence.js';
 import { formatLogContext } from './format-log-context.js';
 import { MetricsAggregator } from './metrics-aggregator.js';
+import { MetricsValidator } from './metrics-validator.js';
 import { PHASE_DECISION_ACTIONS } from '../enums/index.js';
 import {
   STABLE_WORKFLOW_BRANCH,
@@ -137,6 +138,13 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       };
 
       branchResult.metrics = MetricsAggregator.extractBranchMetrics(branchResult);
+      
+      if (modifiedBranch.metricsGuardrails && branchResult.metrics) {
+        branchResult.validation = MetricsValidator.validateBranchMetrics(
+          branchResult.metrics,
+          modifiedBranch.metricsGuardrails
+        );
+      }
 
       return {
         branchResult,
@@ -166,6 +174,13 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       };
 
       errorBranchResult.metrics = MetricsAggregator.extractBranchMetrics(errorBranchResult);
+      
+      if (branch.metricsGuardrails && errorBranchResult.metrics) {
+        errorBranchResult.validation = MetricsValidator.validateBranchMetrics(
+          errorBranchResult.metrics,
+          branch.metricsGuardrails
+        );
+      }
 
       return {
         branchResult: errorBranchResult,
@@ -219,6 +234,13 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       };
 
       skippedResult.metrics = MetricsAggregator.extractBranchMetrics(skippedResult);
+      
+      if (currentBranch.metricsGuardrails && skippedResult.metrics) {
+        skippedResult.validation = MetricsValidator.validateBranchMetrics(
+          skippedResult.metrics,
+          currentBranch.metricsGuardrails
+        );
+      }
 
       branchResults.push(skippedResult);
 
@@ -465,6 +487,13 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
             };
 
             skippedResult.metrics = MetricsAggregator.extractBranchMetrics(skippedResult);
+            
+            if (skippedBranch.metricsGuardrails && skippedResult.metrics) {
+              skippedResult.validation = MetricsValidator.validateBranchMetrics(
+                skippedResult.metrics,
+                skippedBranch.metricsGuardrails
+              );
+            }
 
             branchResults.push(skippedResult);
 

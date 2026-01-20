@@ -63,3 +63,15 @@ export enum RequestOrFunction {
   REQUEST = 'request',
   FUNCTION = 'function'
 }
+
+export enum AnomalySeverity {
+  CRITICAL = 'critical',
+  WARNING = 'warning',
+  INFO = 'info'
+}
+
+export enum ViolationType {
+  BELOW_MIN = 'below_min',
+  ABOVE_MAX = 'above_max',
+  OUTSIDE_TOLERANCE = 'outside_tolerance'
+}

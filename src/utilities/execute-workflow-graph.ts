@@ -14,6 +14,7 @@ import { formatLogContext } from './format-log-context.js';
 import { safelyStringify } from './safely-stringify.js';
 import { MetricsAggregator } from './metrics-aggregator.js';
 import { executeWithPersistence } from './execute-with-persistence.js';
+import { MetricsValidator } from './metrics-validator.js';
 
 export async function executeWorkflowGraph<RequestDataType = any, ResponseDataType = any>(
   graph: WorkflowGraph<RequestDataType, ResponseDataType>,
@@ -418,6 +419,13 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
   
   try {
     result.metrics = MetricsAggregator.extractWorkflowMetrics(result);
+    
+    if (options.metricsGuardrails && result.metrics) {
+      result.validation = MetricsValidator.validateWorkflowMetrics(
+        result.metrics,
+        options.metricsGuardrails
+      );
+    }
   } catch (error) {
     
   }

@@ -2,6 +2,7 @@ import { stableApiGateway } from '../core/index.js';
 import { executeWithPersistence } from './execute-with-persistence.js';
 import { formatLogContext } from './format-log-context';
 import { MetricsAggregator } from './metrics-aggregator.js';
+import { MetricsValidator } from './metrics-validator.js';
 import { RequestOrFunction } from '../enums/index.js';
 import { STABLE_WORKFLOW_PHASE, STABLE_WORKFLOW_PHASE_RESULT, PrePhaseExecutionHookOptions } from '../types/index.js';
 
@@ -125,6 +126,13 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
     
     if (phaseResponses.metrics?.infrastructureMetrics) {
         phaseResult.infrastructureMetrics = phaseResponses.metrics.infrastructureMetrics;
+    }
+    
+    if (modifiedPhase.metricsGuardrails && phaseResult.metrics) {
+        phaseResult.validation = MetricsValidator.validatePhaseMetrics(
+            phaseResult.metrics,
+            modifiedPhase.metricsGuardrails
+        );
     }
 
     if (logPhaseResults) {

@@ -27,7 +27,8 @@ import {
   reqFn,
   safelyStringify,
   validateTrialModeProbabilities,
-  MetricsAggregator
+  MetricsAggregator,
+  MetricsValidator
 } from '../utilities/index.js';
 
 export async function stableRequest<RequestDataType = any, ResponseDataType = any>(
@@ -111,13 +112,13 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
   const errorLogs: ERROR_LOG[] = [];
   const successfulAttemptsList: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>[] = [];
   let totalAttemptsMade = 0;
+  let successfulAttemptsCount = 0;
   
   const buildResult = (success: boolean, data?: ResponseDataType, error?: string): STABLE_REQUEST_RESULT<ResponseDataType> => {
     const totalExecutionTime = Date.now() - requestStartTime;
-    const successfulAttemptsCount = successfulAttemptsList.length;
     const failedAttemptsCount = totalAttemptsMade - successfulAttemptsCount;
     
-    return {
+    const result: STABLE_REQUEST_RESULT<ResponseDataType> = {
       success,
       ...(data !== undefined && { data }),
       ...(error && { error }),
@@ -135,6 +136,15 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
         }
       }
     };
+    
+    if (options.metricsGuardrails && result.metrics) {
+      result.metrics.validation = MetricsValidator.validateRequestMetrics(
+        result.metrics,
+        options.metricsGuardrails
+      );
+    }
+    
+    return result;
   };
   
   let circuitBreakerInstance: CircuitBreaker | null = null;
@@ -291,6 +301,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
       if (res.ok && !performNextAttempt) {
         hadAtLeastOneSuccess = true;
         lastSuccessfulAttemptData = res?.data;
+        successfulAttemptsCount++;
         if (logAllSuccessfulAttempts) {
           const successfulAttemptLog: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType> = {
             attempt: `${currentAttempt}/${maxAttempts}`,

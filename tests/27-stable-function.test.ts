@@ -325,8 +325,8 @@ describe('stable-function', () => {
 
       expect(result.metrics).toBeDefined();
       expect(result.metrics?.totalAttempts).toBe(3);
-      expect(result.metrics?.successfulAttempts).toBe(0);
-      expect(result.metrics?.failedAttempts).toBe(3);
+      expect(result.metrics?.successfulAttempts).toBe(1); // Third attempt succeeds
+      expect(result.metrics?.failedAttempts).toBe(2); // First two attempts fail
       expect(result.metrics?.totalExecutionTime).toBeGreaterThan(0);
       expect(result.metrics?.averageAttemptTime).toBeGreaterThan(0);
     });
@@ -3724,7 +3724,7 @@ describe('Request Groups with Functions', () => {
         groupId: 'critical',
         functionOptions: {
           fn: failTwiceThenSucceed,
-          args: []
+          args: [] as []
         }
       }
     ] satisfies API_GATEWAY_FUNCTION[];
@@ -3764,7 +3764,7 @@ describe('Request Groups with Functions', () => {
         groupId: 'standard',
         functionOptions: {
           fn: failMultipleTimes,
-          args: [],
+          args: [] as [],
           attempts: 5 // Individual: 5 attempts (highest priority)
         }
       }
@@ -3811,7 +3811,7 @@ describe('Request Groups with Functions', () => {
         groupId: 'critical',
         functionOptions: {
           fn: criticalFunction,
-          args: []
+          args: [] as []
         }
       },
       {
@@ -3819,7 +3819,7 @@ describe('Request Groups with Functions', () => {
         groupId: 'optional',
         functionOptions: {
           fn: optionalFunction,
-          args: []
+          args: [] as []
         }
       }
     ] satisfies API_GATEWAY_FUNCTION[];
@@ -3867,7 +3867,7 @@ describe('Request Groups with Functions', () => {
         id: 'ungrouped',
         functionOptions: {
           fn: failOnceThenSucceed,
-          args: []
+          args: [] as []
         }
       }
     ] satisfies API_GATEWAY_FUNCTION[];
@@ -3898,7 +3898,7 @@ describe('Request Groups with Functions', () => {
         groupId: 'my-group',
         functionOptions: {
           fn: testFunction,
-          args: []
+          args: [] as []
         }
       }
     ] satisfies API_GATEWAY_FUNCTION[];
@@ -3931,7 +3931,7 @@ describe('Request Groups with Functions', () => {
         groupId: 'critical',
         functionOptions: {
           fn: failOnceFn,
-          args: []
+          args: [] as []
         }
       }
     ] satisfies API_GATEWAY_FUNCTION[];
@@ -3973,7 +3973,7 @@ describe('Request Groups with Functions', () => {
         groupId: 'no-return-group',
         functionOptions: {
           fn: returnNumberFn,
-          args: []
+          args: [] as []
         }
       },
       {
@@ -3981,7 +3981,7 @@ describe('Request Groups with Functions', () => {
         groupId: 'with-return-group',
         functionOptions: {
           fn: returnNumberFn,
-          args: []
+          args: [] as []
         }
       }
     ] satisfies API_GATEWAY_FUNCTION[];
@@ -4023,7 +4023,7 @@ describe('Request Groups with Functions', () => {
         groupId: 'hooked-group',
         functionOptions: {
           fn: testFn1,
-          args: [],
+          args: [] as [],
           logAllSuccessfulAttempts: true
         }
       },
@@ -4031,7 +4031,7 @@ describe('Request Groups with Functions', () => {
         id: 'fn-with-individual-hook',
         functionOptions: {
           fn: testFn2,
-          args: [],
+          args: [] as [],
           logAllSuccessfulAttempts: true,
           handleSuccessfulAttemptData: async ({ successfulAttemptData }) => {
             individualHookCalls.push(`individual-${successfulAttemptData.data}`);
