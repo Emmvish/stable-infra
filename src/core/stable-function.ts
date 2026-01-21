@@ -16,6 +16,8 @@ import {
   CircuitBreaker,
   CircuitBreakerOpenError,
   executeWithPersistence,
+  executeWithTimeout,
+  TimeoutError,
   formatLogContext,
   getGlobalFunctionCacheManager,
   getNewDelayTime,
@@ -108,7 +110,8 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
     jitter = 0,
     statePersistence,
     rateLimit,
-    maxConcurrentRequests
+    maxConcurrentRequests,
+    executionTimeout
   } = options;
 
   let attempts = givenAttempts;
@@ -171,8 +174,9 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
     concurrencyLimiterInstance = new ConcurrencyLimiter(maxConcurrentRequests);
   }
 
-  try {
-    validateTrialModeProbabilities(trialMode);
+  const executeFunction = async (): Promise<STABLE_FUNCTION_RESULT<TReturn>> => {
+    try {
+      validateTrialModeProbabilities(trialMode);
 
     let res: FnExecResponse<TReturn> = {
       ok: false,
@@ -460,5 +464,23 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
     } else {
       return buildResult(false, undefined, e.message || 'Function execution failed');
     }
+  }
+  };
+
+  try {
+    if (executionTimeout && executionTimeout > 0) {
+      return await executeWithTimeout(
+        executeFunction(),
+        executionTimeout,
+        `${formatLogContext(executionContext)}stable-request: Function execution exceeded timeout of ${executionTimeout}ms`
+      );
+    } else {
+      return await executeFunction();
+    }
+  } catch (e: any) {
+    if (e instanceof TimeoutError) {
+      return buildResult(false, undefined, e.message);
+    }
+    throw e;
   }
 }

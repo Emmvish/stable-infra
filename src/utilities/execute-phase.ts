@@ -84,6 +84,10 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
         phaseGatewayOptions.circuitBreaker = modifiedPhase.circuitBreaker;
     }
 
+    if (!phaseGatewayOptions.commonExecutionTimeout && commonGatewayOptions.commonExecutionTimeout) {
+        phaseGatewayOptions.commonExecutionTimeout = commonGatewayOptions.commonExecutionTimeout;
+    }
+
     let items: any = [];
     
     if (modifiedPhase.items) {

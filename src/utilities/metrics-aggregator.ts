@@ -19,13 +19,8 @@ import { CacheManager } from './cache-manager.js';
 import { RateLimiter } from './rate-limiter.js';
 import { ConcurrencyLimiter } from './concurrency-limiter.js';
 
-/**
- * Metrics Aggregator - Extracts and computes all metrics from workflow results
- */
 export class MetricsAggregator {
-    /**
-     * Extract comprehensive workflow metrics
-     */
+
     static extractWorkflowMetrics<T = any>(
         result: STABLE_WORKFLOW_RESULT<T>
     ): WorkflowMetrics {
@@ -76,7 +71,6 @@ export class MetricsAggregator {
             throughput: throughput
         };
         
-        // Add branch metrics if available
         if (result.branches && result.branches.length > 0) {
             const completedBranches = result.branches.filter(b => !b.skipped && b.success).length;
             const failedBranches = result.branches.filter(b => !b.success && !b.skipped).length;
@@ -92,9 +86,6 @@ export class MetricsAggregator {
         return metrics;
     }
     
-    /**
-     * Extract branch metrics
-     */
     static extractBranchMetrics<T = any>(
         branch: BranchExecutionResult<T>
     ): BranchMetrics {
@@ -132,9 +123,6 @@ export class MetricsAggregator {
         };
     }
     
-    /**
-     * Extract phase metrics
-     */
     static extractPhaseMetrics<T = any>(
         phase: STABLE_WORKFLOW_PHASE_RESULT<T>
     ): PhaseMetrics {
@@ -168,16 +156,12 @@ export class MetricsAggregator {
             error: phase.error
         };
     }
-    
-    /**
-     * Extract request group metrics
-     */
+
     static extractRequestGroupMetrics<T = any>(
         responses: API_GATEWAY_RESPONSE<T>[]
     ): RequestGroupMetrics[] {
         const groupMap = new Map<string, API_GATEWAY_RESPONSE<T>[]>();
         
-        // Group responses by groupId
         responses.forEach(response => {
             const groupId = response.groupId || 'default';
             if (!groupMap.has(groupId)) {
@@ -186,7 +170,6 @@ export class MetricsAggregator {
             groupMap.get(groupId)!.push(response);
         });
         
-        // Calculate metrics for each group
         return Array.from(groupMap.entries()).map(([groupId, groupResponses]) => {
             const successfulRequests = groupResponses.filter(r => r.success).length;
             const failedRequests = groupResponses.filter(r => !r.success).length;
@@ -204,9 +187,6 @@ export class MetricsAggregator {
         });
     }
     
-    /**
-     * Extract individual request metrics
-     */
     static extractRequestMetrics<T = any>(
         responses: API_GATEWAY_RESPONSE<T>[]
     ): RequestMetrics[] {
@@ -219,9 +199,6 @@ export class MetricsAggregator {
         }));
     }
     
-    /**
-     * Extract circuit breaker dashboard metrics
-     */
     static extractCircuitBreakerMetrics(
         circuitBreaker: CircuitBreaker
     ): CircuitBreakerDashboardMetrics {
@@ -265,9 +242,6 @@ export class MetricsAggregator {
         };
     }
     
-    /**
-     * Extract cache dashboard metrics
-     */
     static extractCacheMetrics(
         cache: CacheManager
     ): CacheDashboardMetrics {
@@ -305,9 +279,6 @@ export class MetricsAggregator {
         };
     }
 
-    /**
-     * Extract function cache dashboard metrics
-     */
     static extractFunctionCacheMetrics(
         cache: any
     ): CacheDashboardMetrics {
@@ -344,10 +315,6 @@ export class MetricsAggregator {
         };
     }
 
-    
-    /**
-     * Extract rate limiter dashboard metrics
-     */
     static extractRateLimiterMetrics(
         rateLimiter: RateLimiter
     ): RateLimiterDashboardMetrics {
@@ -381,9 +348,6 @@ export class MetricsAggregator {
         };
     }
     
-    /**
-     * Extract concurrency limiter dashboard metrics
-     */
     static extractConcurrencyLimiterMetrics(
         concurrencyLimiter: ConcurrencyLimiter
     ): ConcurrencyLimiterDashboardMetrics {
@@ -403,7 +367,7 @@ export class MetricsAggregator {
             successRate: state.successRate,
             
             peakConcurrency: state.peakConcurrency,
-            averageConcurrency: state.running, // Current as average approximation
+            averageConcurrency: state.running,
             concurrencyUtilization: state.utilizationPercentage,
             
             peakQueueLength: state.peakQueueLength,
@@ -416,9 +380,6 @@ export class MetricsAggregator {
         };
     }
     
-    /**
-     * Aggregate all metrics from a workflow result
-     */
     static aggregateSystemMetrics<T = any>(
         workflowResult: STABLE_WORKFLOW_RESULT<T>,
         circuitBreaker?: CircuitBreaker,
@@ -426,7 +387,6 @@ export class MetricsAggregator {
         rateLimiter?: RateLimiter,
         concurrencyLimiter?: ConcurrencyLimiter
     ): SystemMetrics {
-        // Extract all responses from phases
         const allResponses = workflowResult.phases.flatMap(phase => phase.responses);
         
         const metrics: SystemMetrics = {
@@ -439,7 +399,6 @@ export class MetricsAggregator {
             requests: this.extractRequestMetrics(allResponses)
         };
         
-        // Add optional utility metrics
         if (circuitBreaker) {
             metrics.circuitBreaker = this.extractCircuitBreakerMetrics(circuitBreaker);
         }

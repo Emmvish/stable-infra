@@ -56,10 +56,16 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       return commonGatewayOptions;
     }
 
-    return {
+    const merged = {
       ...commonGatewayOptions,
       ...branch.commonConfig
     };
+
+    if (!branch.commonConfig.commonExecutionTimeout && commonGatewayOptions.commonExecutionTimeout) {
+      merged.commonExecutionTimeout = commonGatewayOptions.commonExecutionTimeout;
+    }
+
+    return merged;
   };
 
   const executeSingleBranch = async (

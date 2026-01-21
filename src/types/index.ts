@@ -153,6 +153,7 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
   commonPreExecution?: RequestPreExecutionOptions;
   commonCache?: CacheConfig;
   commonStatePersistence?: StatePersistenceConfig;
+  commonExecutionTimeout?: number;
   commonFunctionHookParams?: FunctionHookParams;
   commonFunctionResponseAnalyzer?: <TArgs extends any[], TReturn>(options: FunctionResponseAnalysisHookOptions<TArgs, TReturn>) => boolean | Promise<boolean>;
   commonReturnResult?: boolean;
@@ -518,6 +519,7 @@ export interface STABLE_FUNCTION<TArgs extends any[] = any[], TReturn = any> {
   rateLimit?: RateLimitConfig;
   maxConcurrentRequests?: number;
   metricsGuardrails?: MetricsGuardrails;
+  executionTimeout?: number;
 }
 
 export interface STABLE_REQUEST_RESULT<ResponseDataType = any> {

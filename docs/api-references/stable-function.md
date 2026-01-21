@@ -73,6 +73,7 @@ interface STABLE_FUNCTION<TArgs extends any[] = any[], TReturn = any> {
   statePersistence?: StatePersistenceConfig;
   rateLimit?: RateLimitConfig;
   maxConcurrentRequests?: number;
+  executionTimeout?: number;
   metricsGuardrails?: MetricsGuardrails;
 }
 ```
@@ -107,6 +108,7 @@ interface STABLE_FUNCTION<TArgs extends any[] = any[], TReturn = any> {
 | `statePersistence` | `StatePersistenceConfig` | No | `undefined` | State persistence configuration for external storage. |
 | `rateLimit` | `RateLimitConfig` | No | `undefined` | Rate limiting configuration (maxRequests, windowMs). |
 | `maxConcurrentRequests` | `number` | No | `undefined` | Maximum number of concurrent executions (semaphore). |
+| `executionTimeout` | `number` | No | `undefined` | Maximum execution time in milliseconds. Throws TimeoutError if exceeded. Covers entire execution including all retry attempts. |
 | `metricsGuardrails` | `MetricsGuardrails` | No | `undefined` | Metrics validation guardrails with min/max thresholds for function metrics. |
 
 ---

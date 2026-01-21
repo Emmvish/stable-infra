@@ -9,6 +9,7 @@ export { executeNonLinearWorkflow } from './execute-non-linear-workflow.js';
 export { executePhase } from './execute-phase.js';
 export { executeSequentially } from './execute-sequentially.js';
 export { executeWithPersistence } from './execute-with-persistence.js';
+export { executeWithTimeout, TimeoutError } from './execute-with-timeout.js';
 export { extractCommonRequestConfigOptions } from './extract-common-request-config-options.js';
 export { formatLogContext } from './format-log-context.js';
 export { generateAxiosRequestConfig } from './generate-axios-request-config.js';

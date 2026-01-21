@@ -21,6 +21,7 @@ export const extractCommonOptionsKeys: (keyof API_GATEWAY_OPTIONS)[] = [
     'commonTrialMode',
     'commonCache',
     'commonStatePersistence',
+    'commonExecutionTimeout',
 ];
 
 export const PrepareApiRequestOptionsMapping: ApiRequestOptionsMapping[] = [    

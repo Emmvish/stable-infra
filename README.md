@@ -470,6 +470,196 @@ console.log(`Graph workflow success: ${result.success}`);
 
 ## Resilience Mechanisms
 
+### Execution Timeouts
+
+Set maximum execution time for functions to prevent indefinite hangs. Timeouts are enforced at multiple levels with proper inheritance.
+
+#### Function-Level Timeout
+
+Set timeout directly on a function:
+
+```typescript
+import { stableFunction } from '@emmvish/stable-request';
+
+const result = await stableFunction({
+  fn: async () => {
+    // Long-running operation
+    await processLargeDataset();
+    return 'success';
+  },
+  args: [],
+  returnResult: true,
+  executionTimeout: 5000, // 5 seconds max
+  attempts: 3,
+});
+
+if (!result.success && result.error?.includes('timeout')) {
+  console.log('Function timed out');
+}
+```
+
+#### Gateway-Level Timeout
+
+Apply timeout to all functions in a gateway:
+
+```typescript
+import { stableApiGateway, RequestOrFunction } from '@emmvish/stable-request';
+
+const results = await stableApiGateway(
+  [
+    {
+      type: RequestOrFunction.FUNCTION,
+      function: {
+        id: 'task1',
+        functionOptions: {
+          fn: async () => await task1(),
+          args: [],
+          // No timeout specified - inherits from gateway
+        },
+      },
+    },
+    {
+      type: RequestOrFunction.FUNCTION,
+      function: {
+        id: 'task2',
+        functionOptions: {
+          fn: async () => await task2(),
+          args: [],
+          executionTimeout: 10000, // Override gateway timeout
+        },
+      },
+    },
+  ],
+  {
+    commonExecutionTimeout: 3000, // Default 3s for all functions
+  }
+);
+```
+
+#### Request Group Timeout
+
+Different timeouts for different groups:
+
+```typescript
+const results = await stableApiGateway(
+  [
+    {
+      type: RequestOrFunction.FUNCTION,
+      function: {
+        id: 'critical',
+        groupId: 'criticalOps',
+        functionOptions: { fn: criticalOp, args: [] },
+      },
+    },
+    {
+      type: RequestOrFunction.FUNCTION,
+      function: {
+        id: 'background',
+        groupId: 'backgroundOps',
+        functionOptions: { fn: backgroundOp, args: [] },
+      },
+    },
+  ],
+  {
+    requestGroups: [
+      {
+        id: 'criticalOps',
+        commonConfig: {
+          commonExecutionTimeout: 1000, // Strict 1s timeout
+        },
+      },
+      {
+        id: 'backgroundOps',
+        commonConfig: {
+          commonExecutionTimeout: 30000, // Lenient 30s timeout
+        },
+      },
+    ],
+  }
+);
+```
+
+#### Workflow Phase Timeout
+
+Apply timeout at phase level in workflows:
+
+```typescript
+import { stableWorkflow } from '@emmvish/stable-request';
+
+const result = await stableWorkflow(
+  [
+    {
+      id: 'initialization',
+      functions: [
+        {
+          id: 'init',
+          functionOptions: {
+            fn: initializeSystem,
+            args: [],
+          },
+        },
+      ],
+      commonConfig: {
+        commonExecutionTimeout: 5000, // 5s for initialization
+      },
+    },
+    {
+      id: 'processing',
+      functions: [
+        {
+          id: 'process',
+          functionOptions: {
+            fn: processData,
+            args: [],
+          },
+        },
+      ],
+      commonConfig: {
+        commonExecutionTimeout: 30000, // 30s for processing
+      },
+    },
+  ],
+  {
+    commonExecutionTimeout: 10000, // Default for phases without specific timeout
+  }
+);
+```
+
+#### Timeout Precedence
+
+Timeouts follow the configuration cascade pattern:
+
+**Function > Group > Phase/Branch > Gateway**
+
+- Function-level `executionTimeout` always wins
+- If not set, inherits from request group's `commonExecutionTimeout`
+- If not set, inherits from phase/branch's `commonExecutionTimeout`
+- If not set, inherits from gateway's `commonExecutionTimeout`
+- If not set, no timeout is applied
+
+#### Timeout Behavior
+
+- Timeout applies to **entire function execution** including all retry attempts
+- When timeout is exceeded, function returns failed result with timeout error
+- Timeout does NOT stop execution mid-flight (no AbortController)
+- Metrics are still collected even when timeout occurs
+- Use with retries: timeout encompasses all attempts, not per-attempt
+
+```typescript
+const result = await stableFunction({
+  fn: slowFunction,
+  args: [],
+  attempts: 5,
+  wait: 1000,
+  executionTimeout: 3000, // Total time for all 5 attempts
+});
+
+// If each attempt takes 800ms:
+// - Attempt 1: 800ms
+// - Attempt 2: starts at 1800ms (after 1s wait)
+// - Attempt 3: would start at 3600ms → TIMEOUT at 3000ms
+```
+
 ### Retry Strategies
 
 When a request or function fails and is retryable, retry with configurable backoff.

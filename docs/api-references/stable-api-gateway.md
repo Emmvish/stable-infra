@@ -94,6 +94,7 @@ interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any, Fun
   commonHandleSuccessfulFunctionAttemptData?: <TArgs extends any[], TReturn>(options: HandleSuccessfulFunctionAttemptDataHookOptions<TArgs, TReturn>) => any | Promise<any>;
   commonFunctionPreExecution?: <TArgs extends any[], TReturn>(options: FunctionPreExecutionOptions<TArgs, TReturn>) => any;
   commonFunctionCache?: <TArgs extends any[], TReturn>(config: FunctionCacheConfig<TArgs, TReturn>) => any;
+  commonExecutionTimeout?: number;
   
   // Gateway-specific config
   concurrentExecution?: boolean;
@@ -147,6 +148,7 @@ interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any, Fun
 | `commonFunctionHookParams` | `FunctionHookParams` | `{}` | Default hook parameters for functions. |
 | `commonFunctionPreExecution` | `Function` | `undefined` | Default pre-execution hook for functions. |
 | `commonFunctionCache` | `Function` | `undefined` | Default cache config for functions. |
+| `commonExecutionTimeout` | `number` | `undefined` | Default execution timeout (ms) for functions. Applies to function execution at gateway level. |
 
 #### Gateway Configuration Fields
 

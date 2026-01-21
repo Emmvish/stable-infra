@@ -30,6 +30,7 @@ export function prepareApiFunctionOptions<TArgs extends any[], TReturn>(
         commonBuffer: func.functionOptions.commonBuffer ?? gatewayOptions.sharedBuffer,
         cache: func.functionOptions.cache ?? (funcGroup?.commonConfig?.commonFunctionCache as any) ?? (gatewayOptions.commonFunctionCache as any),
         statePersistence: func.functionOptions.statePersistence ?? funcGroup?.commonConfig?.commonStatePersistence ?? gatewayOptions.commonStatePersistence,
+        executionTimeout: func.functionOptions.executionTimeout ?? funcGroup?.commonConfig?.commonExecutionTimeout ?? gatewayOptions.commonExecutionTimeout,
     };
 
     if (!func.functionOptions.handleErrors && funcGroup?.commonConfig?.commonHandleFunctionErrors) {

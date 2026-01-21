@@ -4057,3 +4057,675 @@ describe('Request Groups with Functions', () => {
     expect(individualHookCalls).toEqual(['individual-Result 2']); // Individual hook called
   });
 });
+
+describe('Execution Timeout Tests', () => {
+  beforeEach(() => {
+    jest.clearAllTimers();
+  });
+
+  describe('Function-Level Timeout', () => {
+    it('should complete successfully when function finishes before timeout', async () => {
+      const fastFunction = async () => {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return 'success';
+      };
+
+      const result = await stableFunction({
+        fn: fastFunction,
+        args: [],
+        returnResult: true,
+        executionTimeout: 200,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data).toBe('success');
+      expect(result.metrics?.totalExecutionTime).toBeLessThan(200);
+    });
+
+    it('should timeout when function exceeds execution timeout', async () => {
+      const slowFunction = async () => {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return 'should not reach here';
+      };
+
+      const result = await stableFunction({
+        fn: slowFunction,
+        args: [],
+        returnResult: true,
+        executionTimeout: 100,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('timeout');
+      expect(result.error).toContain('100ms');
+    });
+
+    it('should respect function-level timeout over gateway-level timeout', async () => {
+      const slowFunction = async () => {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return 'should not reach here';
+      };
+
+      const result = await stableApiGateway(
+        [
+          {
+            type: RequestOrFunction.FUNCTION,
+            function: {
+              id: 'func1',
+              functionOptions: {
+                fn: slowFunction,
+                args: [],
+                returnResult: true,
+                executionTimeout: 100, // Function-specific timeout
+              },
+            },
+          },
+        ],
+        {
+          commonExecutionTimeout: 1000, // Gateway-level timeout
+        }
+      );
+
+      expect(result[0].success).toBe(false);
+      expect(result[0].error).toContain('100ms');
+    });
+
+    it('should work without timeout when executionTimeout is not set', async () => {
+      const normalFunction = async () => {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return 'success';
+      };
+
+      const result = await stableFunction({
+        fn: normalFunction,
+        args: [],
+        returnResult: true,
+        // No executionTimeout set
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data).toBe('success');
+    });
+  });
+
+  describe('Gateway-Level Timeout', () => {
+    it('should apply commonExecutionTimeout to all functions without specific timeout', async () => {
+      const fastFunc = async () => {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return 'fast';
+      };
+
+      const slowFunc = async () => {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        return 'slow';
+      };
+
+      const result = await stableApiGateway(
+        [
+          {
+            type: RequestOrFunction.FUNCTION,
+            function: {
+              id: 'fast',
+              functionOptions: {
+                fn: fastFunc,
+                args: [],
+                returnResult: true,
+              },
+            },
+          },
+          {
+            type: RequestOrFunction.FUNCTION,
+            function: {
+              id: 'slow',
+              functionOptions: {
+                fn: slowFunc,
+                args: [],
+                returnResult: true,
+              },
+            },
+          },
+        ],
+        {
+          commonExecutionTimeout: 150,
+          concurrentExecution: true,
+        }
+      );
+
+      expect(result[0].success).toBe(true);
+      expect(result[0].data).toBe('fast');
+      expect(result[1].success).toBe(false);
+      expect(result[1].error).toContain('timeout');
+    });
+
+    it('should work with sequential execution and timeout', async () => {
+      const func1 = async () => {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return 'first';
+      };
+
+      const func2 = async () => {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        return 'second';
+      };
+
+      const result = await stableApiGateway(
+        [
+          {
+            type: RequestOrFunction.FUNCTION,
+            function: {
+              id: 'func1',
+              functionOptions: {
+                fn: func1,
+                args: [],
+                returnResult: true,
+              },
+            },
+          },
+          {
+            type: RequestOrFunction.FUNCTION,
+            function: {
+              id: 'func2',
+              functionOptions: {
+                fn: func2,
+                args: [],
+                returnResult: true,
+              },
+            },
+          },
+        ],
+        {
+          commonExecutionTimeout: 100,
+          concurrentExecution: false,
+        }
+      );
+
+      expect(result[0].success).toBe(true);
+      expect(result[0].data).toBe('first');
+      expect(result[1].success).toBe(false);
+      expect(result[1].error).toContain('timeout');
+    });
+  });
+
+  describe('Request Group-Level Timeout', () => {
+    it('should apply group-level timeout to functions in the group', async () => {
+      const fastFunc = async () => {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return 'fast';
+      };
+
+      const slowFunc = async () => {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        return 'slow';
+      };
+
+      const result = await stableApiGateway(
+        [
+          {
+            type: RequestOrFunction.FUNCTION,
+            function: {
+              id: 'fast',
+              groupId: 'strictGroup',
+              functionOptions: {
+                fn: fastFunc,
+                args: [],
+                returnResult: true,
+              },
+            },
+          },
+          {
+            type: RequestOrFunction.FUNCTION,
+            function: {
+              id: 'slow',
+              groupId: 'strictGroup',
+              functionOptions: {
+                fn: slowFunc,
+                args: [],
+                returnResult: true,
+              },
+            },
+          },
+        ],
+        {
+          requestGroups: [
+            {
+              id: 'strictGroup',
+              commonConfig: {
+                commonExecutionTimeout: 100,
+              },
+            },
+          ],
+          concurrentExecution: true,
+        }
+      );
+
+      expect(result[0].success).toBe(true);
+      expect(result[1].success).toBe(false);
+      expect(result[1].error).toContain('timeout');
+    });
+
+    it('should allow group timeout to override gateway timeout', async () => {
+      const mediumFunc = async () => {
+        await new Promise(resolve => setTimeout(resolve, 150));
+        return 'medium';
+      };
+
+      const result = await stableApiGateway(
+        [
+          {
+            type: RequestOrFunction.FUNCTION,
+            function: {
+              id: 'func1',
+              groupId: 'lenientGroup',
+              functionOptions: {
+                fn: mediumFunc,
+                args: [],
+                returnResult: true,
+              },
+            },
+          },
+        ],
+        {
+          commonExecutionTimeout: 50, // Strict gateway timeout
+          requestGroups: [
+            {
+              id: 'lenientGroup',
+              commonConfig: {
+                commonExecutionTimeout: 300, // More lenient group timeout
+              },
+            },
+          ],
+        }
+      );
+
+      expect(result[0].success).toBe(true);
+      expect(result[0].data).toBe('medium');
+    });
+  });
+
+  describe('Workflow Phase-Level Timeout', () => {
+    it('should apply phase-level timeout from commonConfig', async () => {
+      const fastFunc = async () => {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return 'fast';
+      };
+
+      const slowFunc = async () => {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        return 'slow';
+      };
+
+      const result = await stableWorkflow(
+        [
+          {
+            id: 'phase1',
+            functions: [
+              {
+                id: 'fast',
+                functionOptions: {
+                  fn: fastFunc,
+                  args: [],
+                  returnResult: true,
+                },
+              },
+            ],
+            commonConfig: {
+              commonExecutionTimeout: 100,
+            },
+          },
+          {
+            id: 'phase2',
+            functions: [
+              {
+                id: 'slow',
+                functionOptions: {
+                  fn: slowFunc,
+                  args: [],
+                  returnResult: true,
+                },
+              },
+            ],
+            commonConfig: {
+              commonExecutionTimeout: 100,
+            },
+          },
+        ],
+        {
+          logPhaseResults: false,
+        }
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.phases[0].success).toBe(true);
+      expect(result.phases[1].success).toBe(false);
+    });
+
+    it('should inherit workflow-level timeout when phase has no specific timeout', async () => {
+      const mediumFunc = async () => {
+        await new Promise(resolve => setTimeout(resolve, 150));
+        return 'medium';
+      };
+
+      const result = await stableWorkflow(
+        [
+          {
+            id: 'phase1',
+            functions: [
+              {
+                id: 'func1',
+                functionOptions: {
+                  fn: mediumFunc,
+                  args: [],
+                  returnResult: true,
+                },
+              },
+            ],
+          },
+        ],
+        {
+          commonExecutionTimeout: 100,
+          logPhaseResults: false,
+        }
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.phases[0].responses[0].error).toContain('timeout');
+    });
+  });
+
+  describe('Workflow Branch-Level Timeout', () => {
+    it('should apply branch-level timeout from commonConfig', async () => {
+      const fastFunc = async () => {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return 'fast';
+      };
+
+      const slowFunc = async () => {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        return 'slow';
+      };
+
+      const result = await stableWorkflow(
+        [],
+        {
+          enableBranchExecution: true,
+          branches: [
+            {
+              id: 'branch1',
+              phases: [
+                {
+                  id: 'phase1',
+                  functions: [
+                    {
+                      id: 'fast',
+                      functionOptions: {
+                        fn: fastFunc,
+                        args: [],
+                        returnResult: true,
+                      },
+                    },
+                  ],
+                },
+              ],
+              commonConfig: {
+                commonExecutionTimeout: 200,
+              },
+            },
+            {
+              id: 'branch2',
+              phases: [
+                {
+                  id: 'phase2',
+                  functions: [
+                    {
+                      id: 'slow',
+                      functionOptions: {
+                        fn: slowFunc,
+                        args: [],
+                        returnResult: true,
+                      },
+                    },
+                  ],
+                },
+              ],
+              commonConfig: {
+                commonExecutionTimeout: 100,
+              },
+            },
+          ],
+          logPhaseResults: false,
+        }
+      );
+
+      expect(result.branches?.[0].success).toBe(true);
+      expect(result.branches?.[1].success).toBe(false);
+    });
+
+    it('should inherit workflow-level timeout when branch has no specific timeout', async () => {
+      const mediumFunc = async () => {
+        await new Promise(resolve => setTimeout(resolve, 150));
+        return 'medium';
+      };
+
+      const result = await stableWorkflow(
+        [],
+        {
+          enableBranchExecution: true,
+          branches: [
+            {
+              id: 'branch1',
+              phases: [
+                {
+                  id: 'phase1',
+                  functions: [
+                    {
+                      id: 'func1',
+                      functionOptions: {
+                        fn: mediumFunc,
+                        args: [],
+                        returnResult: true,
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+          commonExecutionTimeout: 100,
+          logPhaseResults: false,
+        }
+      );
+
+      expect(result.branches?.[0].success).toBe(false);
+    });
+  });
+
+  describe('Timeout Hierarchy and Precedence', () => {
+    it('should follow precedence: function > group > phase/branch > gateway', async () => {
+      const func = async () => {
+        await new Promise(resolve => setTimeout(resolve, 175));
+        return 'result';
+      };
+
+      // Test function-level timeout (highest precedence)
+      const result1 = await stableApiGateway(
+        [
+          {
+            type: RequestOrFunction.FUNCTION,
+            function: {
+              id: 'func1',
+              groupId: 'group1',
+              functionOptions: {
+                fn: func,
+                args: [],
+                returnResult: true,
+                executionTimeout: 200, // Function-level (should win)
+              },
+            },
+          },
+        ],
+        {
+          commonExecutionTimeout: 100, // Gateway-level
+          requestGroups: [
+            {
+              id: 'group1',
+              commonConfig: {
+                commonExecutionTimeout: 150, // Group-level
+              },
+            },
+          ],
+        }
+      );
+      expect(result1[0].success).toBe(true);
+
+      // Test group-level timeout (overrides gateway)
+      const result2 = await stableApiGateway(
+        [
+          {
+            type: RequestOrFunction.FUNCTION,
+            function: {
+              id: 'func2',
+              groupId: 'group2',
+              functionOptions: {
+                fn: func,
+                args: [],
+                returnResult: true,
+                // No function-level timeout
+              },
+            },
+          },
+        ],
+        {
+          commonExecutionTimeout: 100, // Gateway-level
+          requestGroups: [
+            {
+              id: 'group2',
+              commonConfig: {
+                commonExecutionTimeout: 200, // Group-level (should win)
+              },
+            },
+          ],
+        }
+      );
+      expect(result2[0].success).toBe(true);
+    });
+  });
+
+  describe('Timeout with Retries', () => {
+    it('should timeout the entire execution including all retries', async () => {
+      let attemptCount = 0;
+      const retryableFunc = async () => {
+        attemptCount++;
+        await new Promise(resolve => setTimeout(resolve, 50));
+        throw new Error('Retry me');
+      };
+
+      const result = await stableFunction({
+        fn: retryableFunc,
+        args: [],
+        returnResult: true,
+        attempts: 10,
+        wait: 50,
+        executionTimeout: 200, // Should timeout during retries
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('timeout');
+      expect(attemptCount).toBeLessThan(10); // Didn't complete all attempts
+    });
+
+    it('should allow successful completion within timeout despite retries', async () => {
+      let attemptCount = 0;
+      const eventualSuccessFunc = async () => {
+        attemptCount++;
+        await new Promise(resolve => setTimeout(resolve, 40));
+        if (attemptCount < 3) {
+          throw new Error('Not yet');
+        }
+        return 'success';
+      };
+
+      const result = await stableFunction({
+        fn: eventualSuccessFunc,
+        args: [],
+        returnResult: true,
+        attempts: 5,
+        wait: 20,
+        executionTimeout: 200,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data).toBe('success');
+      expect(attemptCount).toBe(3);
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle zero timeout as no timeout', async () => {
+      const func = async () => {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return 'success';
+      };
+
+      const result = await stableFunction({
+        fn: func,
+        args: [],
+        returnResult: true,
+        executionTimeout: 0,
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should handle negative timeout as no timeout', async () => {
+      const func = async () => {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return 'success';
+      };
+
+      const result = await stableFunction({
+        fn: func,
+        args: [],
+        returnResult: true,
+        executionTimeout: -100,
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should handle very short timeout', async () => {
+      const func = async () => {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return 'should not reach';
+      };
+
+      const result = await stableFunction({
+        fn: func,
+        args: [],
+        returnResult: true,
+        executionTimeout: 10,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('timeout');
+    });
+
+    it('should track metrics correctly even when timeout occurs', async () => {
+      const func = async () => {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return 'should not reach';
+      };
+
+      const result = await stableFunction({
+        fn: func,
+        args: [],
+        returnResult: true,
+        executionTimeout: 100,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.metrics).toBeDefined();
+      expect(result.metrics?.totalExecutionTime).toBeGreaterThan(0);
+      expect(result.metrics?.totalExecutionTime).toBeLessThan(200); // Should be close to timeout
+    });
+  });
+});

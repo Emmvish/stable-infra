@@ -20,7 +20,6 @@ export async function executeSequentially<RequestDataType = any, ResponseDataTyp
             : new CircuitBreaker(requestExecutionOptions.circuitBreaker as any))
         : null;
     
-    // Convert to unified format if needed
     const unifiedItems: API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[] = items.map(item => {
         if ('type' in item) {
             return item as API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>;

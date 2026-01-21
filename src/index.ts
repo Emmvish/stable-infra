@@ -162,5 +162,7 @@ export {
     detectOrphanNodes,
     calculateGraphDepth,
     executeWorkflowGraph,
-    MetricsValidator
+    MetricsValidator,
+    TimeoutError,
+    executeWithTimeout
 } from './utilities/index.js';
