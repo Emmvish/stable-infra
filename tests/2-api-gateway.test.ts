@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { stableApiGateway } from '../src/core/index.js';
-import { REQUEST_METHODS } from '../src/enums/index.js';
+import { REQUEST_METHODS, RequestOrFunction } from '../src/enums/index.js';
 import { API_GATEWAY_REQUEST } from '../src/types/index.js';
 
 jest.mock('axios');
@@ -298,5 +298,101 @@ describe('stableApiGateway - Batch Processing', () => {
     // All requests should have been executed
     expect(results).toHaveLength(3);
     expect(mockedAxios.request).toHaveBeenCalledTimes(3);
+  });
+
+  describe('Gateway maxTimeout enforcement', () => {
+    it('should terminate gateway execution if maxTimeout is exceeded', async () => {
+      const slowFunction = async () => {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return 'completed';
+      };
+
+      const start = Date.now();
+      
+      try {
+        await stableApiGateway([
+          {
+            type: RequestOrFunction.FUNCTION,
+            function: {
+              id: 'fn1' as `/fn1`,
+              functionOptions: {
+                fn: slowFunction,
+                args: []
+              }
+            }
+          }
+        ], {
+          maxTimeout: 200, // Gateway will timeout after 200ms
+          executionContext: { requestId: 'test-gateway-1' }
+        });
+        
+        fail('Expected timeout error');
+      } catch (error: any) {
+        const elapsed = Date.now() - start;
+        expect(error.message).toContain('stable-request:');
+        expect(error.message).toContain('Gateway execution exceeded maxTimeout of 200ms');
+        expect(error.message).toContain('requestId=test-gateway-1');
+        expect(elapsed).toBeLessThan(300);
+      }
+    });
+
+    it('should complete successfully if execution finishes before maxTimeout', async () => {
+      const fastFunction = async () => {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return 'completed';
+      };
+
+      const result = await stableApiGateway([
+        {
+          type: RequestOrFunction.FUNCTION,
+          function: {
+            id: 'fn1' as `/fn1`,
+            functionOptions: {
+              fn: fastFunction,
+              args: []
+            }
+          }
+        }
+      ], {
+        maxTimeout: 500
+      });
+
+      expect(result[0].success).toBe(true);
+      expect(result[0].data).toBe('completed');
+    });
+
+    it('should include execution context in timeout error', async () => {
+      const slowFunction = async () => {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        return 'completed';
+      };
+
+      try {
+        await stableApiGateway([
+          {
+            type: RequestOrFunction.FUNCTION,
+            function: {
+              id: 'fn1' as `/fn1`,
+              functionOptions: {
+                fn: slowFunction,
+                args: []
+              }
+            }
+          }
+        ], {
+          maxTimeout: 100,
+          executionContext: { 
+            requestId: 'gw-123',
+            workflowId: 'user-456'
+          }
+        });
+        
+        fail('Expected timeout error');
+      } catch (error: any) {
+        expect(error.message).toContain('stable-request:');
+        expect(error.message).toContain('requestId=gw-123');
+        expect(error.message).toContain('workflowId=user-456');
+      }
+    });
   });
 });

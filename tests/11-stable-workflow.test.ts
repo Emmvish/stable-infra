@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import axios, { AxiosRequestConfig } from 'axios';
 import { stableWorkflow } from '../src/core/index.js';
 import { STABLE_WORKFLOW_PHASE } from '../src/types/index.js';
-import { RETRY_STRATEGIES } from '../src/enums/index.js';
+import { RETRY_STRATEGIES, RequestOrFunction } from '../src/enums/index.js';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -815,5 +815,134 @@ describe('Multi-Phase Workflows', () => {
     expect(sharedBuffer.phase2).toBe(true);
     expect(sharedBuffer.phase3).toBe(true);
     expect(sharedBuffer.counter).toBe(3);
+  });
+
+  it('should terminate workflow if maxTimeout is exceeded', async () => {
+    const slowFunction = async () => {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return 'completed';
+    };
+
+    const phases = [
+      {
+        items: [
+          {
+            type: RequestOrFunction.FUNCTION,
+            function: {
+              id: 'fn1' as `/fn1`,
+              functionOptions: {
+                fn: slowFunction,
+                args: [] as []
+              }
+            }
+          }
+        ]
+      }
+    ] satisfies STABLE_WORKFLOW_PHASE[];
+
+    const start = Date.now();
+
+    try {
+      await stableWorkflow(phases, {
+        workflowId: 'wf-timeout',
+        maxTimeout: 200 // Workflow will timeout after 200ms
+      });
+      
+      throw new Error('Expected timeout error');
+    } catch (error: any) {
+      const elapsed = Date.now() - start;
+      expect(error.message).toContain('stable-request:');
+      expect(error.message).toContain('Workflow execution exceeded maxTimeout of 200ms');
+      expect(error.message).toContain('workflowId=wf-timeout');
+      expect(elapsed).toBeLessThan(300);
+    }
+  });
+
+  it('should terminate phase if phase maxTimeout is exceeded', async () => {
+    const slowFunction = async () => {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return 'completed';
+    };
+
+    const phases = [
+      {
+        items: [
+          {
+            type: RequestOrFunction.FUNCTION,
+            function: {
+              id: 'fn1' as `/fn1`,
+              functionOptions: {
+                fn: slowFunction,
+                args: [] as []
+              }
+            }
+          }
+        ],
+        maxTimeout: 150 // Phase will timeout after 150ms
+      }
+    ] satisfies STABLE_WORKFLOW_PHASE[];
+
+    const start = Date.now();
+
+    const result = await stableWorkflow(phases, {
+      workflowId: 'wf-phase-timeout'
+    });
+
+    const elapsed = Date.now() - start;
+
+    expect(result.success).toBe(false);
+    expect(result.completedPhases).toBe(1);
+    expect(result.failedRequests).toBe(1);
+    expect(result.phases[0].error).toContain('stable-request:');
+    expect(result.phases[0].error).toContain('Phase execution exceeded maxTimeout of 150ms');
+    expect(result.phases[0].error).toContain('workflowId=wf-phase-timeout');
+    expect(result.phases[0].error).toContain('phaseId=phase-1');
+    expect(elapsed).toBeLessThan(250);
+  });
+
+  it('should complete successfully if workflow finishes before maxTimeout', async () => {
+    const fastFunction = async () => {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      return 'completed';
+    };
+
+    const phases = [
+      {
+        items: [
+          {
+            type: RequestOrFunction.FUNCTION,
+            function: {
+              id: 'fn1' as `/fn1`,
+              functionOptions: {
+                fn: fastFunction,
+                args: [] as []
+              }
+            }
+          }
+        ]
+      },
+      {
+        items: [
+          {
+            type: RequestOrFunction.FUNCTION,
+            function: {
+              id: 'fn2' as `/fn2`,
+              functionOptions: {
+                fn: fastFunction,
+                args: [] as []
+              }
+            }
+          }
+        ]
+      }
+    ] satisfies STABLE_WORKFLOW_PHASE[];
+
+    const result = await stableWorkflow(phases, {
+      workflowId: 'wf-fast',
+      maxTimeout: 500
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.completedPhases).toBe(2);
   });
 });

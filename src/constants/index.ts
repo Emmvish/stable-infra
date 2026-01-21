@@ -22,7 +22,7 @@ export const extractCommonOptionsKeys: (keyof API_GATEWAY_OPTIONS)[] = [
     'commonCache',
     'commonStatePersistence',
     'commonExecutionTimeout',
-];
+] as const;
 
 export const PrepareApiRequestOptionsMapping: ApiRequestOptionsMapping[] = [    
     { localKey: 'preExecution', commonKey: 'commonPreExecution', groupCommonKey: 'commonPreExecution', targetKey: 'preExecution' },
@@ -45,7 +45,7 @@ export const PrepareApiRequestOptionsMapping: ApiRequestOptionsMapping[] = [
     { localKey: 'cache', commonKey: 'commonCache', groupCommonKey: 'commonCache', targetKey: 'cache' },
     { localKey: 'commonBuffer', commonKey: 'sharedBuffer', groupCommonKey: 'sharedBuffer', targetKey: 'commonBuffer' },
     { localKey: 'statePersistence', commonKey: 'commonStatePersistence', groupCommonKey: 'commonStatePersistence', targetKey: 'statePersistence' },
-];
+] as const;
 
 export const REQUEST_METRICS_TO_VALIDATE_KEYS = [
     'totalAttempts',

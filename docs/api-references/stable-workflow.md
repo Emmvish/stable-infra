@@ -103,6 +103,7 @@ interface STABLE_WORKFLOW_PHASE<
 | `commonConfig` | `Object?` | `{}` | Common configuration for all items in this phase (extends API_GATEWAY_OPTIONS). |
 | `statePersistence` | `StatePersistenceConfig?` | `undefined` | Phase-specific state persistence. |
 | `metricsGuardrails` | `MetricsGuardrails?` | `undefined` | Phase-specific metrics validation guardrails. |
+| `maxTimeout` | `number?` | `undefined` | Phase-level timeout (ms). |
 
 **Note:** Only one of `requests`, `functions`, or `items` should be provided. If multiple are present, `items` takes precedence.
 
@@ -152,9 +153,11 @@ interface STABLE_WORKFLOW_OPTIONS<
 | `enableMixedExecution` | `boolean?` | `false` | Enable mixed mode: sequential with concurrent groups via `markConcurrentPhase`. |
 | `enableNonLinearExecution` | `boolean?` | `false` | Enable non-linear mode: phases with decision hooks for dynamic control flow. |
 | `enableBranchExecution` | `boolean?` | `false` | Enable branched mode: parallel execution paths with independent phase sequences. |
+| `enableBranchRacing` | `boolean?` | `false` | Enable branch racing: first successful branch wins, others are cancelled. Requires `enableBranchExecution: true` and `markConcurrentBranch: true` on branches. |
 | `branches` | `STABLE_WORKFLOW_BRANCH[]?` | `[]` | Array of workflow branches (required when `enableBranchExecution: true`). |
 | `maxWorkflowIterations` | `number?` | `1000` | Maximum iterations to prevent infinite loops in non-linear/branched mode. |
 | `statePersistence` | `StatePersistenceConfig?` | `undefined` | Workflow-level state persistence. |
+| `maxTimeout` | `number?` | `undefined` | Workflow-level timeout (ms). |
 | `handlePhaseCompletion` | `Function?` | Console logger | Hook called after each phase completes successfully. |
 | `handlePhaseError` | `Function?` | Console logger | Hook called when a phase fails. |
 | `handlePhaseDecision` | `Function?` | No-op | Hook called after phase decision is made (for logging/observability). |
@@ -302,6 +305,36 @@ await stableWorkflow([], {  // No phases in main workflow
 - Feature-flagged execution paths
 - Independent microservice orchestration
 
+### Branch Racing
+
+When `enableBranchRacing: true` is set with concurrent branches, the workflow uses `Promise.race()` to select the first successful branch:
+
+```typescript
+await stableWorkflow([], {
+  enableBranchExecution: true,
+  enableBranchRacing: true,  // First successful branch wins
+  branches: [
+    {
+      id: 'provider-a',
+      markConcurrentBranch: true,
+      phases: [/* ... */]
+    },
+    {
+      id: 'provider-b', 
+      markConcurrentBranch: true,
+      phases: [/* ... */]
+    }
+  ]
+});
+```
+
+**Characteristics:**
+- **First-wins semantics**: The first branch to complete successfully wins
+- **Automatic cancellation**: Losing branches marked as cancelled with appropriate error
+- **Execution history**: Only winning branch's history is recorded
+- **Decision hooks**: Only winning branch's decision hook executes
+- **Concurrent required**: Racing only works with `markConcurrentBranch: true` on branches
+
 ---
 
 ## Branch Configuration
@@ -343,6 +376,7 @@ interface STABLE_WORKFLOW_BRANCH<
 | `branchDecisionHook` | `Function?` | `undefined` | Hook to make dynamic control flow decisions after branch execution. |
 | `statePersistence` | `StatePersistenceConfig?` | `undefined` | Branch-specific state persistence. |
 | `commonConfig` | `Object?` | `{}` | Common configuration for all phases in this branch (extends API_GATEWAY_OPTIONS). |
+| `maxTimeout` | `number?` | `undefined` | Branch-level timeout (ms). |
 
 ---
 
@@ -801,6 +835,88 @@ preBranchExecutionHook: async ({ branch, sharedBuffer, branchId }) => {
   };
 }
 ```
+
+---
+
+## Execution Lifecycle
+
+### Workflow Execution Flow
+
+The execution flow varies based on the mode selected:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. INITIALIZATION                                               │
+│    - Generate workflowId (if not provided)                      │
+│    - Extract configuration options                              │
+│    - Initialize shared buffer                                   │
+│    - Setup execution context                                    │
+│    - Determine execution mode from flags                        │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+┌────────────────────────────▼────────────────────────────────────┐
+│ 2. MODE SELECTION                                               │
+│    Check enabled flags:                                         │
+│    ┌─ enableBranchExecution? ──────────────► Branch Mode        │
+│    ├─ enableNonLinearExecution? ──────────► Non-Linear Mode     │
+│    ├─ concurrentPhaseExecution? ──────────► Concurrent Mode     │
+│    ├─ enableMixedExecution? ──────────────► Mixed Mode          │
+│    └─ else ────────────────────────────────► Sequential Mode    │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+┌────────────────────────────▼────────────────────────────────────┐
+│ 3. BRANCH MODE EXECUTION (if enableBranchExecution: true)       │
+│    ┌────────────────────────────────────────────────────┐       │
+│    │ Check if enableBranchRacing: true                  │       │
+│    └───────────────────┬────────────────────────────────┘       │
+│                        │                                        │
+│         ┌──────────────┴───────────────┐                        │
+│         │                              │                        │
+│         ▼ Yes (Racing Mode)            ▼ No (Standard Mode)     │
+│    ┌────────────────────────┐    ┌─────────────────────────┐    │
+│    │ Promise.race() Branches│    │ Execute Branches        │    │
+│    │ • Start all concurrent │    │   Normally              │    │
+│    │   branches marked with │    │ • Sequential or         │    │
+│    │   markConcurrentBranch │    │   concurrent based on   │    │
+│    │ • Wait for FIRST       │    │   markConcurrentBranch  │    │
+│    │   successful branch    │    │ • All branches complete │    │
+│    │ • Execute winner's     │    │ • All decision hooks    │    │
+│    │   decision hook only   │    │   execute               │    │
+│    │ • Mark losers as       │    │ • Full execution        │    │
+│    │   cancelled            │    │   history recorded      │    │
+│    │ • Record only winner's │    │                         │    │
+│    │   execution history    │    │                         │    │
+│    └───────────┬────────────┘    └────────────┬────────────┘    │
+│                │                              │                 │
+│                └──────────────┬───────────────┘                 │
+│                               │                                 │
+│    ┌──────────────────────────▼────────────────────────────┐    │
+│    │ For each branch:                                      │    │
+│    │   • Call preBranchExecutionHook (if configured)       │    │
+│    │   • Execute branch phases sequentially                │    │
+│    │   • Apply branch decision hook (if not racing or      │    │
+│    │     if winner in racing mode)                         │    │
+│    │   • Call handleBranchCompletion (if configured)       │    │
+│    │   • Store branch results                              │    │
+│    └───────────────────────────────────────────────────────┘    │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+┌────────────────────────────▼────────────────────────────────────┐
+│ 4. RESULT AGGREGATION                                           │
+│    - Collect all phase/branch results                           │
+│    - Calculate workflow metrics                                 │
+│    - Validate against guardrails (if configured)                │
+│    - Build execution history                                    │
+│    - Return STABLE_WORKFLOW_RESULT                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Points:**
+- Racing mode only applies when `enableBranchRacing: true` and branches have `markConcurrentBranch: true`
+- In racing mode, only the winning branch's decision hook executes
+- Losing branches are immediately marked as cancelled with appropriate error message
+- Execution history only records the winning branch in racing mode
+- Standard mode records all branch executions and decision hooks
 
 ---
 

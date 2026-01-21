@@ -5,7 +5,7 @@ import {
   safelyStringify,
   safelyExecuteUnknownFunction
 } from '../src/utilities/index.js';
-import { RETRY_STRATEGIES } from '../src/enums/index.js';
+import { RETRY_STRATEGIES, RequestOrFunction } from '../src/enums/index.js';
 
 describe('Utility Functions', () => {
   describe('delay', () => {

@@ -576,6 +576,154 @@ interface WorkflowGraphOptions<
   FunctionArgsType extends any[] = any[],
   FunctionReturnType = any
 > extends Omit<STABLE_WORKFLOW_OPTIONS, 'branches' | 'enableBranchExecution' | 'concurrentPhaseExecution' | 'enableMixedExecution' | 'enableNonLinearExecution'> {
+  validateGraph?: boolean;           // Pre-execution graph validation (default: true)
+  optimizeExecution?: boolean;       // Execution optimization hints (default: false)
+  maxGraphDepth?: number;            // Maximum graph traversal depth (default: 1000)
+  // Inherits from STABLE_WORKFLOW_OPTIONS:
+  // - workflowId, stopOnFirstPhaseError, logPhaseResults
+  // - maxWorkflowIterations, statePersistence
+  // - handlePhaseCompletion, handlePhaseError, handlePhaseDecision
+  // - handleBranchCompletion, preBranchExecutionHook, prePhaseExecutionHook
+  // - maxSerializableChars, workflowHookParams
+  // - enableBranchRacing (for racing parallel branch nodes)
+  // - Plus all API_GATEWAY_OPTIONS fields (commonAttempts, commonWait, etc.)
+}
+```
+
+**Key Options:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `validateGraph` | `boolean?` | `true` | Validate graph structure before execution (cycles, reachability, orphans). |
+| `optimizeExecution` | `boolean?` | `false` | Remove unreachable/orphan nodes using `detectUnreachableNodes()` and `detectOrphanNodes()`. |
+| `maxGraphDepth` | `number?` | `1000` | Maximum graph traversal depth enforced via `calculateGraphDepth()`. |
+| `maxTimeout` | `number?` | `undefined` | Workflow-level timeout (ms) for graph execution. |
+| `enableBranchRacing` | `boolean?` | `false` | Enable branch racing for parallel group nodes containing branch nodes. First successful branch wins, others cancelled. |
+
+**Inherited from STABLE_WORKFLOW_OPTIONS:**
+- All workflow configuration (workflowId, logPhaseResults, etc.)
+- All phase hooks (handlePhaseCompletion, handlePhaseError, etc.)
+- Branch hooks (handleBranchCompletion, preBranchExecutionHook)
+- State persistence and shared buffer
+- Metrics guardrails
+
+**Inherited from API_GATEWAY_OPTIONS:**
+- All `common*` fields (commonAttempts, commonWait, commonRetryStrategy, etc.)
+- Circuit breaker, rate limiter, concurrency limiter
+- Request groups for configuration organization
+
+### Branch Racing in Graphs
+
+When a parallel group node contains multiple branch nodes and `enableBranchRacing: true`, the graph execution uses racing:
+
+```typescript
+const graph = new WorkflowGraphBuilder()
+  .addBranch('provider-a', { id: 'provider-a', phases: [/* ... */] })
+  .addBranch('provider-b', { id: 'provider-b', phases: [/* ... */] })
+  .addParallelGroup('race-group', ['provider-a', 'provider-b'])
+  .setEntryPoint('race-group')
+  .build();
+
+await stableWorkflowGraph(graph, {
+  enableBranchRacing: true  // First successful branch wins
+});
+```
+
+**Characteristics:**
+- Applies only to parallel groups where all nodes are branch nodes
+- First branch to complete successfully wins
+- Losing branches marked as cancelled
+- Standard parallel execution when racing is disabled
+
+---
+
+## Execution Lifecycle
+
+### Graph Validation
+
+Before execution (if `validateGraph: true`):
+
+1. **Cycle Detection**: Ensures graph is acyclic (DAG)
+2. **Reachability Check**: All nodes reachable from entry point
+3. **Orphan Detection**: No disconnected nodes
+4. **Configuration Validation**: Required fields present
+
+**Example:**
+```typescript
+import { validateWorkflowGraph } from '@emmvish/stable-request';
+
+const validation = validateWorkflowGraph(graph);
+
+if (!validation.valid) {
+  console.error('Invalid graph:', validation.errors);
+  // validation.cycles, validation.unreachableNodes, validation.orphanNodes
+}
+```
+
+Internally, `detectUnreachableNodes()` powers reachability checks, `detectOrphanNodes()` flags disconnected nodes, and `calculateGraphDepth()` is used when enforcing `maxGraphDepth`.
+
+### Execution Flow
+
+1. **Initialization**
+   - Validate graph structure
+   - Initialize shared buffer
+   - Setup execution context
+
+2. **Node Execution**
+   - Start from entry point
+   - Execute nodes based on type
+   - Respect edge conditions
+   - Track visited nodes
+
+3. **Parallel Execution**
+   - PARALLEL_GROUP: Execute all parallel nodes simultaneously
+   - MERGE_POINT: Wait for all dependencies
+   - Branch racing: Use Promise.race() when enabled
+   
+   ```
+   ┌──────────────────────────────────────────────────────┐
+   │ PARALLEL_GROUP Node Execution                        │
+   │                                                      │
+   │ Check if all parallel nodes are BRANCH nodes         │
+   │ AND enableBranchRacing: true                         │
+   │                                                      │
+   │         ┌────────────┴─────────────┐                 │
+   │         │                          │                 │
+   │         ▼ Yes (Racing)             ▼ No (Standard)   │
+   │    ┌─────────────────┐      ┌──────────────────┐     │
+   │    │ Promise.race()  │      │ Promise.all()    │     │
+   │    │ • First branch  │      │ • All branches   │     │
+   │    │   to succeed    │      │   complete       │     │
+   │    │   wins          │      │ • Continue to    │     │
+   │    │ • Others marked │      │   next node      │     │
+   │    │   cancelled     │      │                  │     │
+   │    └────────┬────────┘      └────────┬─────────┘     │
+   │             │                        │               │
+   │             └───────────┬────────────┘               │
+   │                         │                            │
+   │                         ▼                            │
+   │              Continue graph traversal                │
+   └──────────────────────────────────────────────────────┘
+   ```
+
+4. **Conditional Routing**
+   - CONDITIONAL: Evaluate and route to next node
+   - Edge conditions: Check SUCCESS/FAILURE/CUSTOM
+
+5. **Completion**
+   - Aggregate metrics
+   - Validate against guardrails
+   - Return workflow result
+
+### State Management
+
+**Shared Buffer:**
+```typescript
+  RequestDataType = any,
+  ResponseDataType = any,
+  FunctionArgsType extends any[] = any[],
+  FunctionReturnType = any
+> extends Omit<STABLE_WORKFLOW_OPTIONS, 'branches' | 'enableBranchExecution' | 'concurrentPhaseExecution' | 'enableMixedExecution' | 'enableNonLinearExecution'> {
   validateGraph?: boolean;
   optimizeExecution?: boolean;
   maxGraphDepth?: number;
@@ -587,8 +735,8 @@ interface WorkflowGraphOptions<
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `validateGraph` | `boolean?` | `true` | Validate graph structure before execution. |
-| `optimizeExecution` | `boolean?` | `false` | Optimize execution order (future feature). |
-| `maxGraphDepth` | `number?` | `undefined` | Maximum graph traversal depth (prevents deep recursion). |
+| `optimizeExecution` | `boolean?` | `false` | Remove unreachable/orphan nodes using `detectUnreachableNodes()` and `detectOrphanNodes()`. |
+| `maxGraphDepth` | `number?` | `undefined` | Maximum graph traversal depth enforced via `calculateGraphDepth()`. |
 
 **Inherited from STABLE_WORKFLOW_OPTIONS:**
 - `workflowId`, `stopOnFirstPhaseError`, `logPhaseResults`

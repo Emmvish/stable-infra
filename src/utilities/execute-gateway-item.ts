@@ -15,11 +15,11 @@ import { prepareApiFunctionOptions } from "./prepare-api-function-options.js";
 import { CircuitBreaker, CircuitBreakerOpenError } from "./circuit-breaker.js";
 import { RequestOrFunction } from "../enums/index.js";
 
-export async function executeGatewayItem<RequestDataType = any, ResponseDataType = any>(
-    item: API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>,
-    gatewayOptions: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>,
+export async function executeGatewayItem<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+    item: API_GATEWAY_ITEM<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
+    gatewayOptions: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
     circuitBreaker: CircuitBreaker | null
-): Promise<API_GATEWAY_RESPONSE<ResponseDataType>> {
+): Promise<API_GATEWAY_RESPONSE<ResponseDataType, FunctionReturnType>> {
     if (item.type === RequestOrFunction.REQUEST) {
         return await executeGatewayRequest(item.request, gatewayOptions, circuitBreaker);
     } else {
@@ -27,11 +27,11 @@ export async function executeGatewayItem<RequestDataType = any, ResponseDataType
     }
 }
 
-export async function executeGatewayRequest<RequestDataType = any, ResponseDataType = any>(
+export async function executeGatewayRequest<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
     req: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>,
-    gatewayOptions: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType>,
+    gatewayOptions: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
     circuitBreaker: CircuitBreaker | null
-): Promise<API_GATEWAY_RESPONSE<ResponseDataType>> {
+): Promise<API_GATEWAY_RESPONSE<ResponseDataType, FunctionReturnType>> {
     if (circuitBreaker && !circuitBreaker.getState().config.trackIndividualAttempts) {
         const canExecute = await circuitBreaker.canExecute();
         if (!canExecute) {
@@ -42,8 +42,8 @@ export async function executeGatewayRequest<RequestDataType = any, ResponseDataT
     }
 
     const finalRequestOptions = { 
-        reqData: prepareApiRequestData<RequestDataType, ResponseDataType>(req, gatewayOptions),
-        ...prepareApiRequestOptions<RequestDataType, ResponseDataType>(req, gatewayOptions),
+        reqData: prepareApiRequestData(req, gatewayOptions),
+        ...prepareApiRequestOptions(req, gatewayOptions),
         commonBuffer: gatewayOptions.sharedBuffer ?? req.requestOptions.commonBuffer,
         ...(circuitBreaker ? { circuitBreaker } : {}),
         executionContext: {
@@ -86,9 +86,9 @@ export async function executeGatewayRequest<RequestDataType = any, ResponseDataT
 
 export async function executeGatewayFunction<TArgs extends any[] = any[], TReturn = any>(
     func: API_GATEWAY_FUNCTION<TArgs, TReturn>,
-    gatewayOptions: API_GATEWAY_OPTIONS<any, any>,
+    gatewayOptions: API_GATEWAY_OPTIONS<any, any, TArgs, TReturn>,
     circuitBreaker: CircuitBreaker | null
-): Promise<API_GATEWAY_RESPONSE<TReturn>> {
+): Promise<API_GATEWAY_RESPONSE<any, TReturn>> {
     if (!func.functionOptions.fn || !func.functionOptions.args) {
         return {
             requestId: func.id,

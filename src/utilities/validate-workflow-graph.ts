@@ -5,8 +5,8 @@ import {
   WorkflowNode
 } from '../types/index.js';
 
-export function validateWorkflowGraph<T = any, R = any>(
-  graph: WorkflowGraph<T, R>
+export function validateWorkflowGraph<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any, FunctionReturnType = any>(
+  graph: WorkflowGraph<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
 ): WorkflowGraphValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -67,7 +67,10 @@ export function validateWorkflowGraph<T = any, R = any>(
   };
 }
 
-function validateNode<T, R>(node: WorkflowNode<T, R>, graph: WorkflowGraph<T, R>): string[] {
+function validateNode<RequestDataType, ResponseDataType, FunctionArgsType extends any[], FunctionReturnType>(
+  node: WorkflowNode<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
+  graph: WorkflowGraph<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
+): string[] {
   const errors: string[] = [];
   
   switch (node.type) {
@@ -127,8 +130,8 @@ function validateNode<T, R>(node: WorkflowNode<T, R>, graph: WorkflowGraph<T, R>
   return errors;
 }
 
-export function detectCycles<T = any, R = any>(
-  graph: WorkflowGraph<T, R>
+export function detectCycles<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+  graph: WorkflowGraph<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
 ): string[][] {
   const cycles: string[][] = [];
   const visited = new Set<string>();
@@ -172,8 +175,8 @@ export function detectCycles<T = any, R = any>(
   return cycles;
 }
 
-export function detectUnreachableNodes<T = any, R = any>(
-  graph: WorkflowGraph<T, R>
+export function detectUnreachableNodes<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+  graph: WorkflowGraph<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
 ): string[] {
   if (!graph.entryPoint) {
     return Array.from(graph.nodes.keys());
@@ -228,8 +231,8 @@ export function detectUnreachableNodes<T = any, R = any>(
   return unreachable;
 }
 
-export function detectOrphanNodes<T = any, R = any>(
-  graph: WorkflowGraph<T, R>
+export function detectOrphanNodes<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+  graph: WorkflowGraph<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
 ): string[] {
   const hasOutgoing = new Set<string>();
   const hasIncoming = new Set<string>();
@@ -263,8 +266,8 @@ export function detectOrphanNodes<T = any, R = any>(
   return orphans;
 }
 
-export function calculateGraphDepth<T = any, R = any>(
-  graph: WorkflowGraph<T, R>
+export function calculateGraphDepth<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+  graph: WorkflowGraph<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
 ): number {
   if (!graph.entryPoint) {
     return 0;

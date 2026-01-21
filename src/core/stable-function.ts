@@ -32,6 +32,15 @@ import {
 } from '../utilities/index.js';
 
 export async function stableFunction<TArgs extends any[] = any[], TReturn = any>(
+  options: STABLE_FUNCTION<TArgs, TReturn> & { returnResult: true }
+): Promise<STABLE_FUNCTION_RESULT<TReturn, true>>;
+export async function stableFunction<TArgs extends any[] = any[], TReturn = any>(
+  options: STABLE_FUNCTION<TArgs, TReturn> & { returnResult?: false | undefined }
+): Promise<STABLE_FUNCTION_RESULT<TReturn, false>>;
+export async function stableFunction<TArgs extends any[] = any[], TReturn = any>(
+  options: STABLE_FUNCTION<TArgs, TReturn> & { returnResult?: boolean }
+): Promise<STABLE_FUNCTION_RESULT<TReturn>>;
+export async function stableFunction<TArgs extends any[] = any[], TReturn = any>(
   options: STABLE_FUNCTION<TArgs, TReturn>
 ): Promise<STABLE_FUNCTION_RESULT<TReturn>> {
   const { 
@@ -122,7 +131,7 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
   let totalAttemptsMade = 0;
   let successfulAttemptsCount = 0;
   
-  const buildResult = (success: boolean, data?: TReturn, error?: string): STABLE_FUNCTION_RESULT<TReturn> => {
+  const buildResult = (success: boolean, data?: TReturn | boolean, error?: string): STABLE_FUNCTION_RESULT<TReturn> => {
     const totalExecutionTime = Date.now() - functionStartTime;
     const failedAttemptsCount = totalAttemptsMade - successfulAttemptsCount;
     
@@ -161,7 +170,7 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
   if (circuitBreaker) {
     circuitBreakerInstance = circuitBreaker instanceof CircuitBreaker
       ? circuitBreaker
-      : new CircuitBreaker(circuitBreaker as any);
+      : new CircuitBreaker(circuitBreaker);
   }
 
   let rateLimiterInstance: RateLimiter | null = null;
@@ -228,7 +237,7 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
               safelyStringify(res?.data as Record<string, any>, maxSerializableChars)
             );
           }
-          return buildResult(true, returnResult ? res?.data as TReturn : true as any);
+            return buildResult(true, returnResult ? res?.data as TReturn : true);
         }
         
       } catch(attemptError: any) {
@@ -405,7 +414,7 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
           safelyStringify(lastSuccessfulAttemptData as Record<string, any>, maxSerializableChars)
         );
       }
-      return buildResult(true, returnResult ? lastSuccessfulAttemptData! : true as any);
+      return buildResult(true, returnResult ? lastSuccessfulAttemptData! : true);
     } else if (res.ok) {
       if (trialMode.enabled) {
         const finalResponse = res?.data ?? lastSuccessfulAttemptData;
@@ -414,7 +423,7 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
           safelyStringify(finalResponse as Record<string, any>, maxSerializableChars)
         );
       }
-      return buildResult(true, returnResult ? ((res?.data ?? lastSuccessfulAttemptData) as TReturn) : true as any);
+        return buildResult(true, returnResult ? ((res?.data ?? lastSuccessfulAttemptData) as TReturn) : true);
     } else {
       throw new Error(
         safelyStringify(

@@ -16,9 +16,9 @@ import {
   PreBranchExecutionHookOptions
 } from '../types/index.js';
 
-export async function executeBranchWorkflow<RequestDataType = any, ResponseDataType = any>(
-  context: BranchWorkflowContext<RequestDataType, ResponseDataType>
-): Promise<EXECUTE_BRANCH_WORKFLOW_RESPONSE<ResponseDataType>> {
+export async function executeBranchWorkflow<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+  context: BranchWorkflowContext<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
+): Promise<EXECUTE_BRANCH_WORKFLOW_RESPONSE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>> {
   const {
     branches,
     workflowId,
@@ -35,13 +35,14 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     workflowHookParams,
     sharedBuffer,
     stopOnFirstPhaseError,
-    maxWorkflowIterations
+    maxWorkflowIterations,
+    enableBranchRacing = false
   } = context;
 
-  const branchResults: BranchExecutionResult<ResponseDataType>[] = [];
+  const branchResults: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[] = [];
   const allPhaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[] = [];
-  const executionHistory: PhaseExecutionRecord[] = [];
-  const branchExecutionHistory: BranchExecutionRecord[] = [];
+  const executionHistory: PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[] = [];
+  const branchExecutionHistory: BranchExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[] = [];
   const branchExecutionCounts: Map<string, number> = new Map();
   
   let totalRequests = 0;
@@ -51,7 +52,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
   let terminationReason: string | undefined;
   let iterationCount = 0;
 
-  const mergeBranchConfig = (branch: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>) => {
+  const mergeBranchConfig = (branch: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>) => {
     if (!branch.commonConfig) {
       return commonGatewayOptions;
     }
@@ -69,17 +70,54 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
   };
 
   const executeSingleBranch = async (
-    branch: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>,
+    branch: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
     branchIndex: number,
     executionNumber: number
   ) => {
+    const branchStartTime = Date.now();
+    const branchId = branch.id || `branch-${branchIndex + 1}`;
+
+    if (branch.maxTimeout) {
+      const timeoutPromise = new Promise<{
+        branchResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>;
+        phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
+        executionHistory: PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
+        totalRequests: number;
+        successfulRequests: number;
+        failedRequests: number;
+      }>((_, reject) => {
+        setTimeout(() => {
+          const contextStr = `workflowId=${workflowId}, branchId=${branchId}`;
+          reject(new Error(`stable-request: Branch execution exceeded maxTimeout of ${branch.maxTimeout}ms [${contextStr}]`));
+        }, branch.maxTimeout);
+      });
+
+      const executionPromise = executeSingleBranchInternal(branch, branchIndex, executionNumber);
+      return Promise.race([executionPromise, timeoutPromise]);
+    }
+
+    return executeSingleBranchInternal(branch, branchIndex, executionNumber);
+  };
+
+  const executeSingleBranchInternal = async (
+    branch: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
+    branchIndex: number,
+    executionNumber: number
+  ): Promise<{
+    branchResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>;
+    phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
+    executionHistory: PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
+    totalRequests: number;
+    successfulRequests: number;
+    failedRequests: number;
+  }> => {
     const branchStartTime = Date.now();
     const branchId = branch.id || `branch-${branchIndex + 1}`;
     
     let modifiedBranch = branch;
     if (preBranchExecutionHook) {
       try {
-        const hookOptions: PreBranchExecutionHookOptions<RequestDataType, ResponseDataType> = {
+        const hookOptions: PreBranchExecutionHookOptions<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {
           workflowId,
           branchId,
           branchIndex,
@@ -88,7 +126,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
           params: workflowHookParams?.preBranchExecutionHookParams
         };
         
-        const result = await executeWithPersistence<STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>>(
+        const result = await executeWithPersistence<STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>(
           preBranchExecutionHook,
           hookOptions,
           branch.statePersistence,
@@ -132,7 +170,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
 
       const branchExecutionTime = Date.now() - branchStartTime;
 
-      const branchResult: BranchExecutionResult<ResponseDataType> = {
+      const branchResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
         workflowId,
         branchId,
         branchIndex,
@@ -166,7 +204,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
         error
       );
 
-      const errorBranchResult: BranchExecutionResult<ResponseDataType> = {
+      const errorBranchResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
         workflowId,
         branchId,
         branchIndex,
@@ -199,6 +237,154 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     }
   };
 
+  if (enableBranchRacing) {
+    if (logPhaseResults) {
+      console.info(
+        `${formatLogContext({ workflowId })}stable-request: Starting branch racing with ${branches.length} branches`
+      );
+    }
+
+    const branchPromises = branches.map((branch, index) => 
+      executeSingleBranch(branch, index, 1)
+        .then(result => ({ success: true as const, result, index, branchId: branch.id }))
+        .catch(error => ({ success: false as const, error, index, branchId: branch.id }))
+    );
+
+    try {
+      const winner = await Promise.race(branchPromises);
+      
+      if (logPhaseResults) {
+        console.info(
+          `${formatLogContext({ workflowId })}stable-request: Branch '${winner.branchId}' won the race`
+        );
+      }
+
+      if (winner.success && 'result' in winner) {
+        const result = winner.result;
+        branchResults.push(result.branchResult);
+        allPhaseResults.push(...result.phaseResults);
+        executionHistory.push(...result.executionHistory);
+        totalRequests = result.totalRequests;
+        successfulRequests = result.successfulRequests;
+        failedRequests = result.failedRequests;
+        
+        branchExecutionHistory.push({
+          branchId: winner.branchId,
+          branchIndex: winner.index,
+          executionNumber: 1,
+          timestamp: new Date().toISOString(),
+          success: result.branchResult.success,
+          executionTime: result.branchResult.executionTime
+        });
+
+        if (handleBranchCompletion) {
+          try {
+            await executeWithPersistence<void>(
+              handleBranchCompletion,
+              {
+                workflowId,
+                branchId: result.branchResult.branchId,
+                branchResults: result.branchResult.phaseResults,
+                success: result.branchResult.success,
+                maxSerializableChars
+              },
+              branches[winner.index].statePersistence,
+              { workflowId, branchId: result.branchResult.branchId },
+              sharedBuffer || {}
+            );
+          } catch (hookError) {
+            console.error(
+              `${formatLogContext({ workflowId, branchId: result.branchResult.branchId })}stable-request: Error in handleBranchCompletion hook:`,
+              hookError
+            );
+          }
+        }
+      } else {
+        const error = 'error' in winner ? winner.error : undefined;
+        console.error(
+          `${formatLogContext({ workflowId })}stable-request: Winning branch '${winner.branchId}' failed:`,
+          error
+        );
+        
+        const errorResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
+          workflowId,
+          branchId: winner.branchId,
+          branchIndex: winner.index,
+          success: false,
+          executionTime: 0,
+          completedPhases: 0,
+          phaseResults: [],
+          executionNumber: 1,
+          error: error?.message || 'stable-request: Branch execution failed'
+        };
+        
+        errorResult.metrics = MetricsAggregator.extractBranchMetrics(errorResult);
+        
+        branchResults.push(errorResult);
+        failedRequests = 1;
+      }
+
+      for (let i = 0; i < branches.length; i++) {
+        if (i !== winner.index) {
+          const cancelledResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
+            workflowId,
+            branchId: branches[i].id,
+            branchIndex: i,
+            success: false,
+            executionTime: 0,
+            completedPhases: 0,
+            phaseResults: [],
+            executionNumber: 1,
+            skipped: true,
+            error: 'stable-request: Cancelled - another branch won the race'
+          };
+          
+          cancelledResult.metrics = MetricsAggregator.extractBranchMetrics(cancelledResult);
+          
+          branchResults.push(cancelledResult);
+          
+          branchExecutionHistory.push({
+            branchId: branches[i].id,
+            branchIndex: i,
+            executionNumber: 1,
+            timestamp: new Date().toISOString(),
+            success: false,
+            executionTime: 0
+          });
+        }
+      }
+
+      return {
+        branchResults,
+        allPhaseResults,
+        executionHistory,
+        branchExecutionHistory,
+        totalRequests,
+        successfulRequests,
+        failedRequests,
+        terminatedEarly: false,
+        terminationReason: `Branch racing completed - ${winner.branchId} won`
+      };
+    } catch (error) {
+      console.error(
+        `${formatLogContext({ workflowId })}stable-request: Error during branch racing:`,
+        error
+      );
+      
+      return {
+        branchResults: [],
+        allPhaseResults: [],
+        executionHistory: [],
+        branchExecutionHistory: [],
+        totalRequests: 0,
+        successfulRequests: 0,
+        failedRequests: branches.length,
+        terminatedEarly: true,
+        terminationReason: 'Branch racing failed'
+      };
+    }
+  }
+
   let currentBranchId: string | null = branches[0]?.id || null;
 
   while (currentBranchId !== null && iterationCount < maxWorkflowIterations) {
@@ -226,7 +412,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
         );
       }
 
-      const skippedResult: BranchExecutionResult<ResponseDataType> = {
+      const skippedResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
         workflowId,
         branchId: currentBranchId,
         branchIndex,
@@ -267,7 +453,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     
     if (isConcurrent) {
       const concurrentGroup: { 
-        branch: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>; 
+        branch: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>; 
         index: number;
         executionNumber: number;
       }[] = [
@@ -295,7 +481,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       );
       const groupResults = await Promise.all(groupPromises);
 
-      const concurrentBranchResults: BranchExecutionResult<ResponseDataType>[] = [];
+      const concurrentBranchResults: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[] = [];
       let concurrentGroupJumpTarget: string | null = null;
       let concurrentGroupSkipTarget: string | null = null;
       let shouldTerminate = false;
@@ -345,7 +531,8 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
 
         if (branch.branchDecisionHook) {
           try {
-            const decision: BranchExecutionDecision = await executeWithPersistence<BranchExecutionDecision>(
+            const decision: BranchExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> =
+              await executeWithPersistence<BranchExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>(
               branch.branchDecisionHook,
               {
                 workflowId,
@@ -480,7 +667,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
         if (skipTargetIndex !== -1) {
           for (let skipIdx = j; skipIdx < skipTargetIndex; skipIdx++) {
             const skippedBranch = branches[skipIdx];
-            const skippedResult: BranchExecutionResult<ResponseDataType> = {
+            const skippedResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
               workflowId,
               branchId: skippedBranch.id,
               branchIndex: skipIdx,
@@ -568,11 +755,13 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
         }
       }
 
-      let decision: BranchExecutionDecision = { action: PHASE_DECISION_ACTIONS.CONTINUE };
+      let decision: BranchExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {
+        action: PHASE_DECISION_ACTIONS.CONTINUE
+      };
 
       if (currentBranch.branchDecisionHook) {
         try {
-          decision = await executeWithPersistence<BranchExecutionDecision>(
+          decision = await executeWithPersistence<BranchExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>(
             currentBranch.branchDecisionHook,
             {
               workflowId,
@@ -736,7 +925,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
             if (skipTargetIndex !== -1) {
               for (let skipIdx = branchIndex + 1; skipIdx < skipTargetIndex; skipIdx++) {
                 const skippedBranch = branches[skipIdx];
-                const skippedResult: BranchExecutionResult<ResponseDataType> = {
+                const skippedResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
                   workflowId,
                   branchId: skippedBranch.id,
                   branchIndex: skipIdx,
@@ -766,7 +955,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
           } else {
             const nextBranch = branches[branchIndex + 1];
             if (nextBranch) {
-              const skippedResult: BranchExecutionResult<ResponseDataType> = {
+              const skippedResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
                 workflowId,
                 branchId: nextBranch.id,
                 branchIndex: branchIndex + 1,

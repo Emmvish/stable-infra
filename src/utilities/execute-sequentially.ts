@@ -8,27 +8,26 @@ import {
 } from '../types/index.js';
 import { CircuitBreaker, CircuitBreakerOpenError } from "./circuit-breaker.js";
 
-export async function executeSequentially<RequestDataType = any, ResponseDataType = any>(
-    items: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] | API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[] = [],
-    requestExecutionOptions: SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType> = {}
-): Promise<API_GATEWAY_RESPONSE<ResponseDataType>[]> {
-    const responses: API_GATEWAY_RESPONSE<ResponseDataType>[] = [];
+export async function executeSequentially<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+    items: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] | API_GATEWAY_ITEM<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[] = [],
+    requestExecutionOptions: SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {}
+): Promise<API_GATEWAY_RESPONSE<ResponseDataType | FunctionReturnType>[]> {
+    const responses: API_GATEWAY_RESPONSE<ResponseDataType | FunctionReturnType>[] = [];
     
     const circuitBreaker = requestExecutionOptions.circuitBreaker
         ? (requestExecutionOptions.circuitBreaker instanceof CircuitBreaker 
             ? requestExecutionOptions.circuitBreaker 
-            : new CircuitBreaker(requestExecutionOptions.circuitBreaker as any))
+            : new CircuitBreaker(requestExecutionOptions.circuitBreaker))
         : null;
     
-    const unifiedItems: API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>[] = items.map(item => {
+    const unifiedItems: API_GATEWAY_ITEM<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[] = items.map(item => {
         if ('type' in item) {
-            return item as API_GATEWAY_ITEM<RequestDataType, ResponseDataType, any[], any>;
-        } else {
-            return {
-                type: RequestOrFunction.REQUEST,
-                request: item as API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>
-            };
+            return item as API_GATEWAY_ITEM<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
         }
+        return {
+            type: RequestOrFunction.REQUEST,
+            request: item
+        };
     });
     
     for (let i = 0; i < unifiedItems.length; i++) {

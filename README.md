@@ -27,6 +27,7 @@ A production-grade TypeScript library for resilient API integrations, batch proc
   - [Parallel Phase Execution](#parallel-phase-execution)
   - [Merge Points](#merge-points)
   - [Linear Helper](#linear-helper)
+  - [Branch Racing in Graphs](#branch-racing-in-graphs)
 - [Configuration & State](#configuration--state)
   - [Config Cascading](#config-cascading)
   - [Shared & State Buffers](#shared--state-buffers)
@@ -274,6 +275,21 @@ console.log(`Throughput: ${responses.metrics.throughput.toFixed(2)} req/s`);
 console.log(`Average duration: ${responses.metrics.averageRequestDuration.toFixed(2)}ms`);
 ```
 
+#### Request/Function Racing
+
+Enable racing to accept the first successful request or function and cancel others, useful for redundant API calls or failover scenarios.
+
+```typescript
+const responses = await stableApiGateway(items, {
+  concurrentExecution: true,
+  enableRacing: true, // First successful item wins, others cancelled
+  maxConcurrentRequests: 10
+});
+
+// responses contains only the winning result
+// Losing items marked as cancelled with appropriate error
+```
+
 **Key responsibilities:**
 - Execute a batch of requests and functions concurrently or sequentially
 - Apply global, group-level, and item-level config overrides
@@ -473,6 +489,8 @@ console.log(`Graph workflow success: ${result.success}`);
 ### Execution Timeouts
 
 Set maximum execution time for functions to prevent indefinite hangs. Timeouts are enforced at multiple levels with proper inheritance.
+
+You can also set a **workflow/gateway-level `maxTimeout`** to cap total execution time (applies to `stableWorkflow`, `stableWorkflowGraph`, and `stableApiGateway`).
 
 #### Function-Level Timeout
 
@@ -1214,6 +1232,32 @@ const result = await stableWorkflow([], {
 // Both branches access/modify sharedBuffer
 ```
 
+#### Branch Racing
+
+When multiple branches execute concurrently, enable racing to accept the first successful branch and cancel others.
+
+```typescript
+const result = await stableWorkflow([], {
+  workflowId: 'payment-racing',
+  enableBranchExecution: true,
+  enableBranchRacing: true, // First successful branch wins
+  branches: [
+    {
+      id: 'payment-provider-a',
+      phases: [/* ... */]
+    },
+    {
+      id: 'payment-provider-b',
+      phases: [/* ... */]
+    }
+  ],
+  markConcurrentBranch: true
+});
+
+// Only winning branch's execution history recorded
+// Losing branches marked as cancelled
+```
+
 ## Graph-based Workflow Patterns
 
 **Key responsibilities:**
@@ -1415,6 +1459,39 @@ const graph = createLinearWorkflowGraph(phases);
 const result = await stableWorkflowGraph(graph, {
   workflowId: 'linear-workflow'
 });
+```
+
+### Branch Racing in Graphs
+
+Enable branch racing in workflow graphs to accept the first successful branch node when multiple branches are executed in parallel.
+
+```typescript
+import { stableWorkflowGraph, WorkflowGraphBuilder } from '@emmvish/stable-request';
+
+const branch1 = {
+  id: 'provider-a',
+  phases: [{ /* ... */ }]
+};
+
+const branch2 = {
+  id: 'provider-b',
+  phases: [{ /* ... */ }]
+};
+
+const graph = new WorkflowGraphBuilder()
+  .addBranch('provider-a', branch1)
+  .addBranch('provider-b', branch2)
+  .addParallelGroup('race', ['provider-a', 'provider-b'])
+  .setEntryPoint('race')
+  .build();
+
+const result = await stableWorkflowGraph(graph, {
+  workflowId: 'provider-racing',
+  enableBranchRacing: true // First successful branch wins
+});
+
+// Only winning branch's results recorded
+// Losing branch marked as cancelled
 ```
 
 ---

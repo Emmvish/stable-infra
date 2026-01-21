@@ -5,10 +5,10 @@ import {
     SEQUENTIAL_REQUEST_EXECUTION_OPTIONS
 } from "../types/index.js";
 
-export function prepareApiRequestData<RequestDataType = any, ResponseDataType = any>(
+export function prepareApiRequestData<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
     request: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>,
-    commonRequestExecutionOptions: CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType> | 
-                                SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType>
+    commonRequestExecutionOptions: CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> | 
+                                SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
 ): REQUEST_DATA<RequestDataType> {
     const { requestOptions: localOptions } = request;
     const reqGroup = (request.groupId && Array.isArray(commonRequestExecutionOptions.requestGroups) ) ? commonRequestExecutionOptions.requestGroups?.find(group => group.id === request.groupId) : undefined;

@@ -7,7 +7,12 @@ import {
   WorkflowNode,
   PhaseExecutionRecord,
 } from '../types/index.js';
-import { validateWorkflowGraph } from './validate-workflow-graph.js';
+import { 
+  validateWorkflowGraph,
+  detectUnreachableNodes,
+  detectOrphanNodes,
+  calculateGraphDepth
+} from './validate-workflow-graph.js';
 import { executePhase } from './execute-phase.js';
 import { executeBranchWorkflow } from './execute-branch-workflow.js';
 import { formatLogContext } from './format-log-context.js';
@@ -16,12 +21,51 @@ import { MetricsAggregator } from './metrics-aggregator.js';
 import { executeWithPersistence } from './execute-with-persistence.js';
 import { MetricsValidator } from './metrics-validator.js';
 
-export async function executeWorkflowGraph<RequestDataType = any, ResponseDataType = any>(
-  graph: WorkflowGraph<RequestDataType, ResponseDataType>,
-  options: WorkflowGraphOptions<RequestDataType, ResponseDataType>
-): Promise<STABLE_WORKFLOW_RESULT<ResponseDataType>> {
-  const startTime = Date.now();
+export async function executeWorkflowGraph<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+  graph: WorkflowGraph<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
+  options: WorkflowGraphOptions<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
+): Promise<STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>> {
   const workflowId = options.workflowId || `workflow-graph-${Date.now()}`;
+
+  if (options.maxTimeout) {
+    const timeoutPromise = new Promise<STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>>((_, reject) => {
+      setTimeout(() => {
+        const contextStr = `workflowId=${workflowId}`;
+        reject(new Error(`stable-request: Workflow graph execution exceeded maxTimeout of ${options.maxTimeout}ms [${contextStr}]`));
+      }, options.maxTimeout);
+    });
+
+    const executionPromise = executeWorkflowGraphInternal(graph, options, workflowId);
+    return Promise.race([executionPromise, timeoutPromise]);
+  }
+
+  return executeWorkflowGraphInternal(graph, options, workflowId);
+}
+
+async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+  graph: WorkflowGraph<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
+  options: WorkflowGraphOptions<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
+  workflowId: string
+): Promise<STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>> {
+  const startTime = Date.now();
+
+  const removeNodes = (nodeIds: string[]) => {
+    if (nodeIds.length === 0) {
+      return;
+    }
+
+    for (const nodeId of nodeIds) {
+      graph.nodes.delete(nodeId);
+      graph.edges.delete(nodeId);
+    }
+
+    for (const [fromId, edges] of graph.edges) {
+      graph.edges.set(
+        fromId,
+        edges.filter(edge => !nodeIds.includes(edge.to))
+      );
+    }
+  };
   
   if (options.validateGraph !== false) {
     const validation = validateWorkflowGraph(graph);
@@ -33,11 +77,34 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
       console.warn(`${formatLogContext({ workflowId })}stable-request: Workflow graph warnings:\n${validation.errors.join('\n')}`);
     }
   }
+
+  if (options.optimizeExecution) {
+    const unreachableNodes = detectUnreachableNodes(graph);
+    const orphanNodes = detectOrphanNodes(graph);
+    const nodesToRemove = Array.from(new Set([...unreachableNodes, ...orphanNodes]));
+
+    if (nodesToRemove.length > 0 && options.logPhaseResults) {
+      console.info(
+        `${formatLogContext({ workflowId })}stable-request: Optimizing graph by removing nodes: ${nodesToRemove.join(', ')}`
+      );
+    }
+
+    removeNodes(nodesToRemove);
+  }
+
+  if (options.maxGraphDepth !== undefined) {
+    const depth = calculateGraphDepth(graph);
+    if (depth > options.maxGraphDepth) {
+      throw new Error(
+        `${formatLogContext({ workflowId })}stable-request: Workflow graph depth ${depth} exceeds maxGraphDepth of ${options.maxGraphDepth}`
+      );
+    }
+  }
   
-  const results = new Map<string, STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>>();
+  const results = new Map<string, STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>>();
   const visited = new Set<string>();
-  const executionHistory: PhaseExecutionRecord[] = [];
-  const phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[] = [];
+  const executionHistory: PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[] = [];
+  const phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>[] = [];
   const sharedBuffer = options.sharedBuffer || {};
   
   let totalRequests = 0;
@@ -134,7 +201,7 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
     }
   };
   
-  const executePhaseNode = async (node: WorkflowNode<RequestDataType, ResponseDataType>, nodeId: string): Promise<void> => {
+  const executePhaseNode = async (node: WorkflowNode<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>, nodeId: string): Promise<void> => {
     if (!node.phase) {
       throw new Error(`${formatLogContext({ workflowId })}Phase node '${nodeId}' has no phase configuration`);
     }
@@ -186,7 +253,7 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
         successfulRequests += phaseResult.successfulRequests;
         failedRequests += phaseResult.failedRequests;
         
-        const executionRecord: PhaseExecutionRecord = {
+        const executionRecord: PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {
           phaseId,
           phaseIndex,
           executionNumber,
@@ -290,12 +357,12 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
     } while (shouldReplay && !terminatedEarly);
   };
   
-  const executeBranchNode = async (node: WorkflowNode<RequestDataType, ResponseDataType>, nodeId: string): Promise<void> => {
+  const executeBranchNode = async (node: WorkflowNode<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>, nodeId: string): Promise<void> => {
     if (!node.branch) {
       throw new Error(`${formatLogContext({ workflowId })}Branch node '${nodeId}' has no branch configuration`);
     }
     
-    const branchResult = await executeBranchWorkflow({
+    const branchResult = await executeBranchWorkflow<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>({
       branches: [node.branch],
       workflowId,
       commonGatewayOptions: options,
@@ -316,7 +383,7 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
     if (branchResult.branchResults.length > 0) {
       const branch = branchResult.branchResults[0];
       
-      const branchPhaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType> = {
+      const branchPhaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType> = {
         workflowId,
         branchId: branch.branchId,
         phaseId: `branch-${branch.branchId}`,
@@ -341,7 +408,7 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
     }
   };
   
-  const executeConditionalNode = async (node: WorkflowNode<RequestDataType, ResponseDataType>, nodeId: string): Promise<void> => {
+  const executeConditionalNode = async (node: WorkflowNode<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>, nodeId: string): Promise<void> => {
     if (!node.condition) {
       throw new Error(`${formatLogContext({ workflowId })}Conditional node '${nodeId}' has no condition`);
     }
@@ -372,9 +439,80 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
     }
   };
   
-  const executeParallelGroupNode = async (node: WorkflowNode<RequestDataType, ResponseDataType>, nodeId: string): Promise<void> => {
+  const executeParallelGroupNode = async (node: WorkflowNode<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>, nodeId: string): Promise<void> => {
     if (!node.parallelNodes || node.parallelNodes.length === 0) {
       throw new Error(`${formatLogContext({ workflowId })}Parallel group node '${nodeId}' has no parallel nodes`);
+    }
+    
+    const allBranchNodes = node.parallelNodes.every(parallelNodeId => {
+      const parallelNode = graph.nodes.get(parallelNodeId);
+      return parallelNode?.type === WorkflowNodeTypes.BRANCH;
+    });
+    
+    if (options.enableBranchRacing && allBranchNodes && node.parallelNodes.length > 1) {
+      if (options.logPhaseResults) {
+        console.info(`${formatLogContext({ workflowId })}stable-request: Starting branch racing with ${node.parallelNodes.length} branches`);
+      }
+      
+      const branchPromises = node.parallelNodes.map((parallelNodeId, index) => 
+        executeNode(parallelNodeId)
+          .then(() => ({ success: true as const, nodeId: parallelNodeId, index }))
+          .catch(error => ({ success: false as const, nodeId: parallelNodeId, index, error }))
+      );
+      
+      try {
+        const winner = await Promise.race(branchPromises);
+        
+        if (options.logPhaseResults) {
+          console.info(`${formatLogContext({ workflowId })}stable-request: Branch '${winner.nodeId}' won the race`);
+        }
+        
+        for (let i = 0; i < node.parallelNodes.length; i++) {
+          if (i !== winner.index) {
+            const losingNodeId = node.parallelNodes[i];
+            const losingNode = graph.nodes.get(losingNodeId);
+            
+            if (losingNode?.branch) {
+              const cancelledBranchResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType> = {
+                workflowId,
+                branchId: losingNode.branch.id,
+                phaseId: `branch-${losingNode.branch.id}`,
+                phaseIndex: phaseResults.length,
+                success: false,
+                executionTime: 0,
+                timestamp: new Date().toISOString(),
+                totalRequests: 0,
+                successfulRequests: 0,
+                failedRequests: 0,
+                responses: [],
+                skipped: true,
+                error: 'stable-request: Cancelled - another branch won the race'
+              };
+              
+              results.set(losingNodeId, cancelledBranchResult);
+              phaseResults.push(cancelledBranchResult);
+            }
+          }
+        }
+        
+        if (!winner.success) {
+          console.error(
+            `${formatLogContext({ workflowId })}stable-request: Winning branch '${winner.nodeId}' failed:`,
+            winner.error
+          );
+          terminatedEarly = true;
+          terminationReason = `Branch racing completed but winning branch failed: ${winner.error?.message || 'Unknown error'}`;
+        }
+      } catch (error: any) {
+        console.error(
+          `${formatLogContext({ workflowId })}stable-request: Error during branch racing:`,
+          error
+        );
+        terminatedEarly = true;
+        terminationReason = `Branch racing failed: ${error.message || 'Unknown error'}`;
+      }
+      
+      return;
     }
     
     if (options.logPhaseResults) {
@@ -401,7 +539,7 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
   
   const executionTime = Date.now() - startTime;
   
-  const result: STABLE_WORKFLOW_RESULT<ResponseDataType> = {
+  const result: STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
     workflowId,
     success: !terminatedEarly && failedRequests === 0,
     executionTime,

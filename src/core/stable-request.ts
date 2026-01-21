@@ -114,7 +114,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
   let totalAttemptsMade = 0;
   let successfulAttemptsCount = 0;
   
-  const buildResult = (success: boolean, data?: ResponseDataType, error?: string): STABLE_REQUEST_RESULT<ResponseDataType> => {
+  const buildResult = (success: boolean, data?: ResponseDataType | boolean, error?: string): STABLE_REQUEST_RESULT<ResponseDataType> => {
     const totalExecutionTime = Date.now() - requestStartTime;
     const failedAttemptsCount = totalAttemptsMade - successfulAttemptsCount;
     
@@ -151,7 +151,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
   if (circuitBreaker) {
     circuitBreakerInstance = circuitBreaker instanceof CircuitBreaker
       ? circuitBreaker
-      : new CircuitBreaker(circuitBreaker as any);
+      : new CircuitBreaker(circuitBreaker);
   }
   try {
     validateTrialModeProbabilities(trialMode);
@@ -189,7 +189,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
               safelyStringify(res?.data, maxSerializableChars)
             );
           }
-          return buildResult(true, resReq ? res?.data! : true as any);
+          return buildResult(true, resReq ? res?.data! : true);
         }
         
       } catch(attemptError: any) {
@@ -360,7 +360,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
           safelyStringify(lastSuccessfulAttemptData as Record<string, any>, maxSerializableChars)
         );
       }
-      return buildResult(true, resReq ? lastSuccessfulAttemptData! : true as any);
+      return buildResult(true, resReq ? lastSuccessfulAttemptData! : true);
     } else if (res.ok) {
       if (trialMode.enabled) {
         const finalResponse = res?.data ?? lastSuccessfulAttemptData;
@@ -369,7 +369,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
           safelyStringify(finalResponse, maxSerializableChars)
         );
       }
-      return buildResult(true, resReq ? (res?.data ?? lastSuccessfulAttemptData!) : true as any);
+      return buildResult(true, resReq ? (res?.data ?? lastSuccessfulAttemptData!) : true);
     } else {
       throw new Error(
         safelyStringify(

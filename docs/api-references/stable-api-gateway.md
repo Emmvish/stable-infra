@@ -156,6 +156,7 @@ interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any, Fun
 |-------|------|---------|-------------|
 | `concurrentExecution` | `boolean` | `true` | Execute requests/functions concurrently (true) or sequentially (false). |
 | `stopOnFirstError` | `boolean` | `false` | Stop execution immediately on first error. |
+| `enableRacing` | `boolean` | `false` | Enable racing mode: first successful request/function wins, others are cancelled. Requires `concurrentExecution: true`. |
 | `requestGroups` | `RequestGroup[]` | `[]` | Logical groups with shared configuration. |
 | `sharedBuffer` | `Record<string, any>` | `{}` | Shared mutable state accessible across all requests/functions. |
 | `maxConcurrentRequests` | `number` | `undefined` | Global concurrency limit (semaphore). |
@@ -163,6 +164,7 @@ interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any, Fun
 | `circuitBreaker` | `CircuitBreakerConfig` | `undefined` | Global circuit breaker config. |
 | `executionContext` | `Partial<ExecutionContext>` | `undefined` | Context metadata for tracing. |
 | `metricsGuardrails` | `MetricsGuardrails` | `undefined` | Metrics validation guardrails for API Gateway execution. |
+| `maxTimeout` | `number` | `undefined` | Gateway-level timeout (ms) for the entire batch. |
 
 ### RequestGroup Interface
 
@@ -178,6 +180,31 @@ interface RequestGroup<RequestDataType = any, ResponseDataType = any> {
 Groups allow organizing requests with shared configuration:
 - **id**: Unique group identifier
 - **commonConfig**: Group-level configuration that overrides global config
+
+### Racing Mode
+
+When `enableRacing: true` is set, the gateway uses `Promise.race()` instead of `Promise.all()` to execute requests/functions:
+- **First-wins semantics**: The first request/function to complete successfully wins
+- **Automatic cancellation**: All other in-flight operations are marked as cancelled
+- **Single result**: Only the winning result is returned with `success: true`
+- **Concurrent required**: Racing only works with `concurrentExecution: true`
+
+**Use Cases:**
+- Redundant API calls to multiple endpoints
+- Failover scenarios with primary/backup services  
+- Latency optimization (first response wins)
+- Multi-provider scenarios
+
+**Example:**
+```typescript
+await stableApiGateway([
+  { id: 'provider-a', requestOptions: { reqData: { path: '/data' }, resReq: true } },
+  { id: 'provider-b', requestOptions: { reqData: { path: '/data' }, resReq: true } }
+], {
+  concurrentExecution: true,
+  enableRacing: true  // First successful response wins
+});
+```
 
 ### Configuration Cascade
 
@@ -488,18 +515,39 @@ The following diagram illustrates the complete lifecycle of a `stableApiGateway`
 ┌─────────────────────────────────────────────────────────────────┐
 │ 3A. CONCURRENT EXECUTION MODE                                   │
 │    ┌────────────────────────────────────────────────────┐       │
-│    │ Execute all items in parallel using Promise.all()  │       │
-│    │ For each item concurrently:                        │       │
-│    │   • Acquire concurrency semaphore (if configured)  │       │
-│    │   • Acquire rate limit token (if configured)       │       │
-│    │   • Execute item:                                  │       │
-│    │     - REQUEST: Call stableRequest(config)          │       │
-│    │     - FUNCTION: Call stableFunction(config)        │       │
-│    │   • Release concurrency semaphore                  │       │
-│    │   • Capture result/error                           │       │
-│    │   • Continue even if stopOnFirstError=false        │       │
-│    │   • Short-circuit if stopOnFirstError=true         │       │
-│    └────────────────────────────────────────────────────┘       │
+│    │ Check if enableRacing: true                        │       │
+│    └───────────────────┬────────────────────────────────┘       │
+│                        │                                        │
+│         ┌──────────────┴───────────────┐                        │
+│         │                              │                        │
+│         ▼ Yes (Racing Mode)            ▼ No (Standard Mode)     │
+│    ┌────────────────────────┐    ┌─────────────────────────┐    │
+│    │ Promise.race() Logic   │    │ Promise.all() Logic     │    │
+│    │ • Start all items      │    │ • Start all items       │    │
+│    │   concurrently         │    │   concurrently          │    │
+│    │ • Wait for FIRST       │    │ • Wait for ALL to       │    │
+│    │   successful item      │    │   complete              │    │
+│    │ • Mark winner as       │    │ • Capture all results/  │    │
+│    │   success              │    │   errors                │    │
+│    │ • Mark losers as       │    │ • Continue even if      │    │
+│    │   cancelled with error │    │   stopOnFirstError=     │    │
+│    │ • Return all results   │    │   false                 │    │
+│    │   (1 winner, rest      │    │ • Short-circuit if      │    │
+│    │   cancelled)           │    │   stopOnFirstError=true │    │
+│    └───────────┬────────────┘    └────────────┬────────────┘    │
+│                │                              │                 │
+│                └──────────────┬───────────────┘                 │
+│                               │                                 │
+│    ┌──────────────────────────▼───────────────────────────┐     │
+│    │ For each item:                                       │     │
+│    │   • Acquire concurrency semaphore (if configured)    │     │
+│    │   • Acquire rate limit token (if configured)         │     │
+│    │   • Execute item:                                    │     │
+│    │     - REQUEST: Call stableRequest(config)            │     │
+│    │     - FUNCTION: Call stableFunction(config)          │     │
+│    │   • Release concurrency semaphore                    │     │
+│    │   • Capture result/error                             │     │
+│    └──────────────────────────────────────────────────────┘     │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ├─────────────────────────────────────┐

@@ -21,8 +21,8 @@ import { ConcurrencyLimiter } from './concurrency-limiter.js';
 
 export class MetricsAggregator {
 
-    static extractWorkflowMetrics<T = any>(
-        result: STABLE_WORKFLOW_RESULT<T>
+    static extractWorkflowMetrics<ResponseDataType = any, FunctionReturnType = any, RequestDataType = any, FunctionArgsType extends any[] = any[]>(
+        result: STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>
     ): WorkflowMetrics {
         const skippedPhases = result.phases.filter(p => p.skipped).length;
         const failedPhases = result.phases.filter(p => !p.success && !p.skipped).length;
@@ -86,8 +86,8 @@ export class MetricsAggregator {
         return metrics;
     }
     
-    static extractBranchMetrics<T = any>(
-        branch: BranchExecutionResult<T>
+    static extractBranchMetrics<ResponseDataType = any, FunctionReturnType = any, RequestDataType = any, FunctionArgsType extends any[] = any[]>(
+        branch: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>
     ): BranchMetrics {
         const failedPhases = branch.phaseResults.filter(p => !p.success && !p.skipped).length;
         const totalRequests = branch.phaseResults.reduce((sum, p) => sum + p.totalRequests, 0);
@@ -123,8 +123,8 @@ export class MetricsAggregator {
         };
     }
     
-    static extractPhaseMetrics<T = any>(
-        phase: STABLE_WORKFLOW_PHASE_RESULT<T>
+    static extractPhaseMetrics<ResponseDataType = any, FunctionReturnType = any>(
+        phase: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>
     ): PhaseMetrics {
         return {
             phaseId: phase.phaseId,
@@ -157,10 +157,10 @@ export class MetricsAggregator {
         };
     }
 
-    static extractRequestGroupMetrics<T = any>(
-        responses: API_GATEWAY_RESPONSE<T>[]
+    static extractRequestGroupMetrics<ResponseDataType = any, FunctionReturnType = any>(
+        responses: API_GATEWAY_RESPONSE<ResponseDataType, FunctionReturnType>[]
     ): RequestGroupMetrics[] {
-        const groupMap = new Map<string, API_GATEWAY_RESPONSE<T>[]>();
+        const groupMap = new Map<string, API_GATEWAY_RESPONSE<ResponseDataType, FunctionReturnType>[]>();
         
         responses.forEach(response => {
             const groupId = response.groupId || 'default';
@@ -187,8 +187,8 @@ export class MetricsAggregator {
         });
     }
     
-    static extractRequestMetrics<T = any>(
-        responses: API_GATEWAY_RESPONSE<T>[]
+    static extractRequestMetrics<ResponseDataType = any, FunctionReturnType = any>(
+        responses: API_GATEWAY_RESPONSE<ResponseDataType, FunctionReturnType>[]
     ): RequestMetrics[] {
         return responses.map(response => ({
             requestId: response.requestId,

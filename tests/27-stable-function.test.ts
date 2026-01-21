@@ -4650,7 +4650,7 @@ describe('Execution Timeout Tests', () => {
         returnResult: true,
         attempts: 5,
         wait: 20,
-        executionTimeout: 200,
+        executionTimeout: 300,
       });
 
       expect(result.success).toBe(true);

@@ -6,8 +6,8 @@ import { MetricsValidator } from './metrics-validator.js';
 import { RequestOrFunction } from '../enums/index.js';
 import { STABLE_WORKFLOW_PHASE, STABLE_WORKFLOW_PHASE_RESULT, PrePhaseExecutionHookOptions } from '../types/index.js';
 
-export async function executePhase<RequestDataType = any, ResponseDataType = any>(
-    phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>,
+export async function executePhase<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+    phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
     phaseIndex: number,
     workflowId: string,
     commonGatewayOptions: any,
@@ -21,11 +21,69 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
     prePhaseExecutionHook?: Function
 ) {
     const phaseId = phase.id || `phase-${phaseIndex + 1}`;
+
+    if (phase.maxTimeout) {
+        const timeoutPromise = new Promise<STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>>((_, reject) => {
+            setTimeout(() => {
+                const contextStr = `workflowId=${workflowId}${branchId ? `, branchId=${branchId}` : ''}, phaseId=${phaseId}`;
+                reject(new Error(`stable-request: Phase execution exceeded maxTimeout of ${phase.maxTimeout}ms [${contextStr}]`));
+            }, phase.maxTimeout);
+        });
+
+        const executionPromise = executePhaseInternal(
+            phase,
+            phaseIndex,
+            workflowId,
+            commonGatewayOptions,
+            requestGroups,
+            logPhaseResults,
+            handlePhaseCompletion,
+            maxSerializableChars,
+            workflowHookParams,
+            sharedBuffer,
+            branchId,
+            prePhaseExecutionHook
+        );
+
+        return Promise.race([executionPromise, timeoutPromise]);
+    }
+
+    return executePhaseInternal(
+        phase,
+        phaseIndex,
+        workflowId,
+        commonGatewayOptions,
+        requestGroups,
+        logPhaseResults,
+        handlePhaseCompletion,
+        maxSerializableChars,
+        workflowHookParams,
+        sharedBuffer,
+        branchId,
+        prePhaseExecutionHook
+    );
+}
+
+async function executePhaseInternal<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+    phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
+    phaseIndex: number,
+    workflowId: string,
+    commonGatewayOptions: any,
+    requestGroups: any[],
+    logPhaseResults: boolean,
+    handlePhaseCompletion: Function,
+    maxSerializableChars: number,
+    workflowHookParams: any,
+    sharedBuffer?: Record<string, any>,
+    branchId?: string,
+    prePhaseExecutionHook?: Function
+): Promise<STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>> {
+    const phaseId = phase.id || `phase-${phaseIndex + 1}`;
     
     let modifiedPhase = phase;
     if (prePhaseExecutionHook) {
         try {
-            const hookOptions: PrePhaseExecutionHookOptions<RequestDataType, ResponseDataType> = {
+            const hookOptions: PrePhaseExecutionHookOptions<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {
                 workflowId,
                 ...(branchId && { branchId }),
                 phaseId,
@@ -35,7 +93,7 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
                 params: workflowHookParams?.prePhaseExecutionHookParams
             };
             
-            const result = await executeWithPersistence<STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>>(
+            const result = await executeWithPersistence<STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>(
                 prePhaseExecutionHook,
                 hookOptions,
                 phase.statePersistence,

@@ -11,9 +11,9 @@ import {
   STABLE_WORKFLOW_PHASE_RESULT
 } from '../types/index.js';
 
-export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDataType = any>(
-  context: NonLinearWorkflowContext<RequestDataType, ResponseDataType>
-): Promise<EXECUTE_NON_LINEAR_WORKFLOW_RESPONSE<ResponseDataType>> {
+export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+  context: NonLinearWorkflowContext<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
+): Promise<EXECUTE_NON_LINEAR_WORKFLOW_RESPONSE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>> {
   const {
     phases,
     workflowId,
@@ -32,8 +32,8 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
     maxWorkflowIterations
   } = context;
 
-  const phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[] = [];
-  const executionHistory: PhaseExecutionRecord[] = [];
+  const phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>[] = [];
+  const executionHistory: PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[] = [];
   const phaseExecutionCounts: Map<string, number> = new Map();
   
   let totalRequests = 0;
@@ -42,7 +42,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
   let terminatedEarly = false;
   let terminationReason: string | undefined;
 
-  const phaseMap = new Map<string, { phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>; index: number }>();
+  const phaseMap = new Map<string, { phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>; index: number }>();
   phases.forEach((phase, index) => {
     const phaseId = phase.id || `phase-${index + 1}`;
     phaseMap.set(phaseId, { phase, index });
@@ -69,7 +69,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
     const { phase, index: phaseIndex } = phaseData;
 
     if (phase.markConcurrentPhase) {
-      const concurrentPhases: Array<{ phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>; index: number; id: string }> = [];
+      const concurrentPhases: Array<{ phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>; index: number; id: string }> = [];
       let j = phaseIndex;
       
       while (j < phases.length && phases[j].markConcurrentPhase) {
@@ -159,11 +159,13 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
 
       const lastConcurrentPhase = concurrentPhases[concurrentPhases.length - 1];
       const lastResult = concurrentResults[concurrentResults.length - 1];
-      let decision: PhaseExecutionDecision = { action: PHASE_DECISION_ACTIONS.CONTINUE };
+      let decision: PhaseExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {
+        action: PHASE_DECISION_ACTIONS.CONTINUE
+      };
 
       if (lastConcurrentPhase.phase.phaseDecisionHook) {
         try {
-          decision = await executeWithPersistence<PhaseExecutionDecision>(
+          decision = await executeWithPersistence<PhaseExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>(
             lastConcurrentPhase.phase.phaseDecisionHook,
             {
               workflowId,
@@ -226,7 +228,10 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
 
         decision.addPhases.forEach((newPhase, idx) => {
           const newPhaseId = newPhase.id || `dynamic-phase-${Date.now()}-${idx}`;
-          const newPhaseWithId = { ...newPhase, id: newPhaseId };
+          const newPhaseWithId: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {
+            ...newPhase,
+            id: newPhaseId
+          };
           
           const insertIndex = j + idx;
           phases.splice(insertIndex, 0, newPhaseWithId);
@@ -381,7 +386,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
 
       phaseResults.push(phaseResult);
 
-      const historyRecord: PhaseExecutionRecord = {
+        const historyRecord: PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {
         phaseId,
         phaseIndex,
         executionNumber,
@@ -390,11 +395,13 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
         executionTime: phaseResult.executionTime
       };
 
-      let decision: PhaseExecutionDecision = { action: PHASE_DECISION_ACTIONS.CONTINUE };
+      let decision: PhaseExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {
+        action: PHASE_DECISION_ACTIONS.CONTINUE
+      };
 
       if (phase.phaseDecisionHook) {
         try {
-          decision = await executeWithPersistence<PhaseExecutionDecision>(
+          decision = await executeWithPersistence<PhaseExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>(
             phase.phaseDecisionHook,
             {
               workflowId,
@@ -461,7 +468,10 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
 
         decision.addPhases.forEach((newPhase, idx) => {
           const newPhaseId = newPhase.id || `dynamic-phase-${Date.now()}-${idx}`;
-          const newPhaseWithId = { ...newPhase, id: newPhaseId };
+          const newPhaseWithId: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {
+            ...newPhase,
+            id: newPhaseId
+          };
           
           const insertIndex = phaseIndex + 1 + idx;
           phases.splice(insertIndex, 0, newPhaseWithId);

@@ -53,7 +53,30 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
     } else {
         finalOptions = functionsOrOptions || {};
     }
-    
+
+    if (finalOptions.maxTimeout) {
+        const timeoutPromise = new Promise<API_GATEWAY_RESULT<ResponseDataType | FunctionReturnType>>((_, reject) => {
+            setTimeout(() => {
+                const contextStr = finalOptions.executionContext 
+                    ? ` [${Object.entries(finalOptions.executionContext).map(([k, v]) => `${k}=${v}`).join(', ')}]`
+                    : '';
+                reject(new Error(`stable-request: Gateway execution exceeded maxTimeout of ${finalOptions.maxTimeout}ms${contextStr}`));
+            }, finalOptions.maxTimeout);
+        });
+
+        const executionPromise = executeGateway(requests, functions, finalOptions, startTime);
+        return Promise.race([executionPromise, timeoutPromise]);
+    }
+
+    return executeGateway(requests, functions, finalOptions, startTime);
+}
+
+async function executeGateway<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+    requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] | API_GATEWAY_ITEM<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[],
+    functions: API_GATEWAY_FUNCTION<FunctionArgsType, FunctionReturnType>[],
+    finalOptions: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
+    startTime: number
+): Promise<API_GATEWAY_RESULT<ResponseDataType | FunctionReturnType>> {
     const {
         concurrentExecution = true,
         stopOnFirstError = false,
@@ -61,6 +84,7 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
         maxConcurrentRequests,
         rateLimit,
         circuitBreaker,
+        enableRacing = false,
     } = finalOptions;
 
     let items: API_GATEWAY_ITEM<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[] = [];
@@ -103,15 +127,22 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
         ...(maxConcurrentRequests !== undefined && { maxConcurrentRequests }),
         ...(rateLimit !== undefined && { rateLimit }),
         ...(circuitBreaker !== undefined && { circuitBreaker }),
-        ...extractCommonOptions<RequestDataType, ResponseDataType>(finalOptions),
+        ...(enableRacing !== undefined && { enableRacing }),
+        ...extractCommonOptions<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>(finalOptions),
         executionContext: finalOptions.executionContext
     }
 
     let responses: API_GATEWAY_RESPONSE<ResponseDataType | FunctionReturnType>[];
     if (concurrentExecution) {
-        responses = await executeConcurrently<RequestDataType, ResponseDataType>(items as any, requestExecutionOptions as CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>);
+        responses = await executeConcurrently<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>(
+            items,
+            requestExecutionOptions
+        );
     } else {
-        responses = await executeSequentially<RequestDataType, ResponseDataType>(items as any, requestExecutionOptions as SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>);
+        responses = await executeSequentially<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>(
+            items,
+            requestExecutionOptions
+        );
     }
 
     const successfulRequests = responses.filter(r => r.success).length;

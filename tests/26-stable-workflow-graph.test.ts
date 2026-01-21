@@ -952,6 +952,160 @@ describe('stableWorkflowGraph - Graph-Based Workflows', () => {
     });
   });
 
+  describe('Workflow Graph Execution Options', () => {
+    it('should optimize execution by removing unreachable and orphan nodes', async () => {
+      const executed: string[] = [];
+
+      const graph = new WorkflowGraphBuilder()
+        .addPhase('start', {
+          functions: [{
+            id: 'start-fn',
+            functionOptions: {
+              fn: async () => {
+                executed.push('start');
+                return 'ok';
+              },
+              args: []
+            }
+          }]
+        })
+        .addPhase('next', {
+          functions: [{
+            id: 'next-fn',
+            functionOptions: {
+              fn: async () => {
+                executed.push('next');
+                return 'ok';
+              },
+              args: []
+            }
+          }]
+        })
+        .addPhase('orphan', {
+          functions: [{
+            id: 'orphan-fn',
+            functionOptions: {
+              fn: async () => {
+                executed.push('orphan');
+                return 'ok';
+              },
+              args: []
+            }
+          }]
+        })
+        .addPhase('detached', {
+          functions: [{
+            id: 'detached-fn',
+            functionOptions: {
+              fn: async () => {
+                executed.push('detached');
+                return 'ok';
+              },
+              args: []
+            }
+          }]
+        })
+        .connectSequence('start', 'next')
+        .setEntryPoint('start')
+        .build();
+
+      const result = await stableWorkflowGraph(graph, {
+        optimizeExecution: true
+      });
+
+      expect(result.success).toBe(true);
+      expect(executed).toEqual(['start', 'next']);
+      expect(graph.nodes.has('orphan')).toBe(false);
+      expect(graph.nodes.has('detached')).toBe(false);
+    });
+
+    it('should enforce maxGraphDepth when provided', async () => {
+      const graph = new WorkflowGraphBuilder()
+        .addPhase('depth-0', {
+          functions: [{
+            id: 'd0-fn',
+            functionOptions: { fn: async () => 'ok', args: [] }
+          }]
+        })
+        .addPhase('depth-1', {
+          functions: [{
+            id: 'd1-fn',
+            functionOptions: { fn: async () => 'ok', args: [] }
+          }]
+        })
+        .addPhase('depth-2', {
+          functions: [{
+            id: 'd2-fn',
+            functionOptions: { fn: async () => 'ok', args: [] }
+          }]
+        })
+        .connectSequence('depth-0', 'depth-1', 'depth-2')
+        .setEntryPoint('depth-0')
+        .build();
+
+      await expect(stableWorkflowGraph(graph, {
+        maxGraphDepth: 1
+      })).rejects.toThrow(/maxGraphDepth/);
+
+      const result = await stableWorkflowGraph(graph, {
+        maxGraphDepth: 2
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.phases.length).toBe(3);
+    });
+
+    it('should complete when execution finishes before maxTimeout', async () => {
+      const graph = new WorkflowGraphBuilder()
+        .addPhase('fast-phase', {
+          functions: [{
+            id: 'fast-fn',
+            functionOptions: {
+              fn: async () => {
+                await new Promise(resolve => setTimeout(resolve, 30));
+                return 'ok';
+              },
+              args: [],
+              returnResult: true
+            }
+          }]
+        })
+        .setEntryPoint('fast-phase')
+        .build();
+
+      const result = await stableWorkflowGraph(graph, {
+        maxTimeout: 200
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.phases.length).toBe(1);
+      expect(result.phases[0].success).toBe(true);
+    });
+
+    it('should timeout when execution exceeds maxTimeout', async () => {
+      const graph = new WorkflowGraphBuilder()
+        .addPhase('slow-phase', {
+          functions: [{
+            id: 'slow-fn',
+            functionOptions: {
+              fn: async () => {
+                await new Promise(resolve => setTimeout(resolve, 150));
+                return 'late';
+              },
+              args: [],
+              returnResult: true
+            }
+          }]
+        })
+        .setEntryPoint('slow-phase')
+        .build();
+
+      await expect(stableWorkflowGraph(graph, {
+        maxTimeout: 50
+      })).rejects.toThrow(/maxTimeout/);
+    });
+  });
+
   describe('State Management', () => {
     it('should share state across phases via sharedBuffer', async () => {
       const graph = new WorkflowGraphBuilder()

@@ -18,7 +18,28 @@ import {
 export async function stableWorkflow<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
     phases: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[],
     options: STABLE_WORKFLOW_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {}
-): Promise<STABLE_WORKFLOW_RESULT<ResponseDataType | FunctionReturnType>> {
+): Promise<STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>> {
+    const workflowId = options.workflowId || `workflow-${Date.now()}`;
+
+    if (options.maxTimeout) {
+        const timeoutPromise = new Promise<STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>>((_, reject) => {
+            setTimeout(() => {
+                const contextStr = `workflowId=${workflowId}`;
+                reject(new Error(`stable-request: Workflow execution exceeded maxTimeout of ${options.maxTimeout}ms [${contextStr}]`));
+            }, options.maxTimeout);
+        });
+
+        const executionPromise = executeWorkflowInternal(phases, options);
+        return Promise.race([executionPromise, timeoutPromise]);
+    }
+
+    return executeWorkflowInternal(phases, options);
+}
+
+async function executeWorkflowInternal<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
+    phases: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[],
+    options: STABLE_WORKFLOW_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
+): Promise<STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>> {
     const {
         stopOnFirstPhaseError = false,
         logPhaseResults = false,
@@ -49,6 +70,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
         concurrentPhaseExecution = false,
         enableMixedExecution = false,
         enableBranchExecution = false,
+        enableBranchRacing = false,
         enableNonLinearExecution = false,
         maxWorkflowIterations = 1000,
         branches,
@@ -57,17 +79,19 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
 
     const workflowStartTime = Date.now();
     const workflowId = options.workflowId || `workflow-${Date.now()}`;
-    const phaseResults: STABLE_WORKFLOW_RESULT<ResponseDataType>['phases'] = [];
+    const phaseResults: STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>['phases'] = [];
     let totalRequests = 0;
     let successfulRequests = 0;
     let failedRequests = 0;
 
     const workflowCircuitBreaker = commonGatewayOptions.circuitBreaker
-        ? new CircuitBreaker(commonGatewayOptions.circuitBreaker)
+        ? commonGatewayOptions.circuitBreaker instanceof CircuitBreaker
+            ? commonGatewayOptions.circuitBreaker
+            : new CircuitBreaker(commonGatewayOptions.circuitBreaker)
         : null;
     
     const commonGatewayOptionsWithBreaker = workflowCircuitBreaker
-        ? { ...commonGatewayOptions, circuitBreaker: workflowCircuitBreaker as any }
+        ? { ...commonGatewayOptions, circuitBreaker: workflowCircuitBreaker }
         : commonGatewayOptions;
 
     try {
@@ -94,7 +118,8 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 workflowHookParams,
                 sharedBuffer: options.sharedBuffer,
                 stopOnFirstPhaseError,
-                maxWorkflowIterations
+                maxWorkflowIterations,
+                enableBranchRacing
             });
 
             phaseResults.push(...branchResult.allPhaseResults);
@@ -105,7 +130,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
             const workflowExecutionTime = Date.now() - workflowStartTime;
             const workflowSuccess = failedRequests === 0;
 
-            const result: STABLE_WORKFLOW_RESULT = {
+            const result: STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
                 workflowId,
                 success: workflowSuccess,
                 executionTime: workflowExecutionTime,
@@ -171,7 +196,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
             const workflowExecutionTime = Date.now() - workflowStartTime;
             const workflowSuccess = failedRequests === 0;
 
-            const result: STABLE_WORKFLOW_RESULT<ResponseDataType> = {
+            const result: STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
                 workflowId,
                 success: workflowSuccess,
                 executionTime: workflowExecutionTime,
@@ -217,14 +242,19 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
             return result;
         }
 
-        const processPhaseResult = (phaseResult: STABLE_WORKFLOW_RESULT<ResponseDataType>['phases'][number]) => {
+        const processPhaseResult = (phaseResult: STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>['phases'][number]) => {
             phaseResults.push(phaseResult);
             totalRequests += phaseResult.totalRequests;
             successfulRequests += phaseResult.successfulRequests;
             failedRequests += phaseResult.failedRequests;
         };
 
-        const handlePhaseExecutionError = async (phaseId: string, phaseIndex: number, error: any, phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>) => {
+        const handlePhaseExecutionError = async (
+            phaseId: string,
+            phaseIndex: number,
+            error: any,
+            phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
+        ) => {
             const items = phase.items || phase.functions || phase.requests || [];
             const phaseResult = {
                 workflowId,
@@ -278,7 +308,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
                 const currentPhaseId = currentPhase.id || `phase-${i + 1}`;
 
                 if (currentPhase.markConcurrentPhase) {
-                    const concurrentGroup: { phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>; index: number }[] = [
+                    const concurrentGroup: { phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>; index: number }[] = [
                         { phase: currentPhase, index: i }
                     ];
                     
@@ -473,7 +503,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
         const workflowExecutionTime = Date.now() - workflowStartTime;
         const workflowSuccess = failedRequests === 0;
 
-        const result: STABLE_WORKFLOW_RESULT<ResponseDataType> = {
+        const result: STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
             workflowId,
             success: workflowSuccess,
             executionTime: workflowExecutionTime,
@@ -520,7 +550,7 @@ export async function stableWorkflow<RequestDataType = any, ResponseDataType = a
             );
         }
 
-        const errorResult: STABLE_WORKFLOW_RESULT = {
+        const errorResult: STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
             workflowId,
             success: false,
             executionTime: workflowExecutionTime,
