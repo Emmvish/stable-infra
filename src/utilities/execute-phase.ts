@@ -23,7 +23,7 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
     const phaseId = phase.id || `phase-${phaseIndex + 1}`;
 
     if (phase.maxTimeout) {
-        const timeoutPromise = new Promise<STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>>((_, reject) => {
+        const timeoutPromise = new Promise<STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>>((_, reject) => {
             setTimeout(() => {
                 const contextStr = `workflowId=${workflowId}${branchId ? `, branchId=${branchId}` : ''}, phaseId=${phaseId}`;
                 reject(new Error(`stable-request: Phase execution exceeded maxTimeout of ${phase.maxTimeout}ms [${contextStr}]`));
@@ -77,7 +77,7 @@ async function executePhaseInternal<RequestDataType = any, ResponseDataType = an
     sharedBuffer?: Record<string, any>,
     branchId?: string,
     prePhaseExecutionHook?: Function
-): Promise<STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>> {
+): Promise<STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>> {
     const phaseId = phase.id || `phase-${phaseIndex + 1}`;
     
     let modifiedPhase = phase;
@@ -170,7 +170,7 @@ async function executePhaseInternal<RequestDataType = any, ResponseDataType = an
     const phaseSuccessCount = responses.filter(r => r.success).length;
     const phaseFailureCount = responses.filter(r => !r.success).length;
 
-    const phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType> = {
+        const phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
         workflowId,
         ...(branchId && { branchId }),
         phaseId,

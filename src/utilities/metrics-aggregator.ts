@@ -123,8 +123,8 @@ export class MetricsAggregator {
         };
     }
     
-    static extractPhaseMetrics<ResponseDataType = any, FunctionReturnType = any>(
-        phase: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>
+    static extractPhaseMetrics<ResponseDataType = any, FunctionReturnType = any, RequestDataType = any, FunctionArgsType extends any[] = any[]>(
+        phase: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>
     ): PhaseMetrics {
         return {
             phaseId: phase.phaseId,

@@ -653,7 +653,7 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   ) => any | Promise<any>;
   handleBranchDecision?: (
     decision: BranchExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
-    branchResult: BranchExecutionResult<ResponseDataType, FunctionReturnType>,
+    branchResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>,
     maxSerializableChars?: number
   ) => any | Promise<any>;
   prePhaseExecutionHook?: (
@@ -666,7 +666,7 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   workflowHookParams?: WorkflowHookParams;
 }
 
-export interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any, FunctionReturnType = any> {
+export interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any, FunctionReturnType = any, RequestDataType = any, FunctionArgsType extends any[] = any[]> {
   workflowId: string;
   branchId?: string;
   phaseId: string;
@@ -680,7 +680,7 @@ export interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any, FunctionRe
   responses: API_GATEWAY_RESPONSE<ResponseDataType, FunctionReturnType>[];
   executionNumber?: number;
   skipped?: boolean;
-  decision?: PhaseExecutionDecision;
+  decision?: PhaseExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
   error?: string;
   metrics?: PhaseMetrics;
   validation?: MetricsValidationResult;
@@ -702,7 +702,7 @@ export interface STABLE_WORKFLOW_RESULT<ResponseDataType = any, FunctionReturnTy
   totalRequests: number;
   successfulRequests: number;
   failedRequests: number;
-  phases: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>[];
+  phases: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[];
   executionHistory: PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
   branches?: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[];
   branchExecutionHistory?: BranchExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[]; 
@@ -794,7 +794,7 @@ export interface PhaseExecutionDecision<RequestDataType = any, ResponseDataType 
   targetPhaseId?: string;
   replayCount?: number;
   metadata?: Record<string, any>;
-  addPhases?: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
+  addPhases?: ReadonlyArray<STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>;
 }
 
 export interface PhaseDecisionHookOptions<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
@@ -846,7 +846,7 @@ export interface NonLinearWorkflowContext<RequestDataType, ResponseDataType, Fun
 }
 
 export interface EXECUTE_NON_LINEAR_WORKFLOW_RESPONSE<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
-  phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>[];
+  phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[];
   executionHistory: PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
   totalRequests: number;
   successfulRequests: number;
@@ -874,7 +874,7 @@ export interface STABLE_WORKFLOW_BRANCH<RequestDataType = any, ResponseDataType 
 
 export interface BranchDecisionHookOptions<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
   workflowId: string;
-  branchResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>[];
+  branchResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[];
   branchId: string;
   branchIndex: number;
   executionNumber: number;
@@ -889,8 +889,8 @@ export interface BranchExecutionDecision<RequestDataType = any, ResponseDataType
   action: PHASE_DECISION_ACTIONS;
   targetBranchId?: string;
   metadata?: Record<string, any>;
-  addPhases?: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
-  addBranches?: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
+  addPhases?: ReadonlyArray<STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>;
+  addBranches?: ReadonlyArray<STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>;
 }
 
 export interface BranchExecutionResult<ResponseDataType = any, FunctionReturnType = any, RequestDataType = any, FunctionArgsType extends any[] = any[]> {
@@ -900,7 +900,7 @@ export interface BranchExecutionResult<ResponseDataType = any, FunctionReturnTyp
   success: boolean;
   executionTime: number;
   completedPhases: number;
-  phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>[];
+  phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[];
   decision?: BranchExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
   executionNumber: number;
   skipped?: boolean;
@@ -922,7 +922,7 @@ export interface BranchExecutionRecord<RequestDataType = any, ResponseDataType =
 export interface HandleBranchCompletionHookOptions<ResponseDataType = any, FunctionReturnType = any> {
   workflowId: string;
   branchId: string;
-  branchResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>[];
+  branchResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, any, any[]>[];
   success: boolean;
   maxSerializableChars?: number;
 }
@@ -944,7 +944,7 @@ export interface BranchWorkflowContext<RequestDataType = any, ResponseDataType =
   ) => any | Promise<any>;
   handleBranchDecision?: (
     decision: BranchExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
-    branchResult: BranchExecutionResult<ResponseDataType, FunctionReturnType>,
+    branchResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>,
     maxSerializableChars?: number
   ) => any | Promise<any>;
   preBranchExecutionHook?: (
@@ -963,7 +963,7 @@ export interface BranchWorkflowContext<RequestDataType = any, ResponseDataType =
 
 export interface EXECUTE_BRANCH_WORKFLOW_RESPONSE<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
   branchResults: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[];
-  allPhaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>[];
+  allPhaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[];
   executionHistory: PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
   branchExecutionHistory: BranchExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
   totalRequests: number;
@@ -1169,7 +1169,7 @@ export type WorkflowNodeType = WorkflowNodeTypes.PHASE | WorkflowNodeTypes.BRANC
 
 export interface WorkflowGraph<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
   nodes: Map<string, WorkflowNode<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>;
-  edges: Map<string, WorkflowEdge[]>;
+  edges: Map<string, WorkflowEdge<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[]>;
   entryPoint: string;
   exitPoints?: string[];
   metadata?: Record<string, any>;
@@ -1180,7 +1180,7 @@ export interface WorkflowNode<RequestDataType = any, ResponseDataType = any, Fun
   type: WorkflowNodeType;
   phase?: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
   branch?: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
-  condition?: ConditionalNode<ResponseDataType, FunctionReturnType>;
+  condition?: ConditionalNode<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
   parallelNodes?: string[];
   waitForNodes?: string[];
   metadata?: Record<string, any>;
@@ -1189,10 +1189,10 @@ export interface WorkflowNode<RequestDataType = any, ResponseDataType = any, Fun
   ) => PhaseExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> | Promise<PhaseExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>;
 }
 
-export interface WorkflowEdge {
+export interface WorkflowEdge<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
   from: string;
   to: string;
-  condition?: EdgeCondition;
+  condition?: EdgeCondition<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
   weight?: number;
   label?: string;
   metadata?: Record<string, any>;
@@ -1200,28 +1200,28 @@ export interface WorkflowEdge {
 
 export type EdgeConditionType = WorkflowEdgeConditionTypes.SUCCESS | WorkflowEdgeConditionTypes.FAILURE | WorkflowEdgeConditionTypes.CUSTOM | WorkflowEdgeConditionTypes.ALWAYS
 
-export interface EdgeCondition {
+export interface EdgeCondition<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
   type: EdgeConditionType;
-  evaluate?: (context: EdgeEvaluationContext) => boolean | Promise<boolean>;
+  evaluate?: (context: EdgeEvaluationContext<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>) => boolean | Promise<boolean>;
 }
 
-export interface EdgeEvaluationContext {
-  results: Map<string, STABLE_WORKFLOW_PHASE_RESULT<any>>;
+export interface EdgeEvaluationContext<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
+  results: Map<string, STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>>;
   sharedBuffer?: Record<string, any>;
-  executionHistory: PhaseExecutionRecord[];
+  executionHistory: ReadonlyArray<PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>;
   currentNodeId: string;
 }
 
-export interface ConditionalNode<ResponseDataType = any, FunctionReturnType = any> {
-  evaluate: (context: ConditionalEvaluationContext<ResponseDataType, FunctionReturnType>) => string | Promise<string>;
+export interface ConditionalNode<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
+  evaluate: (context: ConditionalEvaluationContext<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>) => string | Promise<string>;
 }
 
-export interface ConditionalEvaluationContext<ResponseDataType = any, FunctionReturnType = any> {
-  results: Map<string, STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>>;
+export interface ConditionalEvaluationContext<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
+  results: Map<string, STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>>;
   sharedBuffer?: Record<string, any>;
-  executionHistory: PhaseExecutionRecord[];
+  executionHistory: ReadonlyArray<PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>;
   currentNodeId: string;
-  phaseResult?: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>;
+  phaseResult?: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>;
 }
 
 export interface WorkflowGraphOptions<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> 

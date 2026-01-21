@@ -171,7 +171,7 @@ async function executeWorkflowInternal<RequestDataType = any, ResponseDataType =
                 );
             }
 
-            const nonLinearResult = await executeNonLinearWorkflow({
+            const nonLinearResult = await executeNonLinearWorkflow<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>({
                 phases,
                 workflowId,
                 commonGatewayOptions: commonGatewayOptionsWithBreaker,

@@ -101,10 +101,10 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
     }
   }
   
-  const results = new Map<string, STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>>();
+  const results = new Map<string, STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>>();
   const visited = new Set<string>();
   const executionHistory: PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[] = [];
-  const phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>[] = [];
+  const phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[] = [];
   const sharedBuffer = options.sharedBuffer || {};
   
   let totalRequests = 0;
@@ -333,7 +333,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
           shouldReplay = false;
         }
       } catch (error: any) {
-        const errorResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType> = {
+        const errorResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
           workflowId,
           phaseId,
           phaseIndex,
@@ -383,7 +383,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
     if (branchResult.branchResults.length > 0) {
       const branch = branchResult.branchResults[0];
       
-      const branchPhaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType> = {
+      const branchPhaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
         workflowId,
         branchId: branch.branchId,
         phaseId: `branch-${branch.branchId}`,
@@ -473,7 +473,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
             const losingNode = graph.nodes.get(losingNodeId);
             
             if (losingNode?.branch) {
-              const cancelledBranchResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType> = {
+              const cancelledBranchResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
                 workflowId,
                 branchId: losingNode.branch.id,
                 phaseId: `branch-${losingNode.branch.id}`,

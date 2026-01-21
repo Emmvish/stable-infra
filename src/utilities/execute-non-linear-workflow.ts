@@ -32,7 +32,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
     maxWorkflowIterations
   } = context;
 
-  const phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>[] = [];
+  const phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[] = [];
   const executionHistory: PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[] = [];
   const phaseExecutionCounts: Map<string, number> = new Map();
   
@@ -329,7 +329,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
         );
       }
       
-      const skippedResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType> = {
+      const skippedResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
         workflowId,
         ...(branchId && { branchId }),
         phaseId,
@@ -363,7 +363,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
     }
 
     try {
-      const phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType> = await executePhase(
+      const phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = await executePhase(
         phase,
         phaseIndex,
         workflowId,
@@ -581,7 +581,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
         phaseError
       );
 
-      const errorResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType> = {
+      const errorResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
         workflowId,
         ...(branchId && { branchId }),
         phaseId,

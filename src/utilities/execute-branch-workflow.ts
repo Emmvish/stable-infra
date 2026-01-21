@@ -40,7 +40,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
   } = context;
 
   const branchResults: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[] = [];
-  const allPhaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[] = [];
+  const allPhaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[] = [];
   const executionHistory: PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[] = [];
   const branchExecutionHistory: BranchExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[] = [];
   const branchExecutionCounts: Map<string, number> = new Map();
@@ -80,7 +80,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     if (branch.maxTimeout) {
       const timeoutPromise = new Promise<{
         branchResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>;
-        phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
+        phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[];
         executionHistory: PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
         totalRequests: number;
         successfulRequests: number;
@@ -105,7 +105,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     executionNumber: number
   ): Promise<{
     branchResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>;
-    phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType>[];
+    phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[];
     executionHistory: PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
     totalRequests: number;
     successfulRequests: number;

@@ -12,15 +12,15 @@ import {
 
 import { detectCycles } from './validate-workflow-graph.js';
 
-export class WorkflowGraphBuilder<RequestDataType = any, ResponseDataType = any> {
-  private nodes = new Map<string, WorkflowNode<RequestDataType, ResponseDataType>>();
-  private edges = new Map<string, WorkflowEdge[]>();
+export class WorkflowGraphBuilder<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
+  private nodes = new Map<string, WorkflowNode<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>();
+  private edges = new Map<string, WorkflowEdge<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[]>();
   private entryPointId?: string;
   private exitPointIds: string[] = [];
   private metadata: Record<string, any> = {};
   private enforceDAG: boolean = true;
 
-  addPhase(id: string, phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType>): this {
+  addPhase(id: string, phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>): this {
     if (this.nodes.has(id)) {
       throw new Error(`Node with id '${id}' already exists`);
     }
@@ -34,7 +34,7 @@ export class WorkflowGraphBuilder<RequestDataType = any, ResponseDataType = any>
     return this;
   }
 
-  addBranch(id: string, branch: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType>): this {
+  addBranch(id: string, branch: STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>): this {
     if (this.nodes.has(id)) {
       throw new Error(`Node with id '${id}' already exists`);
     }
@@ -50,7 +50,7 @@ export class WorkflowGraphBuilder<RequestDataType = any, ResponseDataType = any>
 
   addConditional(
     id: string,
-    evaluate: (context: ConditionalEvaluationContext<ResponseDataType>) => string | Promise<string>
+    evaluate: (context: ConditionalEvaluationContext<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>) => string | Promise<string>
   ): this {
     if (this.nodes.has(id)) {
       throw new Error(`Node with id '${id}' already exists`);
@@ -102,7 +102,7 @@ export class WorkflowGraphBuilder<RequestDataType = any, ResponseDataType = any>
   }
 
   connect(from: string, to: string, options?: {
-    condition?: EdgeCondition;
+    condition?: EdgeCondition<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
     weight?: number;
     label?: string;
     metadata?: Record<string, any>;
@@ -130,14 +130,14 @@ export class WorkflowGraphBuilder<RequestDataType = any, ResponseDataType = any>
     return this;
   }
 
-  connectToMany(from: string, toNodes: string[], condition?: EdgeCondition): this {
+  connectToMany(from: string, toNodes: string[], condition?: EdgeCondition<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>): this {
     for (const to of toNodes) {
       this.connect(from, to, { condition });
     }
     return this;
   }
 
-  connectManyTo(fromNodes: string[], to: string, condition?: EdgeCondition): this {
+  connectManyTo(fromNodes: string[], to: string, condition?: EdgeCondition<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>): this {
     for (const from of fromNodes) {
       this.connect(from, to, { condition });
     }
@@ -172,7 +172,7 @@ export class WorkflowGraphBuilder<RequestDataType = any, ResponseDataType = any>
     return this;
   }
 
-  build(): WorkflowGraph<RequestDataType, ResponseDataType> {
+  build(): WorkflowGraph<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> {
     if (!this.entryPointId) {
       throw new Error('Entry point must be set before building the graph');
     }
@@ -181,7 +181,7 @@ export class WorkflowGraphBuilder<RequestDataType = any, ResponseDataType = any>
       this.exitPointIds = this.detectExitPoints();
     }
 
-    const graph: WorkflowGraph<RequestDataType, ResponseDataType> = {
+    const graph: WorkflowGraph<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {
       nodes: new Map(this.nodes),
       edges: new Map(this.edges),
       entryPoint: this.entryPointId,
