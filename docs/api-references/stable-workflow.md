@@ -147,6 +147,7 @@ interface STABLE_WORKFLOW_OPTIONS<
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `workflowId` | `string?` | `workflow-{timestamp}` | Unique workflow identifier for tracking. |
+| `startPhaseIndex` | `number?` | `0` | Start execution at this 0-based phase index. In mixed/non-linear mode, aligns to the first phase of a concurrent group. |
 | `stopOnFirstPhaseError` | `boolean?` | `false` | Stop entire workflow if any phase fails. |
 | `logPhaseResults` | `boolean?` | `false` | Log phase execution details to console. |
 | `concurrentPhaseExecution` | `boolean?` | `false` | Execute all phases concurrently. |

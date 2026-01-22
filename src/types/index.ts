@@ -629,6 +629,7 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   extends Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>, 
     'concurrentExecution' | 'stopOnFirstError' | 'commonMaxSerializableChars'> {
   workflowId?: string;
+  startPhaseIndex?: number;
   stopOnFirstPhaseError?: boolean;
   logPhaseResults?: boolean;
   concurrentPhaseExecution?: boolean;
@@ -821,6 +822,7 @@ export interface PhaseExecutionRecord<RequestDataType = any, ResponseDataType = 
 
 export interface NonLinearWorkflowContext<RequestDataType, ResponseDataType, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
   phases: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
+  startPhaseIndex?: number;
   workflowId: string;
   branchId?: string;
   commonGatewayOptions: any;

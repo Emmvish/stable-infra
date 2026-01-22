@@ -303,6 +303,8 @@ const responses = await stableApiGateway(items, {
 
 Phased array-based workflows with sequential/concurrent phases, mixed items, and non-linear control flow.
 
+You can start a workflow from a specific phase using `startPhaseIndex` (0-based). When starting inside a concurrent group (`markConcurrentPhase`), execution aligns to the group’s first phase.
+
 ```typescript
 import { stableWorkflow, PHASE_DECISION_ACTIONS, RequestOrFunction, REQUEST_METHODS } from '@emmvish/stable-request';
 import type { STABLE_WORKFLOW_PHASE, API_GATEWAY_ITEM } from '@emmvish/stable-request';

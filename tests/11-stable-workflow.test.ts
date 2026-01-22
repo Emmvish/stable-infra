@@ -97,6 +97,156 @@ describe('Multi-Phase Workflows', () => {
     );
   });
 
+  it('should start workflow from the specified phase index (sequential execution)', async () => {
+    mockedAxios.request.mockImplementation(
+      (async (config: AxiosRequestConfig) => {
+        if (config.url === '/p2') {
+          return {
+            status: 200,
+            data: { step: 'p2' },
+            statusText: 'OK',
+            headers: {},
+            config: config as any
+          };
+        }
+        if (config.url === '/p3') {
+          return {
+            status: 200,
+            data: { step: 'p3' },
+            statusText: 'OK',
+            headers: {},
+            config: config as any
+          };
+        }
+        throw new Error('Unexpected request');
+      }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
+    );
+
+    const phases = [
+      {
+        id: 'phase-1',
+        requests: [{ id: 'r1', requestOptions: { reqData: { path: '/p1' }, resReq: true } }]
+      },
+      {
+        id: 'phase-2',
+        requests: [{ id: 'r2', requestOptions: { reqData: { path: '/p2' }, resReq: true } }]
+      },
+      {
+        id: 'phase-3',
+        requests: [{ id: 'r3', requestOptions: { reqData: { path: '/p3' }, resReq: true } }]
+      }
+    ] satisfies STABLE_WORKFLOW_PHASE[];
+
+    const result = await stableWorkflow(phases, {
+      workflowId: 'wf-start-index-seq',
+      commonRequestData: { hostname: 'api.example.com' },
+      startPhaseIndex: 1
+    });
+
+    expect(mockedAxios.request).toHaveBeenCalledTimes(2);
+    expect(mockedAxios.request).not.toHaveBeenCalledWith(expect.objectContaining({ url: '/p1' }));
+    expect(result.totalPhases).toBe(3);
+    expect(result.completedPhases).toBe(2);
+    expect(result.phases[0].phaseId).toBe('phase-2');
+    expect(result.phases[1].phaseId).toBe('phase-3');
+  });
+
+  it('should align startPhaseIndex to the start of a concurrent group in mixed execution', async () => {
+    mockedAxios.request.mockImplementation(
+      (async (config: AxiosRequestConfig) => {
+        return {
+          status: 200,
+          data: { path: config.url },
+          statusText: 'OK',
+          headers: {},
+          config: config as any
+        };
+      }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
+    );
+
+    const phases = [
+      {
+        id: 'phase-1',
+        markConcurrentPhase: true,
+        requests: [{ id: 'r1', requestOptions: { reqData: { path: '/p1' }, resReq: true } }]
+      },
+      {
+        id: 'phase-2',
+        markConcurrentPhase: true,
+        requests: [{ id: 'r2', requestOptions: { reqData: { path: '/p2' }, resReq: true } }]
+      },
+      {
+        id: 'phase-3',
+        requests: [{ id: 'r3', requestOptions: { reqData: { path: '/p3' }, resReq: true } }]
+      }
+    ] satisfies STABLE_WORKFLOW_PHASE[];
+
+    const result = await stableWorkflow(phases, {
+      workflowId: 'wf-start-index-mixed',
+      commonRequestData: { hostname: 'api.example.com' },
+      enableMixedExecution: true,
+      startPhaseIndex: 1
+    });
+
+    expect(mockedAxios.request).toHaveBeenCalledTimes(3);
+    expect(mockedAxios.request).toHaveBeenCalledWith(expect.objectContaining({ url: '/p1' }));
+    expect(result.completedPhases).toBe(3);
+  });
+
+  it('should start non-linear workflow from the specified phase index', async () => {
+    mockedAxios.request.mockImplementation(
+      (async (config: AxiosRequestConfig) => {
+        if (config.url === '/p2') {
+          return {
+            status: 200,
+            data: { step: 'p2' },
+            statusText: 'OK',
+            headers: {},
+            config: config as any
+          };
+        }
+        if (config.url === '/p3') {
+          return {
+            status: 200,
+            data: { step: 'p3' },
+            statusText: 'OK',
+            headers: {},
+            config: config as any
+          };
+        }
+        throw new Error('Unexpected request');
+      }) as unknown as jest.MockedFunction<typeof mockedAxios.request>
+    );
+
+    const phases = [
+      {
+        id: 'phase-1',
+        requests: [{ id: 'r1', requestOptions: { reqData: { path: '/p1' }, resReq: true } }]
+      },
+      {
+        id: 'phase-2',
+        requests: [{ id: 'r2', requestOptions: { reqData: { path: '/p2' }, resReq: true } }]
+      },
+      {
+        id: 'phase-3',
+        requests: [{ id: 'r3', requestOptions: { reqData: { path: '/p3' }, resReq: true } }]
+      }
+    ] satisfies STABLE_WORKFLOW_PHASE[];
+
+    const result = await stableWorkflow(phases, {
+      workflowId: 'wf-start-index-nonlinear',
+      commonRequestData: { hostname: 'api.example.com' },
+      enableNonLinearExecution: true,
+      startPhaseIndex: 1
+    });
+
+    expect(mockedAxios.request).toHaveBeenCalledTimes(2);
+    expect(mockedAxios.request).not.toHaveBeenCalledWith(expect.objectContaining({ url: '/p1' }));
+    expect(result.completedPhases).toBe(2);
+    expect(result.phases[0].phaseId).toBe('phase-2');
+    expect(result.phases[1].phaseId).toBe('phase-3');
+  });
+
   it('should stop after the first phase that has failed requests when stopOnFirstPhaseError is true', async () => {
     mockedAxios.request
       .mockResolvedValueOnce({

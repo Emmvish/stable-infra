@@ -74,6 +74,7 @@ async function executeWorkflowInternal<RequestDataType = any, ResponseDataType =
         enableNonLinearExecution = false,
         maxWorkflowIterations = 1000,
         branches,
+        startPhaseIndex,
         ...commonGatewayOptions
     } = options;
 
@@ -93,6 +94,25 @@ async function executeWorkflowInternal<RequestDataType = any, ResponseDataType =
     const commonGatewayOptionsWithBreaker = workflowCircuitBreaker
         ? { ...commonGatewayOptions, circuitBreaker: workflowCircuitBreaker }
         : commonGatewayOptions;
+
+    const resolveStartPhaseIndex = () => {
+        if (startPhaseIndex === undefined) {
+            return 0;
+        }
+
+        if (startPhaseIndex < 0 || startPhaseIndex >= phases.length) {
+            throw new Error(`stable-request: startPhaseIndex ${startPhaseIndex} is out of bounds for ${phases.length} phase(s)`);
+        }
+
+        let resolvedIndex = startPhaseIndex;
+        if ((enableMixedExecution || enableNonLinearExecution) && phases[resolvedIndex]?.markConcurrentPhase) {
+            while (resolvedIndex > 0 && phases[resolvedIndex - 1]?.markConcurrentPhase) {
+                resolvedIndex--;
+            }
+        }
+
+        return resolvedIndex;
+    };
 
     try {
         if (enableBranchExecution && branches && branches.length > 0) {
@@ -163,6 +183,7 @@ async function executeWorkflowInternal<RequestDataType = any, ResponseDataType =
             return result;
         }
 
+        const resolvedStartIndex = resolveStartPhaseIndex();
 
         if (enableNonLinearExecution) {
             if (logPhaseResults) {
@@ -173,6 +194,7 @@ async function executeWorkflowInternal<RequestDataType = any, ResponseDataType =
 
             const nonLinearResult = await executeNonLinearWorkflow<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>({
                 phases,
+                startPhaseIndex: resolvedStartIndex,
                 workflowId,
                 commonGatewayOptions: commonGatewayOptionsWithBreaker,
                 requestGroups,
@@ -302,7 +324,7 @@ async function executeWorkflowInternal<RequestDataType = any, ResponseDataType =
         };
 
         if (enableMixedExecution && !concurrentPhaseExecution) {
-            let i = 0;
+            let i = resolvedStartIndex;
             while (i < phases.length) {
                 const currentPhase = phases[i];
                 const currentPhaseId = currentPhase.id || `phase-${i + 1}`;
@@ -417,10 +439,15 @@ async function executeWorkflowInternal<RequestDataType = any, ResponseDataType =
                 }
             }
         } else if (concurrentPhaseExecution) {
-            const phasePromises = phases.map((phase, i) => 
+            const phasesToExecute = phases.slice(resolvedStartIndex).map((phase, offset) => ({
+                phase,
+                index: resolvedStartIndex + offset
+            }));
+
+            const phasePromises = phasesToExecute.map(({ phase, index }) => 
                 executePhase(
                     phase,
-                    i,
+                    index,
                     workflowId,
                     commonGatewayOptionsWithBreaker,
                     requestGroups,
@@ -438,19 +465,20 @@ async function executeWorkflowInternal<RequestDataType = any, ResponseDataType =
 
             for (let i = 0; i < settledPhases.length; i++) {
                 const result = settledPhases[i];
+                const { phase, index } = phasesToExecute[i];
                 if (result.status === 'fulfilled') {
                     processPhaseResult(result.value);
                 } else {
                     await handlePhaseExecutionError(
-                        phases[i].id || `phase-${i + 1}`,
-                        i,
+                        phase.id || `phase-${index + 1}`,
+                        index,
                         result.reason,
-                        phases[i]
+                        phase
                     );
                 }
             }
         } else {
-            for (let i = 0; i < phases.length; i++) {
+            for (let i = resolvedStartIndex; i < phases.length; i++) {
                 const phase = phases[i];
                 const phaseId = phase.id || `phase-${i + 1}`;
 
@@ -541,6 +569,7 @@ async function executeWorkflowInternal<RequestDataType = any, ResponseDataType =
         return result;
 
     } catch (workflowError: any) {
+
         const workflowExecutionTime = Date.now() - workflowStartTime;
 
         if (logPhaseResults) {

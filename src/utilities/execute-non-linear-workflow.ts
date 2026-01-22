@@ -16,6 +16,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
 ): Promise<EXECUTE_NON_LINEAR_WORKFLOW_RESPONSE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>> {
   const {
     phases,
+    startPhaseIndex,
     workflowId,
     branchId,
     commonGatewayOptions,
@@ -42,13 +43,36 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
   let terminatedEarly = false;
   let terminationReason: string | undefined;
 
+  if (phases.length === 0) {
+    return {
+      phaseResults,
+      executionHistory,
+      totalRequests,
+      successfulRequests,
+      failedRequests,
+      terminatedEarly,
+      terminationReason
+    };
+  }
+
   const phaseMap = new Map<string, { phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>; index: number }>();
   phases.forEach((phase, index) => {
     const phaseId = phase.id || `phase-${index + 1}`;
     phaseMap.set(phaseId, { phase, index });
   });
 
-  let currentPhaseId: string | null = phases[0]?.id || 'phase-1';
+  let resolvedStartIndex = startPhaseIndex ?? 0;
+  if (resolvedStartIndex < 0 || resolvedStartIndex >= phases.length) {
+    throw new Error(`stable-request: startPhaseIndex ${resolvedStartIndex} is out of bounds for ${phases.length} phase(s)`);
+  }
+
+  if (phases[resolvedStartIndex]?.markConcurrentPhase) {
+    while (resolvedStartIndex > 0 && phases[resolvedStartIndex - 1]?.markConcurrentPhase) {
+      resolvedStartIndex--;
+    }
+  }
+
+  let currentPhaseId: string | null = phases[resolvedStartIndex]?.id || `phase-${resolvedStartIndex + 1}`;
   let iterationCount = 0;
 
   while (currentPhaseId && iterationCount < maxWorkflowIterations) {
