@@ -1,6 +1,6 @@
 # @emmvish/stable-request
 
-A production-grade TypeScript library for resilient API integrations, batch processing, and orchestrating complex workflows with deterministic error handling, type safety, and comprehensive observability.
+A stability-first production-grade TypeScript framework for resilient API integrations, batch processing, and orchestrating complex workflows with deterministic error handling, type safety, and comprehensive observability.
 
 ## Table of Contents
 
@@ -47,14 +47,14 @@ A production-grade TypeScript library for resilient API integrations, batch proc
 
 ## Overview
 
-**@emmvish/stable-request** evolved from a focused library for resilient API calls to a comprehensive execution framework. Originally addressing API integration challenges, it expanded to include:
+**@emmvish/stable-request** evolved from a focused library for resilient API calls to a comprehensive execution framework. Originally addressing **API integration** challenges via `stableRequest`, it expanded to include:
 
 1. **Batch orchestration** via `stableApiGateway` for processing groups of mixed requests/functions
 2. **Phased workflows** via `stableWorkflow` for array-based multi-phase execution with dynamic control flow
 3. **Graph-based workflows** via `stableWorkflowGraph` for DAG execution with higher parallelism
 4. **Generic function execution** via `stableFunction`, inheriting all resilience guards
 
-All four execution modes support the same resilience stack: retries, jitter, circuit breaking, caching, rate/concurrency limits, config cascading, shared buffers, trial mode, comprehensive hooks, and metrics. This uniformity makes it trivial to compose requests and functions in any topology.
+All five execution modes support the same resilience stack: retries, jitter, circuit breaking, caching, rate/concurrency limits, config cascading, shared buffers, trial mode, comprehensive hooks, and metrics. This uniformity makes it trivial to compose requests and functions in any topology.
 
 ---
 

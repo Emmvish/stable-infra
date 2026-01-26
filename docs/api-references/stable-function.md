@@ -109,7 +109,7 @@ interface STABLE_FUNCTION<TArgs extends any[] = any[], TReturn = any> {
 | `rateLimit` | `RateLimitConfig` | No | `undefined` | Rate limiting configuration (maxRequests, windowMs). |
 | `maxConcurrentRequests` | `number` | No | `undefined` | Maximum number of concurrent executions (semaphore). |
 | `executionTimeout` | `number` | No | `undefined` | Maximum execution time in milliseconds. Throws TimeoutError if exceeded. Covers entire execution including all retry attempts. |
-| `metricsGuardrails` | `MetricsGuardrails` | No | `undefined` | Metrics validation guardrails with min/max thresholds for function metrics. |
+| `metricsGuardrails` | `MetricsGuardrails` | No | `undefined` | Metrics validation guardrails with min/max thresholds for function metrics (see `MetricsGuardrailsInfrastructure`, `MetricsGuardrailsCommon`). |
 
 ---
 
@@ -126,20 +126,7 @@ interface STABLE_FUNCTION_RESULT<TReturn = any> {
   error?: string;
   errorLogs?: FUNCTION_ERROR_LOG[];
   successfulAttempts?: SUCCESSFUL_FUNCTION_ATTEMPT_DATA<TReturn>[];
-  metrics?: {
-    totalAttempts: number;
-    successfulAttempts: number;
-    failedAttempts: number;
-    totalExecutionTime: number;
-    averageAttemptTime: number;
-    validation?: MetricsValidationResult;
-    infrastructureMetrics?: {
-      circuitBreaker?: CircuitBreakerDashboardMetrics;
-      cache?: CacheDashboardMetrics;
-      rateLimiter?: RateLimiterDashboardMetrics;
-      concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
-    };
-  };
+  metrics?: StableFunctionMetrics;
 }
 ```
 
@@ -152,7 +139,7 @@ interface STABLE_FUNCTION_RESULT<TReturn = any> {
 | `error` | `string?` | Error message if execution failed. |
 | `errorLogs` | `FUNCTION_ERROR_LOG[]?` | Array of all error logs from failed attempts. |
 | `successfulAttempts` | `SUCCESSFUL_FUNCTION_ATTEMPT_DATA<TReturn>[]?` | Array of all successful attempt data (if `logAllSuccessfulAttempts: true`). |
-| `metrics` | `Object?` | Execution metrics including attempts, timing, infrastructure stats, and validation results. |
+| `metrics` | `StableFunctionMetrics?` | Execution metrics including attempts, timing, infrastructure stats, and validation results. |
 | `metrics.validation` | `MetricsValidationResult?` | Validation results when `metricsGuardrails` are configured. |
 
 ### Supporting Interfaces

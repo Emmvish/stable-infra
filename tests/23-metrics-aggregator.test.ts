@@ -994,7 +994,8 @@ describe('Metrics Hierarchy - Complete Metrics Flow Across All Levels', () => {
                                 minimumRequests: 5,
                                 recoveryTimeoutMs: 5000,
                                 successThresholdPercentage: 50,
-                                halfOpenMaxRequests: 3
+                                halfOpenMaxRequests: 3,
+                                trackIndividualAttempts: false
                             }
                         }
                     }
@@ -1270,7 +1271,8 @@ describe('Metrics Hierarchy - Complete Metrics Flow Across All Levels', () => {
                                     minimumRequests: 5,
                                     recoveryTimeoutMs: 5000,
                                     successThresholdPercentage: 50,
-                                    halfOpenMaxRequests: 3
+                                    halfOpenMaxRequests: 3,
+                                    trackIndividualAttempts: false
                                 }
                             },
                             rateLimiter: {
@@ -1388,7 +1390,8 @@ describe('Metrics Hierarchy - Complete Metrics Flow Across All Levels', () => {
                             minimumRequests: 5,
                             recoveryTimeoutMs: 5000,
                             successThresholdPercentage: 50,
-                            halfOpenMaxRequests: 3
+                            halfOpenMaxRequests: 3,
+                            trackIndividualAttempts: false
                         }
                     },
                     cache: {

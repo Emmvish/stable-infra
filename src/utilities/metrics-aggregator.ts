@@ -237,7 +237,8 @@ export class MetricsAggregator {
                 minimumRequests: state.config.minimumRequests,
                 recoveryTimeoutMs: state.config.recoveryTimeoutMs,
                 successThresholdPercentage: state.config.successThresholdPercentage,
-                halfOpenMaxRequests: state.config.halfOpenMaxRequests
+                halfOpenMaxRequests: state.config.halfOpenMaxRequests,
+                trackIndividualAttempts: state.config.trackIndividualAttempts
             }
         };
     }

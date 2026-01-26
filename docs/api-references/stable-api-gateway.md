@@ -163,7 +163,7 @@ interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any, Fun
 | `rateLimit` | `RateLimitConfig` | `undefined` | Global rate limiter config. |
 | `circuitBreaker` | `CircuitBreakerConfig` | `undefined` | Global circuit breaker config. |
 | `executionContext` | `Partial<ExecutionContext>` | `undefined` | Context metadata for tracing. |
-| `metricsGuardrails` | `MetricsGuardrails` | `undefined` | Metrics validation guardrails for API Gateway execution. |
+| `metricsGuardrails` | `MetricsGuardrails` | `undefined` | Metrics validation guardrails for API Gateway execution (see `MetricsGuardrailsApiGateway`, `MetricsGuardrailsInfrastructure`, `MetricsGuardrailsCommon`). |
 | `maxTimeout` | `number` | `undefined` | Gateway-level timeout (ms) for the entire batch. |
 
 ### RequestGroup Interface
@@ -362,27 +362,11 @@ The result object returned by `stableApiGateway`.
 
 ```typescript
 interface API_GATEWAY_RESULT<ResponseDataType = any> extends Array<API_GATEWAY_RESPONSE<ResponseDataType>> {
-  metrics?: {
-    totalRequests: number;
-    successfulRequests: number;
-    failedRequests: number;
-    successRate: number;
-    failureRate: number;
-    executionTime: number;
-    timestamp: string;
-    throughput: number;
-    averageRequestDuration: number;
-    validation?: MetricsValidationResult;
-    requestGroups?: RequestGroupMetrics[];
-    infrastructureMetrics?: {
-      circuitBreaker?: CircuitBreakerDashboardMetrics;
-      cache?: CacheDashboardMetrics;
-      rateLimiter?: RateLimiterDashboardMetrics;
-      concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
-    };
-  };
+  metrics?: ApiGatewayMetrics;
 }
 ```
+
+**Note:** `metrics` uses `ApiGatewayMetrics`, and `infrastructureMetrics` uses `ApiGatewayInfrastructureMetrics`.
 
 ### Response Array
 
@@ -431,7 +415,7 @@ const userResponse = result.find(r => r.requestId === 'fetch-user');
 | `throughput` | `number` | Throughput in requests per second (totalRequests / seconds). |
 | `averageRequestDuration` | `number` | Average execution time per request/function in milliseconds. |
 | `requestGroups` | `RequestGroupMetrics[]?` | Per-group metrics breakdown. |
-| `infrastructureMetrics` | `Object?` | Circuit breaker, cache, rate limiter, concurrency stats. |
+| `infrastructureMetrics` | `ApiGatewayInfrastructureMetrics?` | Circuit breaker, cache, rate limiter, concurrency stats. |
 
 **RequestGroupMetrics:**
 ```typescript

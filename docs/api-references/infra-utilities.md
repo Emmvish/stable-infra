@@ -755,7 +755,9 @@ console.log(`Throughput: ${metrics.throughput.toFixed(2)} req/s`);
 | `throughput` | `number` | Requests per second. |
 | `totalBranches` | `number?` | Total branches (if branched). |
 | `completedBranches` | `number?` | Completed branches. |
-| `branchCompletionRate` | `number?` | Branch completion rate. |
+| `failedBranches` | `number?` | Failed branches. |
+| `branchSuccessRate` | `number?` | Branch success rate percentage. |
+| `averageRequestDuration` | `number?` | Average request duration (ms). |
 
 #### extractBranchMetrics<T>(branch: BranchExecutionResult<T>): BranchMetrics
 
@@ -766,6 +768,28 @@ const branchMetrics = MetricsAggregator.extractBranchMetrics(branchResult);
 console.log(`Branch ${branchMetrics.branchId} completion: ${branchMetrics.phaseCompletionRate.toFixed(2)}%`);
 ```
 
+**Returns: BranchMetrics**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `branchId` | `string` | Branch identifier. |
+| `branchIndex` | `number` | Branch index in execution order. |
+| `executionNumber` | `number` | Execution iteration number. |
+| `success` | `boolean` | Branch execution success flag. |
+| `executionTime` | `number` | Total execution time (ms). |
+| `skipped` | `boolean` | Whether the branch was skipped. |
+| `totalPhases` | `number` | Total phases in the branch. |
+| `completedPhases` | `number` | Completed phases count. |
+| `failedPhases` | `number` | Failed phases count. |
+| `phaseCompletionRate` | `number` | Phase completion rate percentage. |
+| `totalRequests` | `number` | Total requests executed in branch. |
+| `successfulRequests` | `number` | Successful requests count. |
+| `failedRequests` | `number` | Failed requests count. |
+| `requestSuccessRate` | `number` | Request success rate percentage. |
+| `hasDecision` | `boolean` | Whether a branch decision was recorded. |
+| `decisionAction` | `string?` | Decision action, if any. |
+| `error` | `string?` | Error message if failed. |
+
 #### extractPhaseMetrics<T>(phase: STABLE_WORKFLOW_PHASE_RESULT<T>): PhaseMetrics
 
 Extract phase-level metrics.
@@ -774,6 +798,30 @@ Extract phase-level metrics.
 const phaseMetrics = MetricsAggregator.extractPhaseMetrics(phaseResult);
 console.log(`Phase ${phaseMetrics.phaseId} success rate: ${phaseMetrics.requestSuccessRate.toFixed(2)}%`);
 ```
+
+**Returns: PhaseMetrics**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `phaseId` | `string` | Phase identifier. |
+| `phaseIndex` | `number` | Phase index in workflow. |
+| `workflowId` | `string` | Workflow identifier. |
+| `branchId` | `string?` | Branch identifier (if branched). |
+| `executionNumber` | `number` | Execution iteration number. |
+| `success` | `boolean` | Phase execution success flag. |
+| `skipped` | `boolean` | Whether the phase was skipped. |
+| `executionTime` | `number` | Total execution time (ms). |
+| `timestamp` | `string` | ISO 8601 timestamp. |
+| `totalRequests` | `number` | Total requests executed in phase. |
+| `successfulRequests` | `number` | Successful requests count. |
+| `failedRequests` | `number` | Failed requests count. |
+| `requestSuccessRate` | `number` | Request success rate percentage. |
+| `requestFailureRate` | `number` | Request failure rate percentage. |
+| `hasDecision` | `boolean` | Whether a phase decision was recorded. |
+| `decisionAction` | `string?` | Decision action, if any. |
+| `targetPhaseId` | `string?` | Target phase id for JUMP decision. |
+| `replayCount` | `number?` | Replay count, if applicable. |
+| `error` | `string?` | Error message if failed. |
 
 #### extractRequestGroupMetrics<T>(responses: API_GATEWAY_RESPONSE<T>[]): RequestGroupMetrics[]
 
@@ -785,6 +833,18 @@ groupMetrics.forEach(group => {
   console.log(`Group ${group.groupId}: ${group.successRate.toFixed(2)}% success`);
 });
 ```
+
+**Returns: RequestGroupMetrics[]**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `groupId` | `string` | Request group identifier. |
+| `totalRequests` | `number` | Total requests in group. |
+| `successfulRequests` | `number` | Successful requests count. |
+| `failedRequests` | `number` | Failed requests count. |
+| `successRate` | `number` | Group success rate percentage. |
+| `failureRate` | `number` | Group failure rate percentage. |
+| `requestIds` | `string[]` | Request IDs in the group. |
 
 #### extractCircuitBreakerMetrics(circuitBreaker: CircuitBreaker): CircuitBreakerDashboardMetrics
 
@@ -800,15 +860,26 @@ console.log(`Health score: ${cbMetrics.healthScore.toFixed(2)}`);
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `state` | `CircuitBreakerState` | Current state. |
-| `totalRequests` | `number` | Total requests. |
-| `failureRate` | `number` | Failure rate percentage. |
-| `stateTransitions` | `number` | Total transitions. |
-| `openCount` | `number` | Times opened. |
+| `state` | `string` | Current circuit state. |
+| `isHealthy` | `boolean` | Health indicator for circuit breaker. |
+| `totalRequests` | `number` | Total requests processed. |
+| `successfulRequests` | `number` | Successful requests count. |
+| `failedRequests` | `number` | Failed requests count. |
+| `failurePercentage` | `number` | Failure percentage. |
+| `stateTransitions` | `number` | Total state transitions. |
+| `lastStateChangeTime` | `number` | Timestamp of last state change. |
+| `timeSinceLastStateChange` | `number` | Time since last state change (ms). |
+| `openCount` | `number` | Times circuit opened. |
+| `totalOpenDuration` | `number` | Total time in OPEN state (ms). |
+| `averageOpenDuration` | `number` | Average OPEN duration (ms). |
+| `isCurrentlyOpen` | `boolean` | Whether circuit is currently OPEN. |
+| `openUntil` | `number \| null` | Timestamp when circuit will try HALF_OPEN. |
+| `timeUntilRecovery` | `number \| null` | Time until recovery attempt (ms). |
+| `recoveryAttempts` | `number` | Total recovery attempts. |
+| `successfulRecoveries` | `number` | Successful recoveries count. |
+| `failedRecoveries` | `number` | Failed recoveries count. |
 | `recoverySuccessRate` | `number` | Recovery success rate. |
-| `healthScore` | `number` | Health score (0-100). |
-| `isHealthy` | `boolean` | Circuit is healthy. |
-| `averageOpenDuration` | `number` | Average open duration (ms). |
+| `config` | `Required<CircuitBreakerConfig>` | Effective circuit breaker configuration. |
 
 #### extractCacheMetrics(cache: CacheManager): CacheDashboardMetrics
 
@@ -824,13 +895,27 @@ console.log(`Performance score: ${cacheMetrics.performanceScore.toFixed(2)}`);
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `size` | `number` | Current cache size. |
-| `hitRate` | `number` | Hit rate percentage. |
+| `isEnabled` | `boolean` | Whether cache is enabled. |
+| `currentSize` | `number` | Current cache size. |
+| `maxSize` | `number` | Maximum cache size. |
+| `validEntries` | `number` | Non-expired entries count. |
+| `expiredEntries` | `number` | Expired entries count. |
 | `utilizationPercentage` | `number` | Utilization percentage. |
-| `averageCacheAge` | `number` | Average age (ms). |
-| `performanceScore` | `number` | Performance score (0-100). |
-| `isEffective` | `boolean` | Cache is effective. |
-| `expirationRate` | `number` | Expiration rate percentage. |
+| `totalRequests` | `number` | Total cache lookups. |
+| `hits` | `number` | Cache hit count. |
+| `misses` | `number` | Cache miss count. |
+| `hitRate` | `number` | Hit rate percentage. |
+| `missRate` | `number` | Miss rate percentage. |
+| `sets` | `number` | Cache writes count. |
+| `evictions` | `number` | Eviction count. |
+| `expirations` | `number` | Expiration count. |
+| `averageGetTime` | `number` | Average get time (ms). |
+| `averageSetTime` | `number` | Average set time (ms). |
+| `averageCacheAge` | `number` | Average cache age (ms). |
+| `oldestEntryAge` | `number \| null` | Age of oldest entry (ms). |
+| `newestEntryAge` | `number \| null` | Age of newest entry (ms). |
+| `networkRequestsSaved` | `number` | Network requests saved via cache. |
+| `cacheEfficiency` | `number` | Cache efficiency score (0-100). |
 
 #### extractRateLimiterMetrics(rateLimiter: RateLimiter): RateLimiterDashboardMetrics
 
@@ -842,6 +927,27 @@ console.log(`Throttle rate: ${rlMetrics.throttleRate.toFixed(2)}%`);
 console.log(`Efficiency score: ${rlMetrics.efficiencyScore.toFixed(2)}`);
 ```
 
+**Returns: RateLimiterDashboardMetrics**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `maxRequests` | `number` | Max requests per window. |
+| `windowMs` | `number` | Window size (ms). |
+| `availableTokens` | `number` | Available tokens in current window. |
+| `queueLength` | `number` | Current queue length. |
+| `requestsInCurrentWindow` | `number` | Requests in current window. |
+| `totalRequests` | `number` | Total requests processed. |
+| `completedRequests` | `number` | Completed requests count. |
+| `throttledRequests` | `number` | Throttled requests count. |
+| `throttleRate` | `number` | Throttle rate percentage. |
+| `currentRequestRate` | `number` | Current requests per second. |
+| `peakRequestRate` | `number` | Peak requests per second. |
+| `averageRequestRate` | `number` | Average requests per second. |
+| `peakQueueLength` | `number` | Peak queue length. |
+| `averageQueueWaitTime` | `number` | Average queue wait time (ms). |
+| `isThrottling` | `boolean` | Whether limiter is throttling. |
+| `utilizationPercentage` | `number` | Utilization percentage. |
+
 #### extractConcurrencyLimiterMetrics(concurrencyLimiter: ConcurrencyLimiter): ConcurrencyLimiterDashboardMetrics
 
 Extract concurrency limiter dashboard metrics.
@@ -851,6 +957,28 @@ const clMetrics = MetricsAggregator.extractConcurrencyLimiterMetrics(limiter);
 console.log(`Utilization: ${clMetrics.utilizationPercentage.toFixed(2)}%`);
 console.log(`Performance score: ${clMetrics.performanceScore.toFixed(2)}`);
 ```
+
+**Returns: ConcurrencyLimiterDashboardMetrics**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `limit` | `number` | Max concurrent operations. |
+| `running` | `number` | Currently running operations. |
+| `queueLength` | `number` | Current queue length. |
+| `utilizationPercentage` | `number` | Utilization percentage. |
+| `totalRequests` | `number` | Total requests processed. |
+| `completedRequests` | `number` | Completed requests count. |
+| `failedRequests` | `number` | Failed requests count. |
+| `queuedRequests` | `number` | Total queued requests. |
+| `successRate` | `number` | Success rate percentage. |
+| `peakConcurrency` | `number` | Peak concurrency. |
+| `averageConcurrency` | `number` | Average concurrency. |
+| `concurrencyUtilization` | `number` | Concurrency utilization metric. |
+| `peakQueueLength` | `number` | Peak queue length. |
+| `averageQueueWaitTime` | `number` | Average queue wait time (ms). |
+| `averageExecutionTime` | `number` | Average execution time (ms). |
+| `isAtCapacity` | `boolean` | Whether at capacity. |
+| `hasQueuedRequests` | `boolean` | Whether there are queued requests. |
 
 #### aggregateSystemMetrics<T>(...): SystemMetrics
 
@@ -867,6 +995,30 @@ const systemMetrics = MetricsAggregator.aggregateSystemMetrics(
 
 console.log('System Metrics:', systemMetrics);
 ```
+
+**Returns: SystemMetrics**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `workflow` | `WorkflowMetrics?` | Workflow-level metrics, if provided. |
+| `branches` | `BranchMetrics[]` | Branch metrics list. |
+| `phases` | `PhaseMetrics[]` | Phase metrics list. |
+| `requestGroups` | `RequestGroupMetrics[]` | Request group metrics list. |
+| `requests` | `RequestMetrics[]` | Request metrics list. |
+| `circuitBreaker` | `CircuitBreakerDashboardMetrics?` | Circuit breaker dashboard metrics. |
+| `cache` | `CacheDashboardMetrics?` | Cache dashboard metrics. |
+| `rateLimiter` | `RateLimiterDashboardMetrics?` | Rate limiter dashboard metrics. |
+| `concurrencyLimiter` | `ConcurrencyLimiterDashboardMetrics?` | Concurrency limiter dashboard metrics. |
+
+**RequestMetrics**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `requestId` | `string` | Request identifier. |
+| `groupId` | `string?` | Group identifier, if any. |
+| `success` | `boolean` | Request success flag. |
+| `hasError` | `boolean` | Whether the request has an error. |
+| `errorMessage` | `string?` | Error message, if any. |
 
 ---
 

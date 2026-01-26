@@ -744,7 +744,7 @@ Internally, `detectUnreachableNodes()` powers reachability checks, `detectOrphan
 - `prePhaseExecutionHook`
 - `sharedBuffer`, `statePersistence`
 - `maxWorkflowIterations` (for cycle protection)
-- `metricsGuardrails` (workflow-level and phase-level validation)
+- `metricsGuardrails` (workflow-level and phase-level validation via `MetricsGuardrailsWorkflow`, `MetricsGuardrailsPhase`, `MetricsGuardrailsInfrastructure`)
 - All `common*` configuration fields
 
 ---

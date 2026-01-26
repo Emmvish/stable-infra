@@ -102,7 +102,7 @@ interface STABLE_WORKFLOW_PHASE<
 | `phaseDecisionHook` | `Function?` | `undefined` | Hook to make dynamic control flow decisions after phase execution. |
 | `commonConfig` | `Object?` | `{}` | Common configuration for all items in this phase (extends API_GATEWAY_OPTIONS). |
 | `statePersistence` | `StatePersistenceConfig?` | `undefined` | Phase-specific state persistence. |
-| `metricsGuardrails` | `MetricsGuardrails?` | `undefined` | Phase-specific metrics validation guardrails. |
+| `metricsGuardrails` | `MetricsGuardrails?` | `undefined` | Phase-specific metrics validation guardrails (see `MetricsGuardrailsPhase`, `MetricsGuardrailsInfrastructure`). |
 | `maxTimeout` | `number?` | `undefined` | Phase-level timeout (ms). |
 
 **Note:** Only one of `requests`, `functions`, or `items` should be provided. If multiple are present, `items` takes precedence.
@@ -168,7 +168,7 @@ interface STABLE_WORKFLOW_OPTIONS<
 | `preBranchExecutionHook` | `Function?` | `undefined` | Hook called before each branch executes (can modify branch config). |
 | `maxSerializableChars` | `number?` | `1000` | Maximum characters for serializing objects in logs. |
 | `workflowHookParams` | `WorkflowHookParams?` | `{}` | Parameters passed to workflow hooks. |
-| `metricsGuardrails` | `MetricsGuardrails?` | `undefined` | Metrics validation guardrails for workflow execution. |
+| `metricsGuardrails` | `MetricsGuardrails?` | `undefined` | Metrics validation guardrails for workflow execution (see `MetricsGuardrailsWorkflow`, `MetricsGuardrailsInfrastructure`, `MetricsGuardrailsCommon`). |
 
 **Inherited from API_GATEWAY_OPTIONS:**
 - All `common*` configuration fields (commonAttempts, commonWait, commonRetryStrategy, etc.)
@@ -945,12 +945,7 @@ interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any> {
   decision?: PhaseExecutionDecision;
   error?: string;
   metrics?: PhaseMetrics;
-  infrastructureMetrics?: {
-    circuitBreaker?: CircuitBreakerDashboardMetrics;
-    cache?: CacheDashboardMetrics;
-    rateLimiter?: RateLimiterDashboardMetrics;
-    concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
-  };
+  infrastructureMetrics?: WorkflowInfrastructureMetrics;
 }
 ```
 
@@ -979,12 +974,7 @@ interface STABLE_WORKFLOW_RESULT<ResponseDataType = any> {
   validation?: MetricsValidationResult;
   metrics?: WorkflowMetrics;
   requestGroupMetrics?: RequestGroupMetrics[];
-  infrastructureMetrics?: {
-    circuitBreaker?: CircuitBreakerDashboardMetrics;
-    cache?: CacheDashboardMetrics;
-    rateLimiter?: RateLimiterDashboardMetrics;
-    concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
-  };
+  infrastructureMetrics?: WorkflowInfrastructureMetrics;
 }
 ```
 

@@ -104,7 +104,7 @@ interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
 | `executionContext` | `ExecutionContext` | No | `undefined` | Context metadata (workflowId, phaseId, requestId) for tracing. |
 | `circuitBreaker` | `CircuitBreakerConfig \| CircuitBreaker` | No | `undefined` | Circuit breaker configuration or instance. |
 | `statePersistence` | `StatePersistenceConfig` | No | `undefined` | State persistence configuration for external storage. |
-| `metricsGuardrails` | `MetricsGuardrails` | No | `undefined` | Metrics validation guardrails with min/max thresholds for request metrics. |
+| `metricsGuardrails` | `MetricsGuardrails` | No | `undefined` | Metrics validation guardrails with min/max thresholds for request metrics (see `MetricsGuardrailsRequest`, `MetricsGuardrailsInfrastructure`, `MetricsGuardrailsCommon`). |
 
 ### REQUEST_DATA Interface
 
@@ -140,18 +140,7 @@ interface STABLE_REQUEST_RESULT<ResponseDataType = any> {
   error?: string;
   errorLogs?: ERROR_LOG[];
   successfulAttempts?: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>[];
-  metrics?: {
-    totalAttempts: number;
-    successfulAttempts: number;
-    failedAttempts: number;
-    totalExecutionTime: number;
-    averageAttemptTime: number;
-    validation?: MetricsValidationResult;
-    infrastructureMetrics?: {
-      circuitBreaker?: CircuitBreakerDashboardMetrics;
-      cache?: CacheDashboardMetrics;
-    };
-  };
+  metrics?: StableRequestMetrics;
 }
 ```
 
@@ -164,7 +153,7 @@ interface STABLE_REQUEST_RESULT<ResponseDataType = any> {
 | `error` | `string?` | Error message if request failed. |
 | `errorLogs` | `ERROR_LOG[]?` | Array of all error logs from failed attempts. |
 | `successfulAttempts` | `SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>[]?` | Array of all successful attempt data (if `logAllSuccessfulAttempts: true`). |
-| `metrics` | `Object?` | Execution metrics including attempts, timing, infrastructure stats, and validation results. |
+| `metrics` | `StableRequestMetrics?` | Execution metrics including attempts, timing, infrastructure stats, and validation results. |
 | `metrics.validation` | `MetricsValidationResult?` | Validation results when `metricsGuardrails` are configured. |
 
 ### Supporting Interfaces

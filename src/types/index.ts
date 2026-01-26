@@ -22,88 +22,110 @@ export interface MetricGuardrail {
   tolerance?: number;
 }
 
+export interface MetricsGuardrailsRequest {
+  totalAttempts?: MetricGuardrail;
+  successfulAttempts?: MetricGuardrail;
+  failedAttempts?: MetricGuardrail;
+  totalExecutionTime?: MetricGuardrail;
+  averageAttemptTime?: MetricGuardrail;
+}
+
+export interface MetricsGuardrailsApiGateway {
+  totalRequests?: MetricGuardrail;
+  successfulRequests?: MetricGuardrail;
+  failedRequests?: MetricGuardrail;
+  successRate?: MetricGuardrail;
+  failureRate?: MetricGuardrail;
+  executionTime?: MetricGuardrail;
+  throughput?: MetricGuardrail;
+  averageRequestDuration?: MetricGuardrail;
+}
+
+export interface MetricsGuardrailsWorkflow {
+  totalPhases?: MetricGuardrail;
+  completedPhases?: MetricGuardrail;
+  failedPhases?: MetricGuardrail;
+  totalRequests?: MetricGuardrail;
+  successfulRequests?: MetricGuardrail;
+  failedRequests?: MetricGuardrail;
+  requestSuccessRate?: MetricGuardrail;
+  requestFailureRate?: MetricGuardrail;
+  executionTime?: MetricGuardrail;
+  averagePhaseExecutionTime?: MetricGuardrail;
+  throughput?: MetricGuardrail;
+  phaseCompletionRate?: MetricGuardrail;
+}
+
+export interface MetricsGuardrailsPhase {
+  totalRequests?: MetricGuardrail;
+  successfulRequests?: MetricGuardrail;
+  failedRequests?: MetricGuardrail;
+  requestSuccessRate?: MetricGuardrail;
+  requestFailureRate?: MetricGuardrail;
+  executionTime?: MetricGuardrail;
+}
+
+export interface MetricsGuardrailsBranch {
+  totalPhases?: MetricGuardrail;
+  completedPhases?: MetricGuardrail;
+  failedPhases?: MetricGuardrail;
+  totalRequests?: MetricGuardrail;
+  successfulRequests?: MetricGuardrail;
+  failedRequests?: MetricGuardrail;
+  requestSuccessRate?: MetricGuardrail;
+  requestFailureRate?: MetricGuardrail;
+  executionTime?: MetricGuardrail;
+  phaseCompletionRate?: MetricGuardrail;
+}
+
+export interface MetricsGuardrailsCircuitBreaker {
+  failureRate?: MetricGuardrail;
+  totalRequests?: MetricGuardrail;
+  failedRequests?: MetricGuardrail;
+}
+
+export interface MetricsGuardrailsCache {
+  hitRate?: MetricGuardrail;
+  missRate?: MetricGuardrail;
+  utilizationPercentage?: MetricGuardrail;
+  evictionRate?: MetricGuardrail;
+}
+
+export interface MetricsGuardrailsRateLimiter {
+  throttleRate?: MetricGuardrail;
+  queueLength?: MetricGuardrail;
+  utilizationPercentage?: MetricGuardrail;
+  averageQueueWaitTime?: MetricGuardrail;
+}
+
+export interface MetricsGuardrailsConcurrencyLimiter {
+  utilizationPercentage?: MetricGuardrail;
+  queueLength?: MetricGuardrail;
+  averageQueueWaitTime?: MetricGuardrail;
+}
+
+export interface MetricsGuardrailsInfrastructure {
+  circuitBreaker?: MetricsGuardrailsCircuitBreaker;
+  cache?: MetricsGuardrailsCache;
+  rateLimiter?: MetricsGuardrailsRateLimiter;
+  concurrencyLimiter?: MetricsGuardrailsConcurrencyLimiter;
+}
+
+export interface MetricsGuardrailsCommon {
+  successRate?: MetricGuardrail;
+  failureRate?: MetricGuardrail;
+  executionTime?: MetricGuardrail;
+  throughput?: MetricGuardrail;
+}
+
 export interface MetricsGuardrails {
-  request?: {
-    totalAttempts?: MetricGuardrail;
-    successfulAttempts?: MetricGuardrail;
-    failedAttempts?: MetricGuardrail;
-    totalExecutionTime?: MetricGuardrail;
-    averageAttemptTime?: MetricGuardrail;
-  };
-  apiGateway?: {
-    totalRequests?: MetricGuardrail;
-    successfulRequests?: MetricGuardrail;
-    failedRequests?: MetricGuardrail;
-    successRate?: MetricGuardrail;
-    failureRate?: MetricGuardrail;
-    executionTime?: MetricGuardrail;
-    throughput?: MetricGuardrail;
-    averageRequestDuration?: MetricGuardrail;
-  };
-  workflow?: {
-    totalPhases?: MetricGuardrail;
-    completedPhases?: MetricGuardrail;
-    failedPhases?: MetricGuardrail;
-    totalRequests?: MetricGuardrail;
-    successfulRequests?: MetricGuardrail;
-    failedRequests?: MetricGuardrail;
-    requestSuccessRate?: MetricGuardrail;
-    requestFailureRate?: MetricGuardrail;
-    executionTime?: MetricGuardrail;
-    averagePhaseExecutionTime?: MetricGuardrail;
-    throughput?: MetricGuardrail;
-    phaseCompletionRate?: MetricGuardrail;
-  };
-  phase?: {
-    totalRequests?: MetricGuardrail;
-    successfulRequests?: MetricGuardrail;
-    failedRequests?: MetricGuardrail;
-    requestSuccessRate?: MetricGuardrail;
-    requestFailureRate?: MetricGuardrail;
-    executionTime?: MetricGuardrail;
-  };
-  branch?: {
-    totalPhases?: MetricGuardrail;
-    completedPhases?: MetricGuardrail;
-    failedPhases?: MetricGuardrail;
-    totalRequests?: MetricGuardrail;
-    successfulRequests?: MetricGuardrail;
-    failedRequests?: MetricGuardrail;
-    requestSuccessRate?: MetricGuardrail;
-    requestFailureRate?: MetricGuardrail;
-    executionTime?: MetricGuardrail;
-    phaseCompletionRate?: MetricGuardrail;
-  };
-  infrastructure?: {
-    circuitBreaker?: {
-      failureRate?: MetricGuardrail;
-      totalRequests?: MetricGuardrail;
-      failedRequests?: MetricGuardrail;
-    };
-    cache?: {
-      hitRate?: MetricGuardrail;
-      missRate?: MetricGuardrail;
-      utilizationPercentage?: MetricGuardrail;
-      evictionRate?: MetricGuardrail;
-    };
-    rateLimiter?: {
-      throttleRate?: MetricGuardrail;
-      queueLength?: MetricGuardrail;
-      utilizationPercentage?: MetricGuardrail;
-      averageQueueWaitTime?: MetricGuardrail;
-    };
-    concurrencyLimiter?: {
-      utilizationPercentage?: MetricGuardrail;
-      queueLength?: MetricGuardrail;
-      averageQueueWaitTime?: MetricGuardrail;
-    };
-  };
-  common?: {
-    successRate?: MetricGuardrail;
-    failureRate?: MetricGuardrail;
-    executionTime?: MetricGuardrail;
-    throughput?: MetricGuardrail;
-  };
+  request?: MetricsGuardrailsRequest;
+  apiGateway?: MetricsGuardrailsApiGateway;
+  workflow?: MetricsGuardrailsWorkflow;
+  phase?: MetricsGuardrailsPhase;
+  branch?: MetricsGuardrailsBranch;
+  infrastructure?: MetricsGuardrailsInfrastructure;
+  common?: MetricsGuardrailsCommon;
 }
 
 export interface MetricAnomaly {
@@ -228,26 +250,30 @@ export interface API_GATEWAY_RESPONSE<ResponseDataType = any, FunctionReturnType
   type?: RequestOrFunctionType;
 }
 
+export interface ApiGatewayInfrastructureMetrics {
+  circuitBreaker?: CircuitBreakerDashboardMetrics;
+  cache?: CacheDashboardMetrics;
+  rateLimiter?: RateLimiterDashboardMetrics;
+  concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
+}
+
+export interface ApiGatewayMetrics {
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  successRate: number;
+  failureRate: number;
+  executionTime: number;
+  timestamp: string;
+  throughput: number;
+  averageRequestDuration: number;
+  requestGroups?: RequestGroupMetrics[];
+  infrastructureMetrics?: ApiGatewayInfrastructureMetrics;
+  validation?: MetricsValidationResult;
+}
+
 export interface API_GATEWAY_RESULT<ResponseDataType = any, FunctionReturnType = any> extends Array<API_GATEWAY_RESPONSE<ResponseDataType, FunctionReturnType>> {
-  metrics?: {
-    totalRequests: number;
-    successfulRequests: number;
-    failedRequests: number;
-    successRate: number;
-    failureRate: number;
-    executionTime: number;
-    timestamp: string;
-    throughput: number;
-    averageRequestDuration: number;
-    requestGroups?: RequestGroupMetrics[];
-    infrastructureMetrics?: {
-      circuitBreaker?: CircuitBreakerDashboardMetrics;
-      cache?: CacheDashboardMetrics;
-      rateLimiter?: RateLimiterDashboardMetrics;
-      concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
-    };
-    validation?: MetricsValidationResult;
-  };
+  metrics?: ApiGatewayMetrics;
 }
 
 export type ApiRequestOptionsMapping = {
@@ -525,24 +551,45 @@ export interface STABLE_FUNCTION<FunctionArgsType extends any[] = any[], Functio
   executionTimeout?: number;
 }
 
+export interface StableRequestInfrastructureMetrics {
+  circuitBreaker?: CircuitBreakerDashboardMetrics;
+  cache?: CacheDashboardMetrics;
+}
+
+export interface StableRequestMetrics {
+  totalAttempts: number;
+  successfulAttempts: number;
+  failedAttempts: number;
+  totalExecutionTime: number;
+  averageAttemptTime: number;
+  infrastructureMetrics?: StableRequestInfrastructureMetrics;
+  validation?: MetricsValidationResult;
+}
+
+export interface StableFunctionInfrastructureMetrics {
+  circuitBreaker?: CircuitBreakerDashboardMetrics;
+  cache?: CacheDashboardMetrics;
+  rateLimiter?: RateLimiterDashboardMetrics;
+  concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
+}
+
+export interface StableFunctionMetrics {
+  totalAttempts: number;
+  successfulAttempts: number;
+  failedAttempts: number;
+  totalExecutionTime: number;
+  averageAttemptTime: number;
+  infrastructureMetrics?: StableFunctionInfrastructureMetrics;
+  validation?: MetricsValidationResult;
+}
+
 export interface STABLE_REQUEST_RESULT<ResponseDataType = any> {
   success: boolean;
   data?: ResponseDataType | boolean;
   error?: string;
   errorLogs?: ERROR_LOG[];
   successfulAttempts?: SUCCESSFUL_ATTEMPT_DATA<ResponseDataType>[];
-  metrics?: {
-    totalAttempts: number;
-    successfulAttempts: number;
-    failedAttempts: number;
-    totalExecutionTime: number;
-    averageAttemptTime: number;
-    infrastructureMetrics?: {
-      circuitBreaker?: CircuitBreakerDashboardMetrics;
-      cache?: CacheDashboardMetrics;
-    };
-    validation?: MetricsValidationResult;
-  };
+  metrics?: StableRequestMetrics;
 }
 
 export interface STABLE_FUNCTION_RESULT<FunctionReturnType = any, ReturnResult extends boolean = boolean> {
@@ -551,20 +598,7 @@ export interface STABLE_FUNCTION_RESULT<FunctionReturnType = any, ReturnResult e
   error?: string;
   errorLogs?: FUNCTION_ERROR_LOG[];
   successfulAttempts?: SUCCESSFUL_FUNCTION_ATTEMPT_DATA<FunctionReturnType>[];
-  metrics?: {
-    totalAttempts: number;
-    successfulAttempts: number;
-    failedAttempts: number;
-    totalExecutionTime: number;
-    averageAttemptTime: number;
-    infrastructureMetrics?: {
-      circuitBreaker?: CircuitBreakerDashboardMetrics;
-      cache?: CacheDashboardMetrics;
-      rateLimiter?: RateLimiterDashboardMetrics;
-      concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
-    };
-    validation?: MetricsValidationResult;
-  };
+  metrics?: StableFunctionMetrics;
 }
 
 export interface SUCCESSFUL_ATTEMPT_DATA<ResponseDataType = any> {
@@ -667,6 +701,13 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   workflowHookParams?: WorkflowHookParams;
 }
 
+export interface WorkflowInfrastructureMetrics {
+  circuitBreaker?: CircuitBreakerDashboardMetrics;
+  cache?: CacheDashboardMetrics;
+  rateLimiter?: RateLimiterDashboardMetrics;
+  concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
+}
+
 export interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any, FunctionReturnType = any, RequestDataType = any, FunctionArgsType extends any[] = any[]> {
   workflowId: string;
   branchId?: string;
@@ -685,12 +726,7 @@ export interface STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType = any, FunctionRe
   error?: string;
   metrics?: PhaseMetrics;
   validation?: MetricsValidationResult;
-  infrastructureMetrics?: {
-    circuitBreaker?: CircuitBreakerDashboardMetrics;
-    cache?: CacheDashboardMetrics;
-    rateLimiter?: RateLimiterDashboardMetrics;
-    concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
-  };
+  infrastructureMetrics?: WorkflowInfrastructureMetrics;
 }
 
 export interface STABLE_WORKFLOW_RESULT<ResponseDataType = any, FunctionReturnType = any, RequestDataType = any, FunctionArgsType extends any[] = any[]> {
@@ -713,12 +749,7 @@ export interface STABLE_WORKFLOW_RESULT<ResponseDataType = any, FunctionReturnTy
   metrics?: WorkflowMetrics;
   validation?: MetricsValidationResult;
   requestGroupMetrics?: RequestGroupMetrics[];
-  infrastructureMetrics?: {
-    circuitBreaker?: CircuitBreakerDashboardMetrics;
-    cache?: CacheDashboardMetrics;
-    rateLimiter?: RateLimiterDashboardMetrics;
-    concurrencyLimiter?: ConcurrencyLimiterDashboardMetrics;
-  };
+  infrastructureMetrics?: WorkflowInfrastructureMetrics;
 }
 
 export interface WorkflowHookParams {
@@ -1083,13 +1114,7 @@ export interface CircuitBreakerDashboardMetrics {
   successfulRecoveries: number;
   failedRecoveries: number;
   recoverySuccessRate: number;
-  config: {
-    failureThresholdPercentage: number;
-    minimumRequests: number;
-    recoveryTimeoutMs: number;
-    successThresholdPercentage: number;
-    halfOpenMaxRequests: number;
-  };
+  config: Required<CircuitBreakerConfig>;
 }
 
 export interface CacheDashboardMetrics {

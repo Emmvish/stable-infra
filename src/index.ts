@@ -113,9 +113,27 @@ export type {
     WorkflowGraphExecutionPlan,
     EdgeConditionType,
     MetricGuardrail,
+    MetricsGuardrailsRequest,
+    MetricsGuardrailsApiGateway,
+    MetricsGuardrailsWorkflow,
+    MetricsGuardrailsPhase,
+    MetricsGuardrailsBranch,
+    MetricsGuardrailsInfrastructure,
+    MetricsGuardrailsCircuitBreaker,
+    MetricsGuardrailsCache,
+    MetricsGuardrailsRateLimiter,
+    MetricsGuardrailsConcurrencyLimiter,
+    MetricsGuardrailsCommon,
     MetricsGuardrails,
     MetricAnomaly,
-    MetricsValidationResult
+    MetricsValidationResult,
+    ApiGatewayInfrastructureMetrics,
+    ApiGatewayMetrics,
+    StableRequestInfrastructureMetrics,
+    StableRequestMetrics,
+    StableFunctionInfrastructureMetrics,
+    StableFunctionMetrics,
+    WorkflowInfrastructureMetrics
 } from './types/index.js';
 
 export {
