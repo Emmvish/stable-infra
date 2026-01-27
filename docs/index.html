@@ -175,25 +175,48 @@
       </div>
 
       <div class="install-box">
-        <div class="code-box">
-          <div class="code-box-header">
-            <div class="code-box-dots">
-              <span></span><span></span><span></span>
+        <div class="install-commands">
+          <div class="code-box">
+            <div class="code-box-header">
+              <div class="code-box-dots">
+                <span></span><span></span><span></span>
+              </div>
+              <span class="code-box-lang">npm</span>
+              <button class="copy-btn" onclick="copyCode(this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copy
+              </button>
             </div>
-            <span class="code-box-lang">Terminal</span>
-            <button class="copy-btn" onclick="copyCode(this)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-              Copy
-            </button>
+            <pre class="install-pre"><code>npm i @emmvish/stable-request</code></pre>
           </div>
-          <pre class="install-pre"><code><span class="comment"># Install via npm</span>
-npm install @emmvish/stable-request
 
-<span class="comment"># Or using yarn</span>
-yarn add @emmvish/stable-request
+          <div class="code-box">
+            <div class="code-box-header">
+              <div class="code-box-dots">
+                <span></span><span></span><span></span>
+              </div>
+              <span class="code-box-lang">yarn</span>
+              <button class="copy-btn" onclick="copyCode(this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <pre class="install-pre"><code>yarn add @emmvish/stable-request</code></pre>
+          </div>
 
-<span class="comment"># Or using pnpm</span>
-pnpm add @emmvish/stable-request</code></pre>
+          <div class="code-box">
+            <div class="code-box-header">
+              <div class="code-box-dots">
+                <span></span><span></span><span></span>
+              </div>
+              <span class="code-box-lang">pnpm</span>
+              <button class="copy-btn" onclick="copyCode(this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <pre class="install-pre"><code>pnpm add @emmvish/stable-request</code></pre>
+          </div>
         </div>
 
         <div class="quick-links">
