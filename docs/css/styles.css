@@ -999,13 +999,15 @@ p {
   }
   
   .tabs-header {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
   }
   
   .tab-btn {
-    min-width: 100px;
-    padding: 0.75rem 1rem;
-    font-size: 0.8rem;
+    min-width: auto;
+    flex: 1 1 calc(33.33% - 2px);
+    padding: 0.75rem 0.5rem;
+    font-size: 0.75rem;
+    text-align: center;
   }
   
   .code-box pre {
@@ -1030,6 +1032,12 @@ p {
   
   .footer-grid {
     grid-template-columns: 1fr 1fr;
+  }
+  
+  .tab-btn {
+    flex: 1 1 calc(50% - 2px);
+    padding: 0.6rem 0.4rem;
+    font-size: 0.7rem;
   }
 }
 
