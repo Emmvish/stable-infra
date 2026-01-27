@@ -292,9 +292,8 @@
 
 (<span class="keyword">async</span> () => {
 
-<span class="comment">// Mock authentication token and logger</span>
+<span class="comment">// Mock authentication token</span>
 <span class="keyword">const</span> token = <span class="string">'your-auth-token-here'</span>;
-<span class="keyword">const</span> customLogger = { <span class="property">error</span>: console.error, <span class="property">info</span>: console.log };
 
 <span class="comment">// Define strongly-typed interfaces for request/response</span>
 <span class="keyword">interface</span> <span class="type">UserProfileRequest</span> {
@@ -312,9 +311,10 @@
 
 <span class="comment">// Create a shared circuit breaker for user service</span>
 <span class="keyword">const</span> userServiceBreaker = <span class="keyword">new</span> <span class="function">CircuitBreaker</span>({
-  <span class="property">failureThreshold</span>: <span class="number">5</span>,
-  <span class="property">resetTimeout</span>: <span class="number">30000</span>,
-  <span class="property">halfOpenRequests</span>: <span class="number">2</span>
+  <span class="property">failureThresholdPercentage</span>: <span class="number">30</span>,
+  <span class="property">minimumRequests</span>: <span class="number">5</span>,
+  <span class="property">recoveryTimeoutMs</span>: <span class="number">30000</span>,
+  <span class="property">halfOpenMaxRequests</span>: <span class="number">2</span>
 });
 
 <span class="comment">// Execute request with full resilience stack</span>
@@ -347,24 +347,20 @@
   <span class="property">cache</span>: {
     <span class="property">enabled</span>: <span class="keyword">true</span>,
     <span class="property">ttl</span>: <span class="number">60000</span>, <span class="comment">// 1 minute cache</span>
-    <span class="property">keyGenerator</span>: <span class="keyword">(req) =></span> <span class="string">`user:${req.body?.userId}`</span>
+    <span class="property">keyGenerator</span>: <span class="keyword">(config) =></span> <span class="string">`user:${config.data?.userId}`</span>
   },
-  
-  <span class="comment">// Rate limiting to respect API quotas</span>
-  <span class="property">rateLimit</span>: { <span class="property">maxRequests</span>: <span class="number">100</span>, <span class="property">windowMs</span>: <span class="number">60000</span> },
-  <span class="property">maxConcurrentRequests</span>: <span class="number">10</span>,
   
   <span class="comment">// Response validation - retry if schema doesn't match</span>
   <span class="property">responseAnalyzer</span>: <span class="keyword">({ data, commonBuffer }) =></span> {
-    <span class="keyword">const</span> isValid = data?.id && data?.email && data?.subscription;
-    <span class="keyword">if</span> (isValid) commonBuffer.lastValidUser = data.id;
+    <span class="keyword">const</span> isValid = !!(data?.id && data?.email && data?.subscription);
+    <span class="keyword">if</span> (isValid && commonBuffer) commonBuffer.lastValidUser = data.id;
     <span class="keyword">return</span> isValid;
   },
   
   <span class="comment">// Observability hooks for monitoring</span>
   <span class="property">logAllErrors</span>: <span class="keyword">true</span>,
-  <span class="property">handleErrors</span>: <span class="keyword">({ errorLog, hookParams }) =></span> {
-    hookParams.logger.error(<span class="string">'User fetch failed'</span>, errorLog);
+  <span class="property">handleErrors</span>: <span class="keyword">({ errorLog }) =></span> {
+    console.error(<span class="string">'User fetch failed'</span>, errorLog);
   },
   <span class="property">handleSuccessfulAttemptData</span>: <span class="keyword">({ successfulAttemptData }) =></span> {
     console.log(<span class="string">`Fetched user in ${successfulAttemptData.executionTime}ms`</span>);
@@ -372,21 +368,20 @@
   
   <span class="comment">// Shared state across attempts</span>
   <span class="property">commonBuffer</span>: { <span class="property">requestStart</span>: Date.now() },
-  <span class="property">hookParams</span>: { <span class="property">logger</span>: customLogger },
   
   <span class="comment">// Metrics guardrails for anomaly detection</span>
   <span class="property">metricsGuardrails</span>: {
-    <span class="property">request</span>: { <span class="property">maxExecutionTime</span>: <span class="number">10000</span> },
-    <span class="property">infrastructure</span>: { <span class="property">maxCircuitBreakerTrips</span>: <span class="number">2</span> }
+    <span class="property">request</span>: { <span class="property">totalExecutionTime</span>: { <span class="property">max</span>: <span class="number">10000</span> } },
+    <span class="property">infrastructure</span>: { <span class="property">circuitBreaker</span>: { <span class="property">failureRate</span>: { <span class="property">max</span>: <span class="number">0.5</span> } } }
   }
 });
 
 <span class="comment">// Type-safe result handling</span>
 <span class="keyword">if</span> (result.success) {
-  <span class="keyword">const</span> user: <span class="type">UserProfile</span> = result.data!;
+  <span class="keyword">const</span> user = result.data <span class="keyword">as</span> <span class="type">UserProfile</span>;
   console.log(<span class="string">`Welcome, ${user.name} (${user.subscription})`</span>);
   console.log(<span class="string">`Metrics: ${result.metrics?.totalAttempts} attempts`</span>);
-  console.log(<span class="string">`Cache: ${result.metrics?.infrastructure?.cache?.hits} hits`</span>);
+  console.log(<span class="string">`Cache: ${result.metrics?.infrastructureMetrics?.cache?.hits} hits`</span>);
 } <span class="keyword">else</span> {
   console.error(<span class="string">`Failed: ${result.error}`</span>);
   console.log(<span class="string">`Error logs: ${result.errorLogs?.length}`</span>);
@@ -430,7 +425,7 @@
 <span class="keyword">const</span> batchId = <span class="string">'batch-001'</span>;
 <span class="keyword">const</span> hashBuffer = (buf: <span class="type">Buffer</span>) => buf.toString(<span class="string">'base64'</span>).slice(<span class="number">0</span>, <span class="number">16</span>);
 <span class="keyword">const</span> metrics = { <span class="property">increment</span>: (key: <span class="type">string</span>) => {}, <span class="property">histogram</span>: (key: <span class="type">string</span>, val: <span class="type">number</span>) => {} };
-<span class="keyword">const</span> logger = { <span class="property">warn</span>: console.warn, <span class="property">info</span>: console.log };
+<span class="keyword">const</span> logger = { <span class="property">warn</span>: console.warn, <span class="property">info</span>: console.info };
 <span class="keyword">const</span> featureFlags = { <span class="property">get</span>: <span class="keyword">async</span> (key: <span class="type">string</span>) => ({ <span class="property">inferenceTimeout</span>: <span class="number">30000</span> }) };
 
 <span class="comment">// Define typed arguments and return type</span>
@@ -467,9 +462,10 @@
 
 <span class="comment">// Shared circuit breaker for ML service</span>
 <span class="keyword">const</span> mlBreaker = <span class="keyword">new</span> <span class="function">CircuitBreaker</span>({
-  <span class="property">failureThreshold</span>: <span class="number">3</span>,
-  <span class="property">resetTimeout</span>: <span class="number">60000</span>,
-  <span class="property">halfOpenRequests</span>: <span class="number">1</span>
+  <span class="property">failureThresholdPercentage</span>: <span class="number">50</span>,
+  <span class="property">minimumRequests</span>: <span class="number">3</span>,
+  <span class="property">recoveryTimeoutMs</span>: <span class="number">60000</span>,
+  <span class="property">halfOpenMaxRequests</span>: <span class="number">1</span>
 });
 
 <span class="comment">// Execute with full resilience stack</span>
@@ -503,19 +499,19 @@
   <span class="property">cache</span>: {
     <span class="property">enabled</span>: <span class="keyword">true</span>,
     <span class="property">ttl</span>: <span class="number">300000</span>, <span class="comment">// 5 minute cache</span>
-    <span class="property">keyGenerator</span>: <span class="keyword">(args) =></span> {
+    <span class="property">keyGenerator</span>: <span class="keyword">(fn, args) =></span> {
       <span class="keyword">const</span> [buffer, config] = args;
       <span class="keyword">return</span> <span class="string">`inference:${config.modelId}:${hashBuffer(buffer)}`</span>;
     }
   },
   
   <span class="comment">// Validate confidence scores - retry if too low</span>
-  <span class="property">responseAnalyzer</span>: <span class="keyword">({ data, stableFunctionOptions, commonBuffer }) =></span> {
-    <span class="keyword">const</span> [, config] = stableFunctionOptions.args;
+  <span class="property">responseAnalyzer</span>: <span class="keyword">({ data, args, commonBuffer }) =></span> {
+    <span class="keyword">const</span> [, config] = args;
     <span class="keyword">const</span> highConfidence = data.labels.some(
       <span class="keyword">l =></span> l.confidence >= config.threshold
     );
-    <span class="keyword">if</span> (highConfidence) {
+    <span class="keyword">if</span> (highConfidence && commonBuffer) {
       commonBuffer.topLabel = data.labels[<span class="number">0</span>].name;
     }
     <span class="keyword">return</span> highConfidence;
@@ -555,7 +551,7 @@
   
   <span class="comment">// Metrics guardrails</span>
   <span class="property">metricsGuardrails</span>: {
-    <span class="property">common</span>: { <span class="property">maxTotalExecutionTime</span>: <span class="number">60000</span> }
+    <span class="property">common</span>: { <span class="property">executionTime</span>: { <span class="property">max</span>: <span class="number">60000</span> } }
   }
 });
 
@@ -564,7 +560,7 @@
   <span class="keyword">const</span> prediction: <span class="type">PredictionResult</span> = result.data!;
   console.log(<span class="string">`Top label: ${prediction.labels[0].name}`</span>);
   console.log(<span class="string">`Confidence: ${(prediction.labels[0].confidence * 100).toFixed(1)}%`</span>);
-  console.log(<span class="string">`Cache status: ${result.metrics?.infrastructure?.cache}`</span>);
+  console.log(<span class="string">`Cache status: ${result.metrics?.infrastructureMetrics?.cache}`</span>);
 } <span class="keyword">else</span> {
   console.error(<span class="string">`Inference failed: ${result.error}`</span>);
 }
@@ -598,9 +594,10 @@
   stableApiGateway, 
   REQUEST_METHODS,
   RETRY_STRATEGIES,
-  RequestOrFunction
-} <span class="keyword">from</span> <span class="string">'@emmvish/stable-request'</span>;
-<span class="keyword">import type</span> { <span class="type">API_GATEWAY_ITEM</span> } <span class="keyword">from</span> <span class="string">'@emmvish/stable-request'</span>;
+  RequestOrFunction,
+  CircuitBreaker,
+  <span class="keyword">type</span> <span class="type">API_GATEWAY_ITEM</span>
+} from '@emmvish/stable-request';
 
 (<span class="keyword">async</span> () => {
 
@@ -609,17 +606,31 @@
   <span class="string">'CA'</span>: <span class="number">0.0725</span>, <span class="string">'NY'</span>: <span class="number">0.08</span>, <span class="string">'TX'</span>: <span class="number">0.0625</span>, <span class="string">'WA'</span>: <span class="number">0.065</span>
 };
 
-<span class="comment">// Define types for different operations</span>
-<span class="keyword">interface</span> <span class="type">InventoryCheck</span> { <span class="property">sku</span>: <span class="type">string</span>; <span class="property">quantity</span>: <span class="type">number</span>; }
-<span class="keyword">interface</span> <span class="type">InventoryResult</span> { <span class="property">available</span>: <span class="type">boolean</span>; <span class="property">warehouse</span>: <span class="type">string</span>; }
-<span class="keyword">interface</span> <span class="type">ShippingRate</span> { <span class="property">provider</span>: <span class="type">string</span>; <span class="property">rate</span>: <span class="type">number</span>; <span class="property">eta</span>: <span class="type">string</span>; }
+<span class="comment">// Define request body types</span>
+<span class="keyword">interface</span> <span class="type">InventoryRequest</span> { <span class="property">sku</span>: <span class="type">string</span>; <span class="property">quantity</span>: <span class="type">number</span>; }
+<span class="keyword">interface</span> <span class="type">PaymentRequest</span> { <span class="property">amount</span>: <span class="type">number</span>; <span class="property">currency</span>: <span class="type">string</span>; }
+
+<span class="comment">// Define response types</span>
+<span class="keyword">interface</span> <span class="type">InventoryResult</span> { <span class="property">available</span>: <span class="type">boolean</span>; <span class="property">warehouse</span>: <span class="type">string</span>; <span class="property">stock</span>: <span class="type">number</span>; }
 <span class="keyword">interface</span> <span class="type">PaymentResult</span> { <span class="property">transactionId</span>: <span class="type">string</span>; <span class="property">status</span>: <span class="type">string</span>; }
 
+<span class="comment">// Define function types</span>
 <span class="keyword">type</span> <span class="type">TaxCalcArgs</span> = [<span class="property">subtotal</span>: <span class="type">number</span>, <span class="property">state</span>: <span class="type">string</span>];
 <span class="keyword">type</span> <span class="type">TaxResult</span> = { <span class="property">tax</span>: <span class="type">number</span>; <span class="property">total</span>: <span class="type">number</span>; };
 
-<span class="comment">// Build mixed items array with requests and functions</span>
-<span class="keyword">const</span> checkoutItems: <span class="type">API_GATEWAY_ITEM</span>[] = [
+<span class="comment">// Union types for mixed gateway items</span>
+<span class="keyword">type</span> <span class="type">RequestBodyUnion</span> = <span class="type">InventoryRequest</span> | <span class="type">PaymentRequest</span>;
+<span class="keyword">type</span> <span class="type">ResponseUnion</span> = <span class="type">InventoryResult</span> | <span class="type">PaymentResult</span>;
+
+<span class="comment">// Create circuit breaker for gateway</span>
+<span class="keyword">const</span> gatewayBreaker = <span class="keyword">new</span> <span class="function">CircuitBreaker</span>({
+  <span class="property">failureThresholdPercentage</span>: <span class="number">50</span>,
+  <span class="property">minimumRequests</span>: <span class="number">5</span>,
+  <span class="property">recoveryTimeoutMs</span>: <span class="number">30000</span>
+});
+
+<span class="comment">// Build mixed items array with requests and functions (using union types)</span>
+<span class="keyword">const</span> checkoutItems: <span class="type">API_GATEWAY_ITEM</span>&lt;<span class="type">RequestBodyUnion</span>, <span class="type">ResponseUnion</span>, <span class="type">TaxCalcArgs</span>, <span class="type">TaxResult</span>&gt;[] = [
   <span class="comment">// Inventory checks (grouped for shared config)</span>
   {
     <span class="property">type</span>: RequestOrFunction.<span class="property">REQUEST</span>,
@@ -684,14 +695,14 @@
         },
         <span class="property">resReq</span>: <span class="keyword">true</span>,
         <span class="property">attempts</span>: <span class="number">5</span>, <span class="comment">// Override group config</span>
-        <span class="property">responseAnalyzer</span>: <span class="keyword">({ data }) =></span> data?.status === <span class="string">'succeeded'</span>
+        <span class="property">responseAnalyzer</span>: <span class="keyword">({ data }) =></span> (data <span class="keyword">as</span> <span class="type">PaymentResult</span>)?.status === <span class="string">'succeeded'</span>
       }
     }
   }
 ];
 
-<span class="comment">// Execute with gateway options</span>
-<span class="keyword">const</span> result = <span class="keyword">await</span> stableApiGateway(checkoutItems, {
+<span class="comment">// Execute with gateway options (pass empty array for separate functions param to use all generics)</span>
+<span class="keyword">const</span> result = <span class="keyword">await</span> stableApiGateway&lt;<span class="type">RequestBodyUnion</span>, <span class="type">ResponseUnion</span>, <span class="type">TaxCalcArgs</span>, <span class="type">TaxResult</span>&gt;(checkoutItems, [], {
   <span class="comment">// Parallel execution for independent operations</span>
   <span class="property">concurrentExecution</span>: <span class="keyword">true</span>,
   <span class="property">maxConcurrentRequests</span>: <span class="number">6</span>,
@@ -733,7 +744,7 @@
   <span class="property">rateLimit</span>: { <span class="property">maxRequests</span>: <span class="number">50</span>, <span class="property">windowMs</span>: <span class="number">10000</span> },
   
   <span class="comment">// Circuit breaker for entire gateway</span>
-  <span class="property">circuitBreaker</span>: { <span class="property">failureThreshold</span>: <span class="number">5</span>, <span class="property">resetTimeout</span>: <span class="number">30000</span> },
+  <span class="property">circuitBreaker</span>: gatewayBreaker,
   
   <span class="comment">// Gateway-level timeout</span>
   <span class="property">maxTimeout</span>: <span class="number">60000</span>,
@@ -743,20 +754,38 @@
   
   <span class="comment">// Metrics guardrails</span>
   <span class="property">metricsGuardrails</span>: {
-    <span class="property">apiGateway</span>: { <span class="property">minSuccessRate</span>: <span class="number">0.9</span> }
+    <span class="property">apiGateway</span>: { <span class="property">successRate</span>: { <span class="property">min</span>: <span class="number">0.9</span> } }
   }
 });
 
-<span class="comment">// Access individual results by ID</span>
-<span class="keyword">const</span> inventoryWest = result.find(<span class="keyword">r =></span> r.id === <span class="string">'inventory-west'</span>);
-<span class="keyword">const</span> taxResult = result.find(<span class="keyword">r =></span> r.id === <span class="string">'calculate-tax'</span>);
-<span class="keyword">const</span> payment = result.find(<span class="keyword">r =></span> r.id === <span class="string">'process-payment'</span>);
+<span class="comment">// Access individual results by ID (type-safe with union result type)</span>
+<span class="keyword">const</span> inventoryWest = result.find(<span class="keyword">(r) =></span> r.requestId === <span class="string">'inventory-west'</span>);
+<span class="keyword">const</span> taxResult = result.find(<span class="keyword">(r) =></span> r.requestId === <span class="string">'calculate-tax'</span>);
+<span class="keyword">const</span> payment = result.find(<span class="keyword">(r) =></span> r.requestId === <span class="string">'process-payment'</span>);
+
+<span class="comment">// Type-safe result access</span>
+<span class="keyword">if</span> (inventoryWest?.success) {
+  <span class="keyword">const</span> inventory = inventoryWest.data <span class="keyword">as</span> <span class="type">InventoryResult</span>;
+  console.log(<span class="string">`Warehouse: ${inventory.warehouse}, Stock: ${inventory.stock}`</span>);
+}
+
+<span class="keyword">if</span> (taxResult?.success) {
+  <span class="keyword">const</span> tax = taxResult.data <span class="keyword">as</span> <span class="type">TaxResult</span>;
+  console.log(<span class="string">`Tax: $${tax.tax.toFixed(2)}, Total: $${tax.total.toFixed(2)}`</span>);
+}
+
+<span class="keyword">if</span> (payment?.success) {
+  <span class="keyword">const</span> paymentData = payment.data <span class="keyword">as</span> <span class="type">PaymentResult</span>;
+  console.log(<span class="string">`Transaction: ${paymentData.transactionId}, Status: ${paymentData.status}`</span>);
+}
 
 <span class="comment">// Aggregate metrics</span>
-console.log(<span class="string">`Success rate: ${result.metrics.successRate.toFixed(1)}%`</span>);
-console.log(<span class="string">`Total time: ${result.metrics.executionTime}ms`</span>);
-console.log(<span class="string">`Throughput: ${result.metrics.throughput.toFixed(2)} items/s`</span>);
-console.log(<span class="string">`Group metrics:`</span>, result.metrics.groupMetrics);
+<span class="keyword">if</span> (result.metrics) {
+  console.log(<span class="string">`Success rate: ${result.metrics.successRate.toFixed(1)}%`</span>);
+  console.log(<span class="string">`Total time: ${result.metrics.executionTime}ms`</span>);
+  console.log(<span class="string">`Throughput: ${result.metrics.throughput.toFixed(2)} items/s`</span>);
+  console.log(<span class="string">`Request groups:`</span>, result.metrics.requestGroups);
+}
 
 })();</code></pre>
           </div>
@@ -788,26 +817,39 @@ console.log(<span class="string">`Group metrics:`</span>, result.metrics.groupMe
   PHASE_DECISION_ACTIONS,
   REQUEST_METHODS,
   RequestOrFunction,
-  RETRY_STRATEGIES
+  RETRY_STRATEGIES,
+  <span class="keyword">type</span> <span class="type">STABLE_WORKFLOW_PHASE</span>
 } <span class="keyword">from</span> <span class="string">'@emmvish/stable-request'</span>;
-<span class="keyword">import type</span> { <span class="type">STABLE_WORKFLOW_PHASE</span> } <span class="keyword">from</span> <span class="string">'@emmvish/stable-request'</span>;
 
 (<span class="keyword">async</span> () => {
 
 <span class="comment">// Mock dependencies for demonstration</span>
-<span class="keyword">const</span> logger = { <span class="property">info</span>: console.log, <span class="property">debug</span>: console.log };
+<span class="keyword">const</span> logger = { <span class="property">info</span>: console.info, <span class="property">debug</span>: console.error };
 <span class="keyword">const</span> redis = {
   <span class="property">set</span>: <span class="keyword">async</span> (key: <span class="type">string</span>, val: <span class="type">any</span>) => { localStorage?.setItem?.(key, JSON.stringify(val)); },
   <span class="property">get</span>: <span class="keyword">async</span> (key: <span class="type">string</span>) => JSON.parse(localStorage?.getItem?.(key) || <span class="string">'null'</span>)
 };
 <span class="keyword">const</span> validateRecord = (record: <span class="type">any</span>, strict: <span class="type">boolean</span>) => record != <span class="keyword">null</span>;
 
-<span class="comment">// Define phase types</span>
-<span class="keyword">interface</span> <span class="type">RawData</span> { <span class="property">records</span>: <span class="type">any</span>[]; <span class="property">timestamp</span>: <span class="type">string</span>; }
-<span class="keyword">interface</span> <span class="type">ValidatedData</span> { <span class="property">valid</span>: <span class="type">any</span>[]; <span class="property">errors</span>: <span class="type">string</span>[]; }
-<span class="keyword">interface</span> <span class="type">EnrichedData</span> { <span class="property">records</span>: <span class="type">any</span>[]; <span class="property">enrichedAt</span>: <span class="type">string</span>; }
+<span class="comment">// Define request body types (for HTTP requests)</span>
+<span class="keyword">interface</span> <span class="type">FetchRequest</span> { <span class="comment">/* empty - GET request */</span> }
+<span class="keyword">interface</span> <span class="type">PersistRequest</span> { <span class="property">data</span>: <span class="type">any</span>[]; <span class="property">metadata</span>: <span class="type">Record</span>&lt;<span class="type">string</span>, <span class="type">any</span>&gt;; }
 
-<span class="keyword">const</span> phases: <span class="type">STABLE_WORKFLOW_PHASE</span>[] = [
+<span class="comment">// Define response types</span>
+<span class="keyword">interface</span> <span class="type">RawData</span> { <span class="property">records</span>: <span class="type">any</span>[]; <span class="property">timestamp</span>: <span class="type">string</span>; }
+<span class="keyword">interface</span> <span class="type">EnrichedData</span> { <span class="property">records</span>: <span class="type">any</span>[]; <span class="property">enrichedAt</span>: <span class="type">string</span>; }
+<span class="keyword">interface</span> <span class="type">PersistResult</span> { <span class="property">success</span>: <span class="type">boolean</span>; }
+
+<span class="comment">// Define function types</span>
+<span class="keyword">interface</span> <span class="type">ValidatedData</span> { <span class="property">valid</span>: <span class="type">any</span>[]; <span class="property">errors</span>: <span class="type">string</span>[]; }
+<span class="keyword">type</span> <span class="type">ValidateFnArgs</span> = [<span class="property">data</span>: <span class="type">RawData</span>, <span class="property">strict</span>: <span class="type">boolean</span>];
+<span class="keyword">type</span> <span class="type">ValidateFnReturn</span> = <span class="type">ValidatedData</span>;
+
+<span class="comment">// Union types for workflow with mixed request/response types</span>
+<span class="keyword">type</span> <span class="type">WorkflowRequestBody</span> = <span class="type">FetchRequest</span> | <span class="type">PersistRequest</span>;
+<span class="keyword">type</span> <span class="type">WorkflowResponseData</span> = <span class="type">RawData</span> | <span class="type">EnrichedData</span> | <span class="type">PersistResult</span>;
+
+<span class="keyword">const</span> phases: <span class="type">STABLE_WORKFLOW_PHASE</span>&lt;<span class="type">WorkflowRequestBody</span>, <span class="type">WorkflowResponseData</span>, <span class="type">ValidateFnArgs</span>, <span class="type">ValidateFnReturn</span>&gt;[] = [
   <span class="comment">// Phase 1: Fetch raw data (sequential)</span>
   {
     <span class="property">id</span>: <span class="string">'fetch-data'</span>,
@@ -825,9 +867,9 @@ console.log(<span class="string">`Group metrics:`</span>, result.metrics.groupMe
     }],
     <span class="comment">// Store results in shared buffer for later phases</span>
     <span class="property">phaseDecisionHook</span>: <span class="keyword">async ({ phaseResult, sharedBuffer }) =></span> {
-      <span class="keyword">if</span> (phaseResult.success) {
-        sharedBuffer.rawData = phaseResult.results[<span class="number">0</span>].data;
-        sharedBuffer.recordCount = phaseResult.results[<span class="number">0</span>].data.records.length;
+      <span class="keyword">if</span> (phaseResult.success && sharedBuffer) {
+        sharedBuffer.rawData = phaseResult.responses[<span class="number">0</span>].data;
+        sharedBuffer.recordCount = (phaseResult.responses[<span class="number">0</span>].data <span class="keyword">as</span> <span class="type">RawData</span>).records.length;
         <span class="keyword">return</span> { <span class="property">action</span>: PHASE_DECISION_ACTIONS.<span class="property">CONTINUE</span> };
       }
       <span class="keyword">return</span> { <span class="property">action</span>: PHASE_DECISION_ACTIONS.<span class="property">TERMINATE</span> };
@@ -854,18 +896,19 @@ console.log(<span class="string">`Group metrics:`</span>, result.metrics.groupMe
     }],
     <span class="property">maxReplayCount</span>: <span class="number">2</span>,
     <span class="property">allowReplay</span>: <span class="keyword">true</span>,
-    <span class="property">phaseDecisionHook</span>: <span class="keyword">async ({ phaseResult, sharedBuffer, replayCount }) =></span> {
-      <span class="keyword">const</span> validData = phaseResult.results[<span class="number">0</span>].data <span class="keyword">as</span> <span class="type">ValidatedData</span>;
+    <span class="property">phaseDecisionHook</span>: <span class="keyword">async ({ phaseResult, sharedBuffer, executionHistory }) =></span> {
+      <span class="keyword">const</span> validData = phaseResult.responses[<span class="number">0</span>].data <span class="keyword">as</span> <span class="type">ValidatedData</span>;
+      <span class="keyword">const</span> replayCount = executionHistory.filter(<span class="keyword">e =></span> e.phaseId === <span class="string">'validate'</span>).length;
       
       <span class="comment">// If too many invalid records, retry with relaxed validation</span>
-      <span class="keyword">if</span> (validData.valid.length < sharedBuffer.recordCount * <span class="number">0.8</span>) {
+      <span class="keyword">if</span> (sharedBuffer && validData.valid.length < sharedBuffer.recordCount * <span class="number">0.8</span>) {
         <span class="keyword">if</span> (replayCount < <span class="number">2</span>) {
           sharedBuffer.strictValidation = <span class="keyword">false</span>;
           <span class="keyword">return</span> { <span class="property">action</span>: PHASE_DECISION_ACTIONS.<span class="property">REPLAY</span> };
         }
       }
       
-      sharedBuffer.validatedData = validData.valid;
+      <span class="keyword">if</span> (sharedBuffer) sharedBuffer.validatedData = validData.valid;
       <span class="keyword">return</span> { <span class="property">action</span>: PHASE_DECISION_ACTIONS.<span class="property">CONTINUE</span> };
     }
   },
@@ -888,19 +931,19 @@ console.log(<span class="string">`Group metrics:`</span>, result.metrics.groupMe
     <span class="property">phaseDecisionHook</span>: <span class="keyword">async ({ phaseResult, sharedBuffer }) =></span> {
       <span class="keyword">if</span> (!phaseResult.success) {
         <span class="comment">// Enrichment is optional - continue without it</span>
-        sharedBuffer.enrichmentSkipped = <span class="keyword">true</span>;
+        <span class="keyword">if</span> (sharedBuffer) sharedBuffer.enrichmentSkipped = <span class="keyword">true</span>;
         <span class="keyword">return</span> { <span class="property">action</span>: PHASE_DECISION_ACTIONS.<span class="property">CONTINUE</span> };
       }
       
       <span class="comment">// Check data freshness</span>
-      <span class="keyword">const</span> enrichment = phaseResult.results[<span class="number">0</span>].data <span class="keyword">as</span> <span class="type">EnrichedData</span>;
+      <span class="keyword">const</span> enrichment = phaseResult.responses[<span class="number">0</span>].data <span class="keyword">as</span> <span class="type">EnrichedData</span>;
       <span class="keyword">const</span> age = Date.now() - <span class="keyword">new</span> Date(enrichment.enrichedAt).getTime();
       <span class="keyword">if</span> (age > <span class="number">3600000</span>) { <span class="comment">// > 1 hour old</span>
-        sharedBuffer.enrichmentSkipped = <span class="keyword">true</span>;
+        <span class="keyword">if</span> (sharedBuffer) sharedBuffer.enrichmentSkipped = <span class="keyword">true</span>;
         <span class="keyword">return</span> { <span class="property">action</span>: PHASE_DECISION_ACTIONS.<span class="property">CONTINUE</span> };
       }
       
-      sharedBuffer.enrichmentData = enrichment;
+      <span class="keyword">if</span> (sharedBuffer) sharedBuffer.enrichmentData = enrichment;
       <span class="keyword">return</span> { <span class="property">action</span>: PHASE_DECISION_ACTIONS.<span class="property">CONTINUE</span> };
     }
   },
@@ -924,8 +967,8 @@ console.log(<span class="string">`Group metrics:`</span>, result.metrics.groupMe
   }
 ];
 
-<span class="comment">// Execute with mixed mode enabled</span>
-<span class="keyword">const</span> result = <span class="keyword">await</span> stableWorkflow(phases, {
+<span class="comment">// Execute with mixed mode enabled (explicit generics for full type safety)</span>
+<span class="keyword">const</span> result = <span class="keyword">await</span> stableWorkflow&lt;<span class="type">WorkflowRequestBody</span>, <span class="type">WorkflowResponseData</span>, <span class="type">ValidateFnArgs</span>, <span class="type">ValidateFnReturn</span>&gt;(phases, {
   <span class="property">workflowId</span>: <span class="string">'data-pipeline-001'</span>,
   
   <span class="comment">// Enable mixed execution (sequential + concurrent groups)</span>
@@ -944,7 +987,7 @@ console.log(<span class="string">`Group metrics:`</span>, result.metrics.groupMe
   },
   
   <span class="comment">// Workflow-level circuit breaker</span>
-  <span class="property">circuitBreaker</span>: { <span class="property">failureThreshold</span>: <span class="number">3</span>, <span class="property">resetTimeout</span>: <span class="number">60000</span> },
+  <span class="property">circuitBreaker</span>: { <span class="property">failureThresholdPercentage</span>: <span class="number">50</span>, <span class="property">minimumRequests</span>: <span class="number">3</span>, <span class="property">recoveryTimeoutMs</span>: <span class="number">60000</span> },
   
   <span class="comment">// Observability hooks</span>
   <span class="property">handlePhaseCompletion</span>: <span class="keyword">({ phaseResult, workflowId }) =></span> {
@@ -954,28 +997,30 @@ console.log(<span class="string">`Group metrics:`</span>, result.metrics.groupMe
       <span class="property">duration</span>: phaseResult.metrics?.executionTime
     });
   },
-  <span class="property">handlePhaseDecision</span>: <span class="keyword">({ decision, phaseId }) =></span> {
-    logger.debug(<span class="string">`Decision for ${phaseId}: ${decision.action}`</span>);
+  <span class="property">handlePhaseDecision</span>: <span class="keyword">({ decision, phaseResult }) =></span> {
+    logger.debug(<span class="string">`Decision for ${phaseResult.phaseId}: ${decision.action}`</span>);
   },
   
   <span class="comment">// State persistence for recovery</span>
   <span class="property">statePersistence</span>: {
-    <span class="property">enabled</span>: <span class="keyword">true</span>,
-    <span class="property">saveState</span>: <span class="keyword">async (state) =></span> redis.set(<span class="string">`workflow:${state.workflowId}`</span>, state),
-    <span class="property">loadState</span>: <span class="keyword">async (id) =></span> redis.get(<span class="string">`workflow:${id}`</span>)
+    <span class="property">persistenceFunction</span>: <span class="keyword">async ({ executionContext, buffer }) =></span> {
+      <span class="keyword">const</span> key = <span class="string">`workflow:${executionContext.workflowId}`</span>;
+      <span class="keyword">await</span> redis.set(key, buffer);
+      <span class="keyword">return</span> (<span class="keyword">await</span> redis.get(key)) || buffer;
+    }
   },
   
   <span class="comment">// Metrics guardrails</span>
   <span class="property">metricsGuardrails</span>: {
-    <span class="property">workflow</span>: { <span class="property">maxTotalPhases</span>: <span class="number">10</span>, <span class="property">maxTotalExecutionTime</span>: <span class="number">300000</span> }
+    <span class="property">workflow</span>: { <span class="property">totalPhases</span>: { <span class="property">max</span>: <span class="number">10</span> }, <span class="property">executionTime</span>: { <span class="property">max</span>: <span class="number">300000</span> } }
   }
 });
 
 <span class="comment">// Access workflow results</span>
 console.log(<span class="string">`Workflow success: ${result.success}`</span>);
 console.log(<span class="string">`Phases executed: ${result.totalPhases}`</span>);
-console.log(<span class="string">`Replays: ${result.metrics?.totalReplays || 0}`</span>);
-console.log(<span class="string">`Phase results:`</span>, result.phaseResults.map(<span class="keyword">p =></span> p.phaseId));
+console.log(<span class="string">`Replays: ${result.metrics?.totalPhaseReplays || 0}`</span>);
+console.log(<span class="string">`Phase results:`</span>, result.phases.map(<span class="keyword">(p) =></span> p.phaseId));
 
 })();</code></pre>
           </div>
@@ -1005,17 +1050,17 @@ console.log(<span class="string">`Phase results:`</span>, result.phaseResults.ma
             <pre><code><span class="keyword">import</span> { 
   stableWorkflowGraph, 
   WorkflowGraphBuilder,
-  WorkflowNodeTypes,
   WorkflowEdgeConditionTypes,
   RequestOrFunction,
-  REQUEST_METHODS
+  REQUEST_METHODS,
+  <span class="keyword">type</span> <span class="type">ConditionalEvaluationContext</span>
 } <span class="keyword">from</span> <span class="string">'@emmvish/stable-request'</span>;
 
 (<span class="keyword">async</span> () => {
 
 <span class="comment">// Mock dependencies for demonstration</span>
 <span class="keyword">const</span> inputBuffer = Buffer.from(<span class="string">'mock-input-data'</span>);
-<span class="keyword">const</span> logger = { <span class="property">info</span>: console.log };
+<span class="keyword">const</span> logger = { <span class="property">info</span>: console.info };
 <span class="keyword">const</span> preprocessPipeline = {
   <span class="property">execute</span>: <span class="keyword">async</span> (data: <span class="type">Buffer</span>) => ({ <span class="property">normalized</span>: <span class="keyword">true</span>, <span class="property">data</span>: data.toString() })
 };
@@ -1023,8 +1068,29 @@ console.log(<span class="string">`Phase results:`</span>, result.phaseResults.ma
   <span class="property">extract</span>: <span class="keyword">async</span> (input: <span class="type">any</span>) => ({ <span class="property">features</span>: [<span class="number">0.1</span>, <span class="number">0.5</span>, <span class="number">0.3</span>] })
 };
 
-<span class="comment">// Build the workflow graph with fluent API</span>
-<span class="keyword">const</span> graph = <span class="keyword">new</span> <span class="function">WorkflowGraphBuilder</span>()
+<span class="comment">// Define request body types</span>
+<span class="keyword">interface</span> <span class="type">MLRequest</span> { <span class="property">features</span>?: <span class="type">number</span>[]; <span class="property">data</span>?: <span class="type">any</span>; }
+<span class="keyword">interface</span> <span class="type">ReviewRequest</span> { <span class="property">itemId</span>: <span class="type">string</span>; <span class="property">data</span>: <span class="type">any</span>; }
+<span class="keyword">interface</span> <span class="type">StoreRequest</span> { <span class="property">results</span>: <span class="type">any</span>; <span class="property">metadata</span>: <span class="type">Record</span>&lt;<span class="type">string</span>, <span class="type">any</span>&gt;; }
+
+<span class="comment">// Define response types</span>
+<span class="keyword">interface</span> <span class="type">PreprocessResult</span> { <span class="property">normalized</span>: <span class="type">boolean</span>; <span class="property">data</span>: <span class="type">string</span>; }
+<span class="keyword">interface</span> <span class="type">InferenceResult</span> { <span class="property">confidence</span>: <span class="type">number</span>; <span class="property">predictions</span>: <span class="type">any</span>[]; }
+<span class="keyword">interface</span> <span class="type">FeatureResult</span> { <span class="property">features</span>: <span class="type">number</span>[]; }
+<span class="keyword">interface</span> <span class="type">ReviewResult</span> { <span class="property">queued</span>: <span class="type">boolean</span>; <span class="property">reviewId</span>: <span class="type">string</span>; }
+<span class="keyword">interface</span> <span class="type">StoreResult</span> { <span class="property">stored</span>: <span class="type">boolean</span>; }
+<span class="keyword">interface</span> <span class="type">FormatResult</span> { <span class="property">features</span>: <span class="type">any</span>; <span class="property">predictions</span>: <span class="type">any</span>; <span class="property">timestamp</span>: <span class="type">string</span>; }
+
+<span class="comment">// Union types for graph workflow</span>
+<span class="keyword">type</span> <span class="type">GraphRequestBody</span> = <span class="type">MLRequest</span> | <span class="type">ReviewRequest</span> | <span class="type">StoreRequest</span>;
+<span class="keyword">type</span> <span class="type">GraphResponseData</span> = <span class="type">PreprocessResult</span> | <span class="type">InferenceResult</span> | <span class="type">FeatureResult</span> | <span class="type">ReviewResult</span> | <span class="type">StoreResult</span> | <span class="type">FormatResult</span>;
+
+<span class="comment">// Function types (use any[] for heterogeneous function signatures)</span>
+<span class="keyword">type</span> <span class="type">GraphFunctionArgs</span> = <span class="type">any</span>[];
+<span class="keyword">type</span> <span class="type">GraphFunctionReturn</span> = <span class="type">PreprocessResult</span> | <span class="type">FeatureResult</span> | <span class="type">FormatResult</span>;
+
+<span class="comment">// Build the workflow graph with fluent API (using all 4 generics)</span>
+<span class="keyword">const</span> graph = <span class="keyword">new</span> <span class="function">WorkflowGraphBuilder</span>&lt;<span class="type">GraphRequestBody</span>, <span class="type">GraphResponseData</span>, <span class="type">GraphFunctionArgs</span>, <span class="type">GraphFunctionReturn</span>&gt;()
   
   <span class="comment">// Entry point: Data preprocessing</span>
   .<span class="function">addPhase</span>(<span class="string">'preprocess'</span>, {
@@ -1072,7 +1138,7 @@ console.log(<span class="string">`Phase results:`</span>, result.phaseResults.ma
         },
         <span class="property">resReq</span>: <span class="keyword">true</span>,
         <span class="property">attempts</span>: <span class="number">3</span>,
-        <span class="property">responseAnalyzer</span>: <span class="keyword">({ data }) =></span> data?.confidence !== <span class="keyword">undefined</span>
+        <span class="property">responseAnalyzer</span>: <span class="keyword">({ data }) =></span> (data <span class="keyword">as</span> <span class="type">InferenceResult</span>)?.confidence !== <span class="keyword">undefined</span>
       }
     }]
   })
@@ -1084,18 +1150,16 @@ console.log(<span class="string">`Phase results:`</span>, result.phaseResults.ma
   .<span class="function">addMergePoint</span>(<span class="string">'sync-results'</span>, [<span class="string">'parallel-processing'</span>])
   
   <span class="comment">// Conditional routing based on inference confidence</span>
-  .<span class="function">addConditional</span>(<span class="string">'confidence-check'</span>, {
-    <span class="property">evaluate</span>: <span class="keyword">({ results, sharedBuffer }) =></span> {
-      <span class="keyword">const</span> inferenceResult = results.get(<span class="string">'run-inference'</span>);
-      <span class="keyword">const</span> confidence = inferenceResult?.results?.[<span class="number">0</span>]?.data?.confidence || <span class="number">0</span>;
-      
-      <span class="comment">// Route to human review if confidence is low</span>
-      <span class="keyword">if</span> (confidence < <span class="number">0.85</span>) {
-        sharedBuffer.needsReview = <span class="keyword">true</span>;
-        <span class="keyword">return</span> <span class="string">'human-review'</span>;
-      }
-      <span class="keyword">return</span> <span class="string">'postprocess'</span>;
+  .<span class="function">addConditional</span>(<span class="string">'confidence-check'</span>, <span class="keyword">({ results, sharedBuffer }: <span class="type">ConditionalEvaluationContext</span>&lt;<span class="type">GraphRequestBody</span>, <span class="type">GraphResponseData</span>, <span class="type">GraphFunctionArgs</span>, <span class="type">GraphFunctionReturn</span>&gt;) =></span> {
+    <span class="keyword">const</span> inferenceResult = results.get(<span class="string">'run-inference'</span>);
+    <span class="keyword">const</span> confidence = (inferenceResult?.responses?.[<span class="number">0</span>]?.data <span class="keyword">as</span> <span class="type">InferenceResult</span>)?.confidence || <span class="number">0</span>;
+    
+    <span class="comment">// Route to human review if confidence is low</span>
+    <span class="keyword">if</span> (confidence < <span class="number">0.85</span>) {
+      <span class="keyword">if</span> (sharedBuffer) sharedBuffer.needsReview = <span class="keyword">true</span>;
+      <span class="keyword">return</span> <span class="string">'human-review'</span>;
     }
+    <span class="keyword">return</span> <span class="string">'postprocess'</span>;
   })
   
   <span class="comment">// Human review path</span>
@@ -1155,7 +1219,7 @@ console.log(<span class="string">`Phase results:`</span>, result.phaseResults.ma
   
   <span class="comment">// Connect nodes with edge conditions</span>
   .<span class="function">connect</span>(<span class="string">'preprocess'</span>, <span class="string">'parallel-processing'</span>, { 
-    <span class="property">type</span>: WorkflowEdgeConditionTypes.<span class="property">SUCCESS</span> 
+    <span class="property">condition</span>: { <span class="property">type</span>: WorkflowEdgeConditionTypes.<span class="property">SUCCESS</span> }
   })
   .<span class="function">connect</span>(<span class="string">'parallel-processing'</span>, <span class="string">'sync-results'</span>)
   .<span class="function">connect</span>(<span class="string">'sync-results'</span>, <span class="string">'confidence-check'</span>)
@@ -1168,8 +1232,8 @@ console.log(<span class="string">`Phase results:`</span>, result.phaseResults.ma
   .<span class="function">setEntryPoint</span>(<span class="string">'preprocess'</span>)
   .<span class="function">build</span>();
 
-<span class="comment">// Execute the graph workflow</span>
-<span class="keyword">const</span> result = <span class="keyword">await</span> stableWorkflowGraph(graph, {
+<span class="comment">// Execute the graph workflow (with all 4 explicit generics)</span>
+<span class="keyword">const</span> result = <span class="keyword">await</span> stableWorkflowGraph&lt;<span class="type">GraphRequestBody</span>, <span class="type">GraphResponseData</span>, <span class="type">GraphFunctionArgs</span>, <span class="type">GraphFunctionReturn</span>&gt;(graph, {
   <span class="property">workflowId</span>: <span class="string">'ml-pipeline-001'</span>,
   
   <span class="comment">// Shared state across all nodes</span>
@@ -1184,7 +1248,7 @@ console.log(<span class="string">`Phase results:`</span>, result.phaseResults.ma
   <span class="property">maxConcurrentRequests</span>: <span class="number">10</span>,
   
   <span class="comment">// Circuit breaker for entire graph</span>
-  <span class="property">circuitBreaker</span>: { <span class="property">failureThreshold</span>: <span class="number">5</span>, <span class="property">resetTimeout</span>: <span class="number">60000</span> },
+  <span class="property">circuitBreaker</span>: { <span class="property">failureThresholdPercentage</span>: <span class="number">50</span>, <span class="property">minimumRequests</span>: <span class="number">5</span>, <span class="property">recoveryTimeoutMs</span>: <span class="number">60000</span> },
   
   <span class="comment">// Graph-level timeout</span>
   <span class="property">maxTimeout</span>: <span class="number">120000</span>,
@@ -1195,14 +1259,18 @@ console.log(<span class="string">`Phase results:`</span>, result.phaseResults.ma
   },
   
   <span class="comment">// Execution context for tracing</span>
-  <span class="property">executionContext</span>: { <span class="property">traceId</span>: <span class="string">'trace-abc-123'</span> }
+  <span class="property">executionContext</span>: { <span class="property">workflowId</span>: <span class="string">'ml-pipeline-001'</span> }
 });
 
 <span class="comment">// Access results</span>
 console.log(<span class="string">`Graph success: ${result.success}`</span>);
 console.log(<span class="string">`Nodes executed: ${result.executionHistory?.length}`</span>);
-console.log(<span class="string">`Path taken: ${result.executionHistory?.map(n => n.nodeId).join(' → ')}`</span>);
-console.log(<span class="string">`Human review needed: ${result.sharedBuffer?.needsReview || false}`</span>);
+console.log(<span class="string">`Path taken: ${result.executionHistory?.map((n) => n.phaseId).join(' → ')}`</span>);
+<span class="comment">// Note: sharedBuffer is passed in options but not returned in result</span>
+<span class="comment">// Check phases for specific results instead</span>
+<span class="keyword">const</span> inferencePhase = result.phases.find(<span class="keyword">(p) =></span> p.phaseId === <span class="string">'run-inference'</span>);
+<span class="keyword">const</span> needsReview = (inferencePhase?.responses?.[<span class="number">0</span>]?.data <span class="keyword">as</span> <span class="type">InferenceResult</span>)?.confidence < <span class="number">0.85</span>;
+console.log(<span class="string">`Human review needed: ${needsReview}`</span>);
 
 })();</code></pre>
           </div>
