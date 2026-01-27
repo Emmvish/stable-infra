@@ -464,22 +464,45 @@ p {
 
 /* ===== Get Started Section ===== */
 .install-box {
-  max-width: 700px;
+  max-width: 900px;
   margin: 0 auto;
 }
 
-.install-box .code-box {
+.install-commands {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
   margin-bottom: 2rem;
+}
+
+.install-commands .code-box {
+  margin-bottom: 0;
+}
+
+.install-commands .code-box-header {
+  padding: 0.75rem 1rem;
+}
+
+.install-commands .code-box-lang {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+@media (max-width: 768px) {
+  .install-commands {
+    grid-template-columns: 1fr;
+  }
 }
 
 .install-pre {
   height: auto !important;
-  padding: 1.5rem !important;
+  padding: 1rem 1.25rem !important;
 }
 
 .install-pre code {
-  font-size: 0.95rem;
-  line-height: 2;
+  font-size: 0.9rem;
+  line-height: 1.6;
 }
 
 .quick-links {
