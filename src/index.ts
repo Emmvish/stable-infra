@@ -22,6 +22,7 @@ export {
 } from './enums/index.js';
 
 export type {
+    API_GATEWAY_ITEM,
     API_GATEWAY_OPTIONS,
     API_GATEWAY_REQUEST,
     API_GATEWAY_REQUEST_OPTIONS_TYPE,
