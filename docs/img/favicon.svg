@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+  <defs>
+    <!-- Gradient for the main flow path -->
+    <linearGradient id="flowGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="50%" style="stop-color:#8b5cf6"/>
+      <stop offset="100%" style="stop-color:#a855f7"/>
+    </linearGradient>
+    
+    <!-- Gradient for nodes -->
+    <linearGradient id="nodeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22d3ee"/>
+      <stop offset="100%" style="stop-color:#06b6d4"/>
+    </linearGradient>
+    
+    <!-- Glow effect -->
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Outer stability ring -->
+  <circle cx="20" cy="20" r="17" stroke="url(#flowGradient)" stroke-width="2.5" fill="none" opacity="0.25"/>
+  
+  <!-- Main workflow flow - simplified S-curve -->
+  <path 
+    d="M9 14 Q 15 14, 20 19 Q 25 24, 31 24 L 31 28 Q 25 28, 20 23 Q 15 18, 9 18 Z" 
+    fill="url(#flowGradient)" 
+    filter="url(#glow)"
+    opacity="0.95"
+  />
+  
+  <!-- Phase nodes (workflow steps) -->
+  <!-- Start node -->
+  <circle cx="9" cy="16" r="4" fill="url(#nodeGradient)" filter="url(#glow)"/>
+  <circle cx="9" cy="16" r="2" fill="#ffffff"/>
+  
+  <!-- Middle node (branching point) -->
+  <circle cx="20" cy="21" r="5" fill="url(#nodeGradient)" filter="url(#glow)"/>
+  <circle cx="20" cy="21" r="2.5" fill="#ffffff"/>
+  
+  <!-- End node -->
+  <circle cx="31" cy="26" r="4" fill="url(#nodeGradient)" filter="url(#glow)"/>
+  <circle cx="31" cy="26" r="2" fill="#ffffff"/>
+  
+  <!-- Retry arrow (top) -->
+  <path 
+    d="M16 9 L 20 5 L 24 9" 
+    stroke="#22d3ee" 
+    stroke-width="2.5" 
+    fill="none" 
+    stroke-linecap="round" 
+    stroke-linejoin="round"
+    opacity="0.85"
+  />
+  
+  <!-- Stability pulse (bottom) -->
+  <path 
+    d="M12 33 L 15 33 L 17 30 L 20 36 L 23 33 L 28 33" 
+    stroke="#10b981" 
+    stroke-width="2" 
+    fill="none" 
+    stroke-linecap="round" 
+    stroke-linejoin="round"
+    opacity="0.9"
+  />
+</svg>
