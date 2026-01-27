@@ -986,8 +986,16 @@ p {
     font-size: 1.1rem;
   }
   
-  .nav-link span {
+  .nav-link > span:not(.nav-icon) {
     display: none;
+  }
+  
+  .navbar-right {
+    gap: 0.2rem;
+  }
+  
+  .nav-link {
+    padding: 0.5rem;
   }
   
   .hero {
