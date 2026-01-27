@@ -269,6 +269,10 @@ pnpm add @emmvish/stable-request</code></pre>
 
 (<span class="keyword">async</span> () => {
 
+<span class="comment">// Mock authentication token and logger</span>
+<span class="keyword">const</span> token = <span class="string">'your-auth-token-here'</span>;
+<span class="keyword">const</span> customLogger = { <span class="property">error</span>: console.error, <span class="property">info</span>: console.log };
+
 <span class="comment">// Define strongly-typed interfaces for request/response</span>
 <span class="keyword">interface</span> <span class="type">UserProfileRequest</span> {
   <span class="property">userId</span>: <span class="type">string</span>;
@@ -398,6 +402,14 @@ pnpm add @emmvish/stable-request</code></pre>
 
 (<span class="keyword">async</span> () => {
 
+<span class="comment">// Mock dependencies for demonstration</span>
+<span class="keyword">const</span> imageBuffer = Buffer.from(<span class="string">'mock-image-data'</span>);
+<span class="keyword">const</span> batchId = <span class="string">'batch-001'</span>;
+<span class="keyword">const</span> hashBuffer = (buf: <span class="type">Buffer</span>) => buf.toString(<span class="string">'base64'</span>).slice(<span class="number">0</span>, <span class="number">16</span>);
+<span class="keyword">const</span> metrics = { <span class="property">increment</span>: (key: <span class="type">string</span>) => {}, <span class="property">histogram</span>: (key: <span class="type">string</span>, val: <span class="type">number</span>) => {} };
+<span class="keyword">const</span> logger = { <span class="property">warn</span>: console.warn, <span class="property">info</span>: console.log };
+<span class="keyword">const</span> featureFlags = { <span class="property">get</span>: <span class="keyword">async</span> (key: <span class="type">string</span>) => ({ <span class="property">inferenceTimeout</span>: <span class="number">30000</span> }) };
+
 <span class="comment">// Define typed arguments and return type</span>
 <span class="keyword">type</span> <span class="type">InferenceArgs</span> = [
   <span class="property">imageBuffer</span>: <span class="type">Buffer</span>, 
@@ -421,8 +433,13 @@ pnpm add @emmvish/stable-request</code></pre>
   imageBuffer: <span class="type">Buffer</span>, 
   config: <span class="type">ModelConfig</span>
 ): <span class="type">Promise</span>&lt;<span class="type">PredictionResult</span>&gt; {
-  <span class="comment">// Actual ML model inference logic...</span>
-  <span class="keyword">return</span> mlModel.predict(imageBuffer, config);
+  <span class="comment">// Simulate ML inference with mock response</span>
+  <span class="keyword">await new</span> Promise(<span class="keyword">r =></span> setTimeout(r, <span class="number">100</span>));
+  <span class="keyword">return</span> {
+    <span class="property">labels</span>: [{ <span class="property">name</span>: <span class="string">'cat'</span>, <span class="property">confidence</span>: <span class="number">0.92</span> }, { <span class="property">name</span>: <span class="string">'dog'</span>, <span class="property">confidence</span>: <span class="number">0.08</span> }],
+    <span class="property">processingTime</span>: <span class="number">95</span>,
+    <span class="property">modelVersion</span>: config.modelId
+  };
 }
 
 <span class="comment">// Shared circuit breaker for ML service</span>
@@ -563,6 +580,11 @@ pnpm add @emmvish/stable-request</code></pre>
 <span class="keyword">import type</span> { <span class="type">API_GATEWAY_ITEM</span> } <span class="keyword">from</span> <span class="string">'@emmvish/stable-request'</span>;
 
 (<span class="keyword">async</span> () => {
+
+<span class="comment">// Mock tax rates by state</span>
+<span class="keyword">const</span> stateTaxRates: <span class="type">Record</span>&lt;<span class="type">string</span>, <span class="type">number</span>&gt; = {
+  <span class="string">'CA'</span>: <span class="number">0.0725</span>, <span class="string">'NY'</span>: <span class="number">0.08</span>, <span class="string">'TX'</span>: <span class="number">0.0625</span>, <span class="string">'WA'</span>: <span class="number">0.065</span>
+};
 
 <span class="comment">// Define types for different operations</span>
 <span class="keyword">interface</span> <span class="type">InventoryCheck</span> { <span class="property">sku</span>: <span class="type">string</span>; <span class="property">quantity</span>: <span class="type">number</span>; }
@@ -748,6 +770,14 @@ console.log(<span class="string">`Group metrics:`</span>, result.metrics.groupMe
 <span class="keyword">import type</span> { <span class="type">STABLE_WORKFLOW_PHASE</span> } <span class="keyword">from</span> <span class="string">'@emmvish/stable-request'</span>;
 
 (<span class="keyword">async</span> () => {
+
+<span class="comment">// Mock dependencies for demonstration</span>
+<span class="keyword">const</span> logger = { <span class="property">info</span>: console.log, <span class="property">debug</span>: console.log };
+<span class="keyword">const</span> redis = {
+  <span class="property">set</span>: <span class="keyword">async</span> (key: <span class="type">string</span>, val: <span class="type">any</span>) => { localStorage?.setItem?.(key, JSON.stringify(val)); },
+  <span class="property">get</span>: <span class="keyword">async</span> (key: <span class="type">string</span>) => JSON.parse(localStorage?.getItem?.(key) || <span class="string">'null'</span>)
+};
+<span class="keyword">const</span> validateRecord = (record: <span class="type">any</span>, strict: <span class="type">boolean</span>) => record != <span class="keyword">null</span>;
 
 <span class="comment">// Define phase types</span>
 <span class="keyword">interface</span> <span class="type">RawData</span> { <span class="property">records</span>: <span class="type">any</span>[]; <span class="property">timestamp</span>: <span class="type">string</span>; }
@@ -959,6 +989,16 @@ console.log(<span class="string">`Phase results:`</span>, result.phaseResults.ma
 } <span class="keyword">from</span> <span class="string">'@emmvish/stable-request'</span>;
 
 (<span class="keyword">async</span> () => {
+
+<span class="comment">// Mock dependencies for demonstration</span>
+<span class="keyword">const</span> inputBuffer = Buffer.from(<span class="string">'mock-input-data'</span>);
+<span class="keyword">const</span> logger = { <span class="property">info</span>: console.log };
+<span class="keyword">const</span> preprocessPipeline = {
+  <span class="property">execute</span>: <span class="keyword">async</span> (data: <span class="type">Buffer</span>) => ({ <span class="property">normalized</span>: <span class="keyword">true</span>, <span class="property">data</span>: data.toString() })
+};
+<span class="keyword">const</span> featureExtractor = {
+  <span class="property">extract</span>: <span class="keyword">async</span> (input: <span class="type">any</span>) => ({ <span class="property">features</span>: [<span class="number">0.1</span>, <span class="number">0.5</span>, <span class="number">0.3</span>] })
+};
 
 <span class="comment">// Build the workflow graph with fluent API</span>
 <span class="keyword">const</span> graph = <span class="keyword">new</span> <span class="function">WorkflowGraphBuilder</span>()
@@ -1223,8 +1263,8 @@ console.log(<span class="string">`Human review needed: ${result.sharedBuffer?.ne
           <div class="resilience-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
           </div>
-          <h4>Shared Buffers</h4>
-          <p>Mutable shared state accessible across attempts, phases, branches, and items. Pass computed data without global state pollution.</p>
+          <h4>Shared Buffers & Persistence</h4>
+          <p>Mutable shared state accessible across attempts, phases, branches, and items. Pass computed data without global state pollution. Buffers can be persisted using State Persistence Hooks.</p>
         </div>
 
         <div class="resilience-card">
