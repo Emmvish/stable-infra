@@ -1,6 +1,6 @@
 import { stableApiGateway } from '../core/index.js';
 import { executeWithPersistence } from './execute-with-persistence.js';
-import { formatLogContext } from './format-log-context';
+import { formatLogContext } from './format-log-context.js';
 import { MetricsAggregator } from './metrics-aggregator.js';
 import { MetricsValidator } from './metrics-validator.js';
 import { RequestOrFunction } from '../enums/index.js';
