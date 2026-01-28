@@ -1,6 +1,6 @@
 {
   "name": "@emmvish/stable-request",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "A production-grade Workflow Execution Engine for Node.js that transforms unreliable API calls into resilient, observable, and sophisticated multi-phase workflows with intelligent retry strategies, circuit breakers, and advanced execution patterns.",
   "type": "module",
   "main": "dist/index.js",
