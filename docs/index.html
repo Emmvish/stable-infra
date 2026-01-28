@@ -1014,7 +1014,9 @@
       }
       <span class="keyword">await</span> redis.set(key, buffer);
       <span class="keyword">return</span> buffer;
-    }
+    },
+    <span class="property">loadBeforeHooks</span>: <span class="keyword">true</span>,
+    <span class="property">storeAfterHooks</span>: <span class="keyword">true</span>
   },
   
   <span class="comment">// Metrics guardrails</span>
