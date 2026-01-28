@@ -96,6 +96,19 @@ Production-ready infrastructure components for building resilient systems.
 
 ---
 
+## 🧰 Runner Utilities
+
+### [Stable Runner](./stable-runner.md)
+Config-driven runner for executing Stable Request jobs via JSON or ESM config files.
+
+**Key Features:**
+- Config-based execution for all core APIs
+- File change detection and auto re-run
+- Append-only JSON output for auditability
+- Docker-friendly execution model
+
+---
+
 ## 🎯 Quick Navigation
 
 ### By Use Case
@@ -113,6 +126,7 @@ Production-ready infrastructure components for building resilient systems.
 
 **Infrastructure:**
 - Caching, circuit breaking, rate limiting → [Infrastructure Utilities](./infra-utilities.md)
+- Config-driven execution → [Stable Runner](./stable-runner.md)
 
 ---
 
