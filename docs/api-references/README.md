@@ -81,7 +81,7 @@ Graph-based workflow orchestration with conditional routing, parallel execution,
 
 ---
 
-## Infrastructure Utilities
+## 🛠️ Infrastructure Utilities
 
 ### [Infrastructure Utilities](./infra-utilities.md)
 Production-ready infrastructure components for building resilient systems.
@@ -96,7 +96,7 @@ Production-ready infrastructure components for building resilient systems.
 
 ---
 
-## Runner Utilities
+## 🧰 Runner Utilities
 
 ### [Stable Runner](./stable-runner.md)
 Config-driven runner for executing Stable Request jobs via JSON or ESM config files.
