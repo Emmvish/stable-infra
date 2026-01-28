@@ -80,3 +80,11 @@ export enum PersistenceStage {
   BEFORE_HOOK = 'before_hook',
   AFTER_HOOK = 'after_hook'
 }
+
+export enum RunnerJobs {
+  STABLE_REQUEST = 'stableRequest',
+  STABLE_FUNCTION = 'stableFunction',
+  STABLE_API_GATEWAY = 'stableApiGateway',
+  STABLE_WORKFLOW = 'stableWorkflow',
+  STABLE_WORKFLOW_GRAPH = 'stableWorkflowGraph'
+}

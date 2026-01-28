@@ -19,7 +19,8 @@ export {
     WorkflowNodeTypes,
     AnomalySeverity,
     ViolationType,
-    PersistenceStage
+    PersistenceStage,
+    RunnerJobs
 } from './enums/index.js';
 
 export type {
@@ -135,7 +136,12 @@ export type {
     StableRequestMetrics,
     StableFunctionInfrastructureMetrics,
     StableFunctionMetrics,
-    WorkflowInfrastructureMetrics
+    WorkflowInfrastructureMetrics,
+    RunnerConfig,
+    RunnerJob,
+    CreateHash,
+    NodeCryptoLike,
+    CachedFunctionResponse
 } from './types/index.js';
 
 export {
@@ -184,5 +190,7 @@ export {
     executeWorkflowGraph,
     MetricsValidator,
     TimeoutError,
-    executeWithTimeout
+    executeWithTimeout,
+    getNodeCrypto,
+    simpleHashToHex
 } from './utilities/index.js';

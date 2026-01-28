@@ -1,7 +1,9 @@
-import * as crypto from 'crypto';
 import { AxiosRequestConfig } from 'axios';
 import { REQUEST_METHODS } from '../enums/index.js';
 import { CachedResponse, CacheConfig } from '../types/index.js';
+import { getNodeCrypto, simpleHashToHex } from './hash-utils.js';
+
+const nodeCrypto = getNodeCrypto();
 
 export class CacheManager {
     private cache: Map<string, CachedResponse>;
@@ -45,8 +47,12 @@ export class CacheManager {
             .join('|');
 
         const keyString = `${method}:${url}:${params}:${headerString}`;
-        
-        return crypto.createHash('sha256').update(keyString).digest('hex');
+
+        if (nodeCrypto?.createHash) {
+            return nodeCrypto.createHash('sha256').update(keyString).digest('hex');
+        }
+
+        return simpleHashToHex(keyString);
     }
 
     private shouldCacheMethod(method?: string): boolean {

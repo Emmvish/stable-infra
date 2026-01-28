@@ -11,10 +11,14 @@ import {
   RequestOrFunction,
   AnomalySeverity,
   ViolationType,
-  PersistenceStage
+  PersistenceStage,
+  RunnerJobs
 } from '../enums/index.js';
 
 import { CircuitBreaker } from '../utilities/index.js';
+
+export type CreateHash = (algorithm: string) => { update: (data: string) => { digest: (encoding: 'hex') => string } };
+export type NodeCryptoLike = { createHash?: CreateHash };
 
 export interface MetricGuardrail {
   min?: number;
@@ -825,6 +829,12 @@ export interface CachedResponse<T = any> {
   expiresAt: number;
 }
 
+export interface CachedFunctionResponse<T = any> {
+  data: T;
+  timestamp: number;
+  expiresAt: number;
+}
+
 export interface PhaseExecutionDecision<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
   action: PHASE_DECISION_ACTIONS;
   targetPhaseId?: string;
@@ -1277,3 +1287,21 @@ export interface WorkflowGraphExecutionPlan {
   dependencies: Map<string, string[]>;
   estimatedDepth: number;
 }
+
+export type RunnerJob =
+  | { kind: RunnerJobs.STABLE_REQUEST; options: STABLE_REQUEST }
+  | { kind: RunnerJobs.STABLE_FUNCTION; options: STABLE_FUNCTION }
+  | {
+      kind: RunnerJobs.STABLE_API_GATEWAY;
+      requests: API_GATEWAY_REQUEST[] | API_GATEWAY_ITEM[];
+      options: API_GATEWAY_OPTIONS;
+      functions?: API_GATEWAY_FUNCTION[];
+    }
+  | { kind: RunnerJobs.STABLE_WORKFLOW; phases: STABLE_WORKFLOW_PHASE[]; options?: STABLE_WORKFLOW_OPTIONS }
+  | { kind: RunnerJobs.STABLE_WORKFLOW_GRAPH; graph: WorkflowGraph; options?: WorkflowGraphOptions };
+
+export type RunnerConfig = {
+  outputPath?: string;
+  jobId: string;
+  job: RunnerJob;
+};

@@ -246,6 +246,75 @@
           </a>
         </div>
       </div>
+
+      <div class="section-header" style="margin-top: 48px;">
+        <h3><span class="gradient-text">Stable Runner</span> (Docker)</h3>
+        <p style="margin-top: 24px;">Run config-driven jobs using the built-in runner. Create a config file, build the image, and execute jobs with automatic re-runs on config changes.</p>
+      </div>
+
+      <div class="install-box">
+        <div class="install-commands">
+          <div class="code-box">
+            <div class="code-box-header">
+              <div class="code-box-dots">
+                <span></span><span></span><span></span>
+              </div>
+              <span class="code-box-lang">MJS</span>
+              <button class="copy-btn" onclick="copyCode(this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <pre class="install-pre" style="white-space: pre-wrap; word-wrap: break-word;"><code>// examples/runner-config.mjs
+import { RunnerJobs } from '@emmvish/stable-request';
+
+export default {
+  jobId: 'demo-001',
+  job: {
+    kind: RunnerJobs.STABLE_REQUEST,
+    options: {
+      reqData: { url: 'https://jsonplaceholder.typicode.com/todos/1', method: 'GET' },
+      resReq: true
+    }
+  }
+};</code></pre>
+          </div>
+
+          <div class="code-box">
+            <div class="code-box-header">
+              <div class="code-box-dots">
+                <span></span><span></span><span></span>
+              </div>
+              <span class="code-box-lang">BUILD</span>
+              <button class="copy-btn" onclick="copyCode(this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <pre class="install-pre" style="white-space: pre-wrap; word-wrap: break-word;"><code>docker build -t stable-request-runner .</code></pre>
+          </div>
+
+          <div class="code-box">
+            <div class="code-box-header">
+              <div class="code-box-dots">
+                <span></span><span></span><span></span>
+              </div>
+              <span class="code-box-lang">RUN</span>
+              <button class="copy-btn" onclick="copyCode(this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <pre class="install-pre" style="white-space: pre-wrap; word-wrap: break-word;"><code>docker run --rm \
+  -e CONFIG_PATH=/app/examples/runner-config.mjs \
+  -e OUTPUT_PATH=/app/output/result.json \
+  -e MAX_RUNS=1 \
+  -v "$(pwd)/examples:/app/examples" \
+  -v "$(pwd)/output:/app/output" \
+  stable-request-runner</code></pre>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- Core APIs Section -->

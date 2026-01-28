@@ -30,3 +30,4 @@ export { validateTrialModeProbabilities } from './validate-trial-mode-probabilit
 export { WorkflowGraphBuilder, createLinearWorkflowGraph } from './workflow-graph-builder.js';
 export { validateWorkflowGraph, detectCycles, detectUnreachableNodes, detectOrphanNodes, calculateGraphDepth } from './validate-workflow-graph.js';
 export { executeWorkflowGraph } from './execute-workflow-graph.js';
+export { getNodeCrypto, simpleHashToHex } from './hash-utils.js';

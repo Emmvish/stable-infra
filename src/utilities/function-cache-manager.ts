@@ -1,11 +1,7 @@
-import { FunctionCacheConfig } from '../types/index.js';
-import crypto from 'crypto';
+import { FunctionCacheConfig, CachedFunctionResponse } from '../types/index.js';
+import { getNodeCrypto, simpleHashToHex } from './hash-utils.js';
 
-export interface CachedFunctionResponse<T = any> {
-  data: T;
-  timestamp: number;
-  expiresAt: number;
-}
+const nodeCrypto = getNodeCrypto();
 
 export class FunctionCacheManager {
   private cache: Map<string, CachedFunctionResponse>;
@@ -35,8 +31,13 @@ export class FunctionCacheManager {
     
     const fnName = fn.name || fn.toString();
     const argsString = JSON.stringify(args);
-    const hash = crypto.createHash('md5').update(`${fnName}:${argsString}`).digest('hex');
-    return hash;
+    const keyString = `${fnName}:${argsString}`;
+
+    if (nodeCrypto?.createHash) {
+      return nodeCrypto.createHash('md5').update(keyString).digest('hex');
+    }
+
+    return simpleHashToHex(keyString);
   }
 
   get<TArgs extends any[], TReturn>(
