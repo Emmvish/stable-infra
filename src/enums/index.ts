@@ -75,3 +75,8 @@ export enum ViolationType {
   ABOVE_MAX = 'above_max',
   OUTSIDE_TOLERANCE = 'outside_tolerance'
 }
+
+export enum PersistenceStage {
+  BEFORE_HOOK = 'before_hook',
+  AFTER_HOOK = 'after_hook'
+}

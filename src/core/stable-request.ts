@@ -42,7 +42,8 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
       continueOnPreExecutionHookFailure: false,
     },
     commonBuffer = {},
-    executionContext
+    executionContext,
+    throwOnFailedErrorAnalysis = false
   } = options;
   let preExecutionResult: Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>> | unknown;
   try {
@@ -64,9 +65,22 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
       }
       Object.assign(options, finalOptions);
     }
-  } catch(e) {
+  } catch(e: any) {
     if (!preExecution?.continueOnPreExecutionHookFailure) {
-      throw e;
+      if (throwOnFailedErrorAnalysis) {
+        throw e;
+      }
+      return {
+        success: false,
+        error: e.message || 'Pre-execution hook failed',
+        metrics: {
+          totalAttempts: 0,
+          successfulAttempts: 0,
+          failedAttempts: 0,
+          totalExecutionTime: 0,
+          averageAttemptTime: 0
+        }
+      };
     }
   }
   const {
@@ -371,7 +385,7 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
       }
       return buildResult(true, resReq ? (res?.data ?? lastSuccessfulAttemptData!) : true);
     } else {
-      throw new Error(
+      const finalError = new Error(
         safelyStringify(
           {
             error: res?.error,
@@ -380,6 +394,37 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
           maxSerializableChars
         )
       );
+      
+      let errorAnalysisResult = false;
+      try {
+        errorAnalysisResult = await executeWithPersistence<boolean>(
+          finalErrorAnalyzer,
+          {
+            reqData,
+            error: finalError,
+            trialMode,
+            params: hookParams?.finalErrorAnalyzerParams,
+            preExecutionResult,
+            commonBuffer,
+            executionContext
+          },
+          statePersistence,
+          executionContext || {},
+          commonBuffer
+        );
+      } catch(errorAnalysisError: any) {
+        console.error(
+          `${formatLogContext(executionContext)}stable-request: Unable to analyze the final error returned. Error message provided by your finalErrorAnalyzer: ${safelyStringify(
+            errorAnalysisError.message,
+            maxSerializableChars
+          )}`
+        );
+      }
+
+      if (throwOnFailedErrorAnalysis && !errorAnalysisResult) {
+        throw finalError;
+      }
+      return buildResult(false, undefined, res?.error || 'Request failed');
     }
   } catch (e: any) {
     if (trialMode.enabled) {
@@ -411,7 +456,10 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
       );
     }
     if(!errorAnalysisResult) {
-      throw e;
+      if (throwOnFailedErrorAnalysis) {
+        throw e;
+      }
+      return buildResult(false, undefined, e.message || 'Request failed');
     } else {
       return buildResult(false, undefined, e.message || 'Request failed');
     }

@@ -1594,7 +1594,7 @@ const result = await stableWorkflow(phases, {
 #### Common Buffer (Request Level)
 
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest, PersistenceStage } from '@emmvish/stable-request';
 
 const commonBuffer = { transactionId: null };
 
@@ -2016,8 +2016,10 @@ const result = await stableWorkflow(phases, {
 
 Persist state across retry attempts for distributed tracing.
 
+The `persistenceFunction` receives a `persistenceStage` parameter (`PersistenceStage.BEFORE_HOOK` or `PersistenceStage.AFTER_HOOK`) to indicate when it is called.
+
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest, PersistenceStage } from '@emmvish/stable-request';
 
 interface DataRequest {}
 interface DataResponse { data: any; }
@@ -2027,19 +2029,19 @@ const result = await stableRequest<DataRequest, DataResponse>({
   resReq: true,
   attempts: 3,
   statePersistence: {
-    save: async (state, executionContext) => {
+    persistenceFunction: async ({ executionContext, buffer, params, persistenceStage }) => {
+      const key = `${executionContext.workflowId}:${executionContext.requestId}`;
+      if (persistenceStage === PersistenceStage.BEFORE_HOOK || params?.operation === 'load') {
+        // Load state for recovery
+        return await loadFromDatabase(key);
+      }
       // Save state to database or distributed cache
-      await saveToDatabase({
-        key: `${executionContext.workflowId}:${executionContext.requestId}`,
-        state
-      });
+      await saveToDatabase({ key, state: buffer });
+      return buffer;
     },
-    load: async (executionContext) => {
-      // Load state for recovery
-      return await loadFromDatabase(
-        `${executionContext.workflowId}:${executionContext.requestId}`
-      );
-    }
+    persistenceParams: { operation: 'save' },
+    loadBeforeHooks: true,
+    storeAfterHooks: true
   }
 });
 ```

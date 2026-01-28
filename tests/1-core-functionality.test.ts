@@ -98,7 +98,28 @@ describe('stableRequest - Core Functionality', () => {
     expect(mockedAxios.request).toHaveBeenCalledTimes(3);
   });
 
-  it('should throw error when all retry attempts are exhausted', async () => {
+  it('should return failed result when all retry attempts are exhausted', async () => {
+    mockedAxios.request.mockRejectedValue({
+      response: { status: 500, data: 'Server Error' },
+      code: undefined
+    });
+
+    const result = await stableRequest({
+      reqData: {
+        hostname: 'api.example.com',
+        path: '/data'
+      },
+      attempts: 3,
+      wait: 10
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+    expect(result.metrics?.totalAttempts).toBe(3);
+    expect(mockedAxios.request).toHaveBeenCalledTimes(3);
+  });
+
+  it('should throw error when all retry attempts are exhausted and throwOnFailedErrorAnalysis is true', async () => {
     mockedAxios.request.mockRejectedValue({
       response: { status: 500, data: 'Server Error' },
       code: undefined
@@ -111,7 +132,8 @@ describe('stableRequest - Core Functionality', () => {
           path: '/data'
         },
         attempts: 3,
-        wait: 10
+        wait: 10,
+        throwOnFailedErrorAnalysis: true
       })
     ).rejects.toThrow();
 
@@ -124,17 +146,16 @@ describe('stableRequest - Core Functionality', () => {
       code: undefined
     });
 
-    await expect(
-      stableRequest({
-        reqData: {
-          hostname: 'api.example.com',
-          path: '/missing'
-        },
-        attempts: 3,
-        wait: 10
-      })
-    ).rejects.toThrow();
+    const result = await stableRequest({
+      reqData: {
+        hostname: 'api.example.com',
+        path: '/missing'
+      },
+      attempts: 3,
+      wait: 10
+    });
 
+    expect(result.success).toBe(false);
     // Should only attempt once since 404 is not retryable
     expect(mockedAxios.request).toHaveBeenCalledTimes(1);
   });

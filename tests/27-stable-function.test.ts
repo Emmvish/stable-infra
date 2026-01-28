@@ -251,7 +251,26 @@ describe('stable-function', () => {
       expect(result.metrics?.totalAttempts).toBe(2);
     });
 
-    it('should throw error when finalErrorAnalyzer returns false', async () => {
+    it('should return failed result when finalErrorAnalyzer returns false', async () => {
+      const criticalFailure = () => {
+        throw new Error('Critical error');
+      };
+
+      const result = await stableFunction({
+        fn: criticalFailure,
+        args: [],
+        returnResult: true,
+        attempts: 1,
+        finalErrorAnalyzer: ({ error }) => {
+          return false; // Don't suppress the error
+        }
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+    });
+
+    it('should throw error when finalErrorAnalyzer returns false and throwOnFailedErrorAnalysis is true', async () => {
       const criticalFailure = () => {
         throw new Error('Critical error');
       };
@@ -264,7 +283,8 @@ describe('stable-function', () => {
           attempts: 1,
           finalErrorAnalyzer: ({ error }) => {
             return false; // Don't suppress the error
-          }
+          },
+          throwOnFailedErrorAnalysis: true
         })
       ).rejects.toThrow();
     });
@@ -1587,6 +1607,26 @@ describe('Stable Function - Error Handling with Limits', () => {
     });
 
     it('should handle final failure with rate and concurrency metrics', async () => {
+        // Test with throwOnFailedErrorAnalysis: false (default) - should return failed result with metrics
+        const result = await stableFunction({
+            fn: errorFunction,
+            args: [true],
+            returnResult: true,
+            attempts: 3,
+            wait: 10,
+            rateLimit: {
+                maxRequests: 10,
+                windowMs: 1000
+            },
+            maxConcurrentRequests: 5
+        });
+        
+        expect(result.success).toBe(false);
+        expect(result.error).toBeDefined();
+        expect(result.metrics).toBeDefined();
+    });
+
+    it('should throw error with rate and concurrency metrics when throwOnFailedErrorAnalysis is true', async () => {
         try {
             await stableFunction({
                 fn: errorFunction,
@@ -1598,10 +1638,12 @@ describe('Stable Function - Error Handling with Limits', () => {
                     maxRequests: 10,
                     windowMs: 1000
                 },
-                maxConcurrentRequests: 5
+                maxConcurrentRequests: 5,
+                throwOnFailedErrorAnalysis: true
             });
             
-            fail('Should have thrown an error');
+            // If we reach here, the test should fail
+            expect(true).toBe(false);
         } catch (error: any) {
             expect(error).toBeDefined();
             expect(error.message).toContain('Simulated failure');

@@ -821,6 +821,7 @@
   REQUEST_METHODS,
   RequestOrFunction,
   RETRY_STRATEGIES,
+  PersistenceStage,
   <span class="keyword">type</span> <span class="type">STABLE_WORKFLOW_PHASE</span>
 } <span class="keyword">from</span> <span class="string">'@emmvish/stable-request'</span>;
 
@@ -1006,10 +1007,13 @@
   
   <span class="comment">// State persistence for recovery</span>
   <span class="property">statePersistence</span>: {
-    <span class="property">persistenceFunction</span>: <span class="keyword">async ({ executionContext, buffer }) =></span> {
+    <span class="property">persistenceFunction</span>: <span class="keyword">async ({ executionContext, buffer, persistenceStage }) =></span> {
       <span class="keyword">const</span> key = <span class="string">`workflow:${executionContext.workflowId}`</span>;
+      <span class="keyword">if</span> (persistenceStage === PersistenceStage.<span class="property">BEFORE_HOOK</span>) {
+        <span class="keyword">return</span> (<span class="keyword">await</span> redis.get(key)) || buffer;
+      }
       <span class="keyword">await</span> redis.set(key, buffer);
-      <span class="keyword">return</span> (<span class="keyword">await</span> redis.get(key)) || buffer;
+      <span class="keyword">return</span> buffer;
     }
   },
   

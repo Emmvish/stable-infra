@@ -51,7 +51,8 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
       continueOnPreExecutionHookFailure: false,
     },
     commonBuffer = {},
-    executionContext
+    executionContext,
+    throwOnFailedErrorAnalysis = false
   } = options;
   
   let preExecutionResult: Partial<STABLE_FUNCTION<TArgs, TReturn>> | unknown;
@@ -74,9 +75,22 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
       }
       Object.assign(options, finalOptions);
     }
-  } catch(e) {
+  } catch(e: any) {
     if (!preExecution?.continueOnPreExecutionHookFailure) {
-      throw e;
+      if (throwOnFailedErrorAnalysis) {
+        throw e;
+      }
+      return {
+        success: false,
+        error: e.message || 'Pre-execution hook failed',
+        metrics: {
+          totalAttempts: 0,
+          successfulAttempts: 0,
+          failedAttempts: 0,
+          totalExecutionTime: 0,
+          averageAttemptTime: 0
+        }
+      };
     }
   }
 
@@ -425,7 +439,7 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
       }
         return buildResult(true, returnResult ? ((res?.data ?? lastSuccessfulAttemptData) as TReturn) : true);
     } else {
-      throw new Error(
+      const finalError = new Error(
         safelyStringify(
           {
             error: res?.error,
@@ -435,6 +449,38 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
           maxSerializableChars
         )
       );
+
+      let errorAnalysisResult = false;
+      try {
+        errorAnalysisResult = await executeWithPersistence<boolean>(
+          finalErrorAnalyzer,
+          {
+            fn,
+            args,
+            error: finalError,
+            trialMode,
+            params: hookParams?.finalErrorAnalyzerParams,
+            preExecutionResult,
+            commonBuffer,
+            executionContext
+          },
+          statePersistence,
+          executionContext || {},
+          commonBuffer
+        );
+      } catch(errorAnalysisError: any) {
+        console.error(
+          `${formatLogContext(executionContext)}stable-request: Unable to analyze the final error returned. Error message provided by your finalErrorAnalyzer: ${safelyStringify(
+            errorAnalysisError.message,
+            maxSerializableChars
+          )}`
+        );
+      }
+
+      if (throwOnFailedErrorAnalysis && !errorAnalysisResult) {
+        throw finalError;
+      }
+      return buildResult(false, undefined, res?.error || 'Function execution failed');
     }
   } catch (e: any) {
     if (trialMode.enabled) {
@@ -469,7 +515,10 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
     }
 
     if(!errorAnalysisResult) {
-      throw e;
+      if (throwOnFailedErrorAnalysis) {
+        throw e;
+      }
+      return buildResult(false, undefined, e.message || 'Function execution failed');
     } else {
       return buildResult(false, undefined, e.message || 'Function execution failed');
     }
@@ -490,6 +539,9 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
     if (e instanceof TimeoutError) {
       return buildResult(false, undefined, e.message);
     }
-    throw e;
+    if (throwOnFailedErrorAnalysis) {
+      throw e;
+    }
+    return buildResult(false, undefined, e.message || 'Function execution failed');
   }
 }

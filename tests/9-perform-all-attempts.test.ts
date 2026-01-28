@@ -61,24 +61,25 @@ describe('PerformAllAttempts Mode', () => {
     expect(mockedAxios.request).toHaveBeenCalledTimes(3);
   });
 
-  it('should throw error if all attempts fail even with performAllAttempts', async () => {
+  it('should return failed result if all attempts fail even with performAllAttempts', async () => {
     mockedAxios.request.mockRejectedValue({
       response: { status: 500, data: 'Error' },
       code: undefined
     });
 
-    await expect(
-      stableRequest({
-        reqData: {
-          hostname: 'api.example.com',
-          path: '/test'
-        },
-        attempts: 3,
-        wait: 10,
-        performAllAttempts: true
-      })
-    ).rejects.toThrow();
+    const result = await stableRequest({
+      reqData: {
+        hostname: 'api.example.com',
+        path: '/test'
+      },
+      attempts: 3,
+      wait: 10,
+      performAllAttempts: true
+    });
 
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+    expect(result.metrics?.totalAttempts).toBe(3);
     expect(mockedAxios.request).toHaveBeenCalledTimes(3);
   });
 

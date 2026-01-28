@@ -122,19 +122,18 @@ describe('Hook System - Observability & Analysis', () => {
       code: 'ECONNREFUSED'
     });
 
-    await expect(
-      stableRequest({
-        reqData: {
-          hostname: 'api.example.com',
-          path: '/data'
-        },
-        attempts: 2,
-        wait: 10,
-        logAllErrors: true,
-        handleErrors: errorHandler
-      })
-    ).rejects.toThrow();
+    const result = await stableRequest({
+      reqData: {
+        hostname: 'api.example.com',
+        path: '/data'
+      },
+      attempts: 2,
+      wait: 10,
+      logAllErrors: true,
+      handleErrors: errorHandler
+    });
 
+    expect(result.success).toBe(false);
     expect(errorHandler).toHaveBeenCalledWith(
       expect.objectContaining({
         errorLog: expect.objectContaining({
@@ -160,19 +159,18 @@ describe('Hook System - Observability & Analysis', () => {
       code: undefined
     });
 
-    // Should not throw due to hook error, but due to actual request error
-    await expect(
-      stableRequest({
-        reqData: {
-          hostname: 'api.example.com',
-          path: '/data'
-        },
-        attempts: 1,
-        logAllErrors: true,
-        handleErrors: brokenHandler
-      })
-    ).rejects.toThrow();
+    // Should return failed result, not throw due to hook error
+    const result = await stableRequest({
+      reqData: {
+        hostname: 'api.example.com',
+        path: '/data'
+      },
+      attempts: 1,
+      logAllErrors: true,
+      handleErrors: brokenHandler
+    });
 
+    expect(result.success).toBe(false);
     expect(brokenHandler).toHaveBeenCalled();
   });
 

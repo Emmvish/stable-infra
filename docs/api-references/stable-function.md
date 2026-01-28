@@ -75,6 +75,7 @@ interface STABLE_FUNCTION<TArgs extends any[] = any[], TReturn = any> {
   maxConcurrentRequests?: number;
   executionTimeout?: number;
   metricsGuardrails?: MetricsGuardrails;
+  throwOnFailedErrorAnalysis?: boolean;
 }
 ```
 
@@ -105,11 +106,12 @@ interface STABLE_FUNCTION<TArgs extends any[] = any[], TReturn = any> {
 | `cache` | `FunctionCacheConfig` | No | `undefined` | Caching configuration for function results. |
 | `executionContext` | `ExecutionContext` | No | `undefined` | Context metadata (workflowId, phaseId, etc.) for tracing. |
 | `circuitBreaker` | `CircuitBreakerConfig \| CircuitBreaker` | No | `undefined` | Circuit breaker configuration or instance. |
-| `statePersistence` | `StatePersistenceConfig` | No | `undefined` | State persistence configuration for external storage. |
+| `statePersistence` | `StatePersistenceConfig` | No | `undefined` | State persistence configuration for external storage. `persistenceFunction` receives `persistenceStage` (`PersistenceStage.BEFORE_HOOK` \| `PersistenceStage.AFTER_HOOK`). |
 | `rateLimit` | `RateLimitConfig` | No | `undefined` | Rate limiting configuration (maxRequests, windowMs). |
 | `maxConcurrentRequests` | `number` | No | `undefined` | Maximum number of concurrent executions (semaphore). |
 | `executionTimeout` | `number` | No | `undefined` | Maximum execution time in milliseconds. Throws TimeoutError if exceeded. Covers entire execution including all retry attempts. |
 | `metricsGuardrails` | `MetricsGuardrails` | No | `undefined` | Metrics validation guardrails with min/max thresholds for function metrics (see `MetricsGuardrailsInfrastructure`, `MetricsGuardrailsCommon`). |
+| `throwOnFailedErrorAnalysis` | `boolean` | No | `false` | If `true`, throws when `finalErrorAnalyzer` returns `false`. Otherwise returns a failed result with metrics. |
 
 ---
 
@@ -777,7 +779,7 @@ const result = await stableFunction<[any[]], { processed: number }>({
   },
   
   statePersistence: {
-    persistenceFunction: async ({ executionContext, buffer, params }) => {
+    persistenceFunction: async ({ executionContext, buffer, params, persistenceStage }) => {
       const key = `fn_${executionContext.workflowId}_state`;
       
       if (params?.operation === 'load') {

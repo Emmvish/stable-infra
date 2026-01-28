@@ -81,23 +81,22 @@ describe('stableRequest - preExecution option (stableRequest)', () => {
       code: undefined
     });
 
-    await expect(
-      stableRequest({
-        reqData: { hostname: 'api.example.com', path: '/no-override' },
-        resReq: true,
-        attempts: 1,
-        wait: 1,
-        retryStrategy: RETRY_STRATEGIES.FIXED,
-        preExecution: {
-          preExecutionHook: () => ({ attempts: 3 }),
-          preExecutionHookParams: {},
-          applyPreExecutionConfigOverride: false,
-          continueOnPreExecutionHookFailure: false
-        },
-        commonBuffer: {}
-      })
-    ).rejects.toThrow();
+    const result = await stableRequest({
+      reqData: { hostname: 'api.example.com', path: '/no-override' },
+      resReq: true,
+      attempts: 1,
+      wait: 1,
+      retryStrategy: RETRY_STRATEGIES.FIXED,
+      preExecution: {
+        preExecutionHook: () => ({ attempts: 3 }),
+        preExecutionHookParams: {},
+        applyPreExecutionConfigOverride: false,
+        continueOnPreExecutionHookFailure: false
+      },
+      commonBuffer: {}
+    });
 
+    expect(result.success).toBe(false);
     expect(mockedAxios.request).toHaveBeenCalledTimes(1);
   });
 
@@ -132,7 +131,30 @@ describe('stableRequest - preExecution option (stableRequest)', () => {
     );
   });
 
-  it('throws if preExecutionHook throws and continueOnPreExecutionHookFailure=false (axios not called)', async () => {
+  it('returns failed result if preExecutionHook throws and continueOnPreExecutionHookFailure=false (axios not called)', async () => {
+    const preExecutionHook = () => {
+      throw new Error('pre-exec failed');
+    };
+
+    const result = await stableRequest({
+      reqData: { hostname: 'api.example.com', path: '/will-not-run' },
+      attempts: 1,
+      wait: 1,
+      preExecution: {
+        preExecutionHook,
+        preExecutionHookParams: {},
+        applyPreExecutionConfigOverride: true,
+        continueOnPreExecutionHookFailure: false
+      },
+      commonBuffer: {}
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('pre-exec failed');
+    expect(mockedAxios.request).not.toHaveBeenCalled();
+  });
+
+  it('throws if preExecutionHook throws and continueOnPreExecutionHookFailure=false with throwOnFailedErrorAnalysis=true', async () => {
     const preExecutionHook = () => {
       throw new Error('pre-exec failed');
     };
@@ -148,7 +170,8 @@ describe('stableRequest - preExecution option (stableRequest)', () => {
           applyPreExecutionConfigOverride: true,
           continueOnPreExecutionHookFailure: false
         },
-        commonBuffer: {}
+        commonBuffer: {},
+        throwOnFailedErrorAnalysis: true
       })
     ).rejects.toThrow('pre-exec failed');
 

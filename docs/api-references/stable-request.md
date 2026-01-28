@@ -74,6 +74,7 @@ interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   circuitBreaker?: CircuitBreakerConfig | CircuitBreaker;
   statePersistence?: StatePersistenceConfig;
   metricsGuardrails?: MetricsGuardrails;
+  throwOnFailedErrorAnalysis?: boolean;
 }
 ```
 
@@ -103,8 +104,9 @@ interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
 | `cache` | `CacheConfig` | No | `undefined` | Caching configuration for HTTP responses. |
 | `executionContext` | `ExecutionContext` | No | `undefined` | Context metadata (workflowId, phaseId, requestId) for tracing. |
 | `circuitBreaker` | `CircuitBreakerConfig \| CircuitBreaker` | No | `undefined` | Circuit breaker configuration or instance. |
-| `statePersistence` | `StatePersistenceConfig` | No | `undefined` | State persistence configuration for external storage. |
+| `statePersistence` | `StatePersistenceConfig` | No | `undefined` | State persistence configuration for external storage. `persistenceFunction` receives `persistenceStage` (`PersistenceStage.BEFORE_HOOK` \| `PersistenceStage.AFTER_HOOK`). |
 | `metricsGuardrails` | `MetricsGuardrails` | No | `undefined` | Metrics validation guardrails with min/max thresholds for request metrics (see `MetricsGuardrailsRequest`, `MetricsGuardrailsInfrastructure`, `MetricsGuardrailsCommon`). |
+| `throwOnFailedErrorAnalysis` | `boolean` | No | `false` | If `true`, throws when `finalErrorAnalyzer` returns `false`. Otherwise returns a failed result with metrics. |
 
 ### REQUEST_DATA Interface
 

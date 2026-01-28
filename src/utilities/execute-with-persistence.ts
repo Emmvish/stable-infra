@@ -1,3 +1,4 @@
+import { PersistenceStage } from '../enums/index.js';
 import { StatePersistenceConfig, ExecutionContext } from '../types/index.js';
 import { safelyExecuteUnknownFunction } from './safely-execute-unknown-function.js';
 import { formatLogContext } from './format-log-context.js';
@@ -16,7 +17,8 @@ export async function executeWithPersistence<T = any>(
         {
           executionContext,
           params: persistenceConfig.persistenceParams,
-          buffer: { ...buffer }
+          buffer: { ...buffer },
+          persistenceStage: PersistenceStage.BEFORE_HOOK
         }
       );
       
@@ -39,7 +41,8 @@ export async function executeWithPersistence<T = any>(
         {
           executionContext,
           params: persistenceConfig.persistenceParams,
-          buffer: { ...buffer }
+          buffer: { ...buffer },
+          persistenceStage: PersistenceStage.AFTER_HOOK
         }
       );
     } catch (error: any) {

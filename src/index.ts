@@ -19,6 +19,7 @@ export {
     WorkflowNodeTypes,
     AnomalySeverity,
     ViolationType,
+    PersistenceStage
 } from './enums/index.js';
 
 export type {

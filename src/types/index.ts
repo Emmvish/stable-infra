@@ -11,6 +11,7 @@ import {
   RequestOrFunction,
   AnomalySeverity,
   ViolationType,
+  PersistenceStage
 } from '../enums/index.js';
 
 import { CircuitBreaker } from '../utilities/index.js';
@@ -474,6 +475,7 @@ export interface FunctionPreExecutionOptions<FunctionArgsType extends any[] = an
 
 export interface StatePersistenceOptions {
   executionContext: ExecutionContext;
+  persistenceStage: PersistenceStage;
   params?: any;
   buffer: Record<string, any>;
 }
@@ -514,6 +516,7 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   circuitBreaker?: CircuitBreakerConfig | CircuitBreaker;
   statePersistence?: StatePersistenceConfig;
   metricsGuardrails?: MetricsGuardrails;
+  throwOnFailedErrorAnalysis?: boolean;
 }
 
 export interface STABLE_FUNCTION<FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
@@ -548,6 +551,7 @@ export interface STABLE_FUNCTION<FunctionArgsType extends any[] = any[], Functio
   rateLimit?: RateLimitConfig;
   maxConcurrentRequests?: number;
   metricsGuardrails?: MetricsGuardrails;
+  throwOnFailedErrorAnalysis?: boolean;
   executionTimeout?: number;
 }
 

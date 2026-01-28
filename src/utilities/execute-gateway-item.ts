@@ -56,7 +56,11 @@ export async function executeGatewayRequest<RequestDataType = any, ResponseDataT
         const result: STABLE_REQUEST_RESULT<ResponseDataType> = await stableRequest<RequestDataType, ResponseDataType>(finalRequestOptions);
         
         if (circuitBreaker && !circuitBreaker.getState().config.trackIndividualAttempts) {
-            circuitBreaker.recordSuccess();
+            if (result.success) {
+                circuitBreaker.recordSuccess();
+            } else {
+                circuitBreaker.recordFailure();
+            }
         }
         
         return {
@@ -124,7 +128,11 @@ export async function executeGatewayFunction<TArgs extends any[] = any[], TRetur
         const result: STABLE_FUNCTION_RESULT<TReturn> = await stableFunction<TArgs, TReturn>(finalFunctionOptions);
         
         if (circuitBreaker && !circuitBreaker.getState().config.trackIndividualAttempts) {
-            circuitBreaker.recordSuccess();
+            if (result.success) {
+                circuitBreaker.recordSuccess();
+            } else {
+                circuitBreaker.recordFailure();
+            }
         }
         
         return {

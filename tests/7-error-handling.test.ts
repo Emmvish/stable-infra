@@ -67,17 +67,16 @@ describe('Error Handling', () => {
       message: 'Request cancelled'
     });
 
-    await expect(
-      stableRequest({
-        reqData: {
-          hostname: 'api.example.com',
-          path: '/data'
-        },
-        attempts: 3,
-        wait: 10
-      })
-    ).rejects.toThrow();
+    const result = await stableRequest({
+      reqData: {
+        hostname: 'api.example.com',
+        path: '/data'
+      },
+      attempts: 3,
+      wait: 10
+    });
 
+    expect(result.success).toBe(false);
     // Should not retry cancelled requests
     expect(mockedAxios.request).toHaveBeenCalledTimes(1);
   });
@@ -102,7 +101,26 @@ describe('Error Handling', () => {
     expect(result.success).toBe(false);
   });
 
-  it('should throw error when finalErrorAnalyzer returns false', async () => {
+  it('should return failed result when finalErrorAnalyzer returns false', async () => {
+    mockedAxios.request.mockRejectedValue({
+      response: { status: 500, data: 'Server Error' },
+      message: 'Server Error'
+    });
+
+    const result = await stableRequest({
+      reqData: {
+        hostname: 'api.example.com',
+        path: '/critical'
+      },
+      attempts: 1,
+      finalErrorAnalyzer: async () => false
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+  });
+
+  it('should throw error when finalErrorAnalyzer returns false and throwOnFailedErrorAnalysis is true', async () => {
     mockedAxios.request.mockRejectedValue({
       response: { status: 500, data: 'Server Error' },
       message: 'Server Error'
@@ -115,7 +133,8 @@ describe('Error Handling', () => {
           path: '/critical'
         },
         attempts: 1,
-        finalErrorAnalyzer: async () => false
+        finalErrorAnalyzer: async () => false,
+        throwOnFailedErrorAnalysis: true
       })
     ).rejects.toThrow();
   });
