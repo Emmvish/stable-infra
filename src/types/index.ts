@@ -1315,6 +1315,8 @@ export interface SchedulerConfig<TJob = unknown> {
   timezone?: string;
   persistence?: SchedulerPersistence<TJob>;
   retry?: SchedulerRetryConfig;
+  executionTimeoutMs?: number;
+  persistenceDebounceMs?: number;
 }
 
 export interface SchedulerRunContext {
@@ -1378,6 +1380,7 @@ export type RunnerScheduledJob = RunnerJob & {
   id?: string;
   schedule?: SchedulerSchedule;
   retry?: SchedulerRetryConfig;
+  executionTimeoutMs?: number;
 };
 
 export type RunnerConfig = {

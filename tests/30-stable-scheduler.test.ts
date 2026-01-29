@@ -203,4 +203,52 @@ describe('StableScheduler', () => {
     expect(jobState.retryAttempts).toBe(0);
     scheduler.stop();
   });
+
+  test('times out long-running handlers and records failure', async () => {
+    const scheduler = new StableScheduler({ maxParallel: 1, tickIntervalMs: 50, executionTimeoutMs: 100 }, async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+    });
+
+    scheduler.addJobs([{ id: 'timeout-job' }]);
+    scheduler.tick();
+    await flushPromises();
+
+    await jest.advanceTimersByTimeAsync(100);
+    await flushPromises();
+
+    expect(scheduler.getStats().failed).toBe(1);
+    scheduler.stop();
+  });
+
+  test('debounces persistence saves', async () => {
+    let saveCount = 0;
+
+    const scheduler = new StableScheduler(
+      {
+        maxParallel: 1,
+        tickIntervalMs: 50,
+        persistenceDebounceMs: 200,
+        persistence: {
+          enabled: true,
+          saveState: () => {
+            saveCount += 1;
+          }
+        }
+      },
+      async () => {}
+    );
+
+    scheduler.addJobs([{ id: 'job-1' }, { id: 'job-2' }]);
+    scheduler.tick();
+    scheduler.tick();
+    await flushPromises();
+
+    expect(saveCount).toBe(0);
+
+    await jest.advanceTimersByTimeAsync(200);
+    await flushPromises();
+
+    expect(saveCount).toBe(1);
+    scheduler.stop();
+  });
 });

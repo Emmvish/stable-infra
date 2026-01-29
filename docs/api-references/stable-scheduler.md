@@ -38,6 +38,8 @@ interface SchedulerConfig<TJob = unknown> {
 	timezone?: string;
 	persistence?: SchedulerPersistence<TJob>;
 	retry?: SchedulerRetryConfig;
+	executionTimeoutMs?: number;
+	persistenceDebounceMs?: number;
 }
 
 interface SchedulerPersistence<TJob = unknown> {
@@ -64,6 +66,8 @@ interface SchedulerRetryConfig {
 | `timezone` | `string?` | `undefined` | Optional timezone hint for cron parsing (best-effort). |
 | `persistence` | `SchedulerPersistence?` | `undefined` | Custom persistence handlers for state recoverability. |
 | `retry` | `SchedulerRetryConfig?` | `undefined` | Default retry policy applied when a job does not specify `retry`. |
+| `executionTimeoutMs` | `number?` | `86400000` | Max handler execution time (ms) before timing out and marking failure. |
+| `persistenceDebounceMs` | `number?` | `1000` | Debounce window for persistence writes to reduce rapid saves. |
 
 ---
 
@@ -111,6 +115,8 @@ The handler is invoked for each scheduled job and receives execution metadata li
 ## Retry Behavior
 
 Retries are opt-in. Provide a retry policy in `SchedulerConfig.retry` or per job using `job.retry`. When a job fails, the scheduler retries up to `maxAttempts` (including the initial attempt). The next retry is scheduled after `delayMs` with optional exponential backoff via `backoffMultiplier`, capped by `maxDelayMs`.
+
+Execution timeouts are also opt-in. Set `SchedulerConfig.executionTimeoutMs` to apply a default timeout, or add `executionTimeoutMs` to a job to override it. When a timeout occurs, the run is marked as a failure.
 
 ---
 

@@ -9,7 +9,9 @@ import type {
   ScheduledJob
 } from '../types/index.js';
 
-export class StableScheduler<TJob extends { id?: string; schedule?: SchedulerSchedule; retry?: SchedulerRetryConfig }> {
+export class StableScheduler<
+  TJob extends { id?: string; schedule?: SchedulerSchedule; retry?: SchedulerRetryConfig; executionTimeoutMs?: number }
+> {
   private readonly config: {
     maxParallel: number;
     tickIntervalMs: number;
@@ -21,12 +23,16 @@ export class StableScheduler<TJob extends { id?: string; schedule?: SchedulerSch
       loadState?: () => Promise<SchedulerState<TJob> | null> | SchedulerState<TJob> | null;
     };
     retry?: SchedulerRetryConfig;
+    executionTimeoutMs?: number;
+    persistenceDebounceMs?: number;
   };
   private readonly handler: SchedulerJobHandler<TJob>;
   private readonly jobs = new Map<string, ScheduledJob<TJob>>();
   private readonly queue: string[] = [];
   private readonly queued = new Set<string>();
   private timer: NodeJS.Timeout | null = null;
+  private persistTimer: NodeJS.Timeout | null = null;
+  private persistQueued = false;
   private runningCount = 0;
   private completed = 0;
   private failed = 0;
@@ -44,7 +50,9 @@ export class StableScheduler<TJob extends { id?: string; schedule?: SchedulerSch
         saveState: config.persistence?.saveState as ((state: SchedulerState<TJob>) => Promise<void> | void) | undefined,
         loadState: config.persistence?.loadState as (() => Promise<SchedulerState<TJob> | null> | SchedulerState<TJob> | null) | undefined
       },
-      retry: config.retry
+      retry: config.retry,
+      executionTimeoutMs: config.executionTimeoutMs ?? 86400000,
+      persistenceDebounceMs: config.persistenceDebounceMs ?? 1000
     };
     this.handler = handler;
   }
@@ -238,7 +246,10 @@ export class StableScheduler<TJob extends { id?: string; schedule?: SchedulerSch
 
     let jobError: unknown = null;
 
-    void this.handler(job.job, context)
+    const handlerPromise = this.handler(job.job, context);
+    const executionPromise = this.withTimeout(handlerPromise, this.getExecutionTimeoutMs(job));
+
+    void executionPromise
       .then(() => {
         this.completed += 1;
         job.retryAttempts = 0;
@@ -265,6 +276,10 @@ export class StableScheduler<TJob extends { id?: string; schedule?: SchedulerSch
     return job.job.retry ?? this.config.retry;
   }
 
+  private getExecutionTimeoutMs(job: ScheduledJob<TJob>): number | undefined {
+    return (job.job as { executionTimeoutMs?: number }).executionTimeoutMs ?? this.config.executionTimeoutMs;
+  }
+
   private scheduleRetryIfEnabled(job: ScheduledJob<TJob>, startedAt: number, error: unknown): boolean {
     if (!error) {
       return false;
@@ -287,6 +302,28 @@ export class StableScheduler<TJob extends { id?: string; schedule?: SchedulerSch
 
     job.nextRunAt = startedAt + Math.max(0, delay);
     return true;
+  }
+
+  private withTimeout<T>(promise: Promise<T>, timeoutMs?: number): Promise<T> {
+    if (!timeoutMs || timeoutMs <= 0) {
+      return promise;
+    }
+
+    return new Promise<T>((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error(`Scheduler job timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      promise
+        .then((value) => {
+          clearTimeout(timeoutId);
+          resolve(value);
+        })
+        .catch((error) => {
+          clearTimeout(timeoutId);
+          reject(error);
+        });
+    });
   }
 
   private initializeSchedule(schedule: SchedulerSchedule | undefined, now: number): {
@@ -392,13 +429,18 @@ export class StableScheduler<TJob extends { id?: string; schedule?: SchedulerSch
     let candidate = new Date(fromMs + 1000);
     for (let i = 0; i < maxIterations; i += 1) {
       const candidateDate = candidate;
+      const parts = this.getCronDateParts(candidateDate, timezone);
+      if (!parts) {
+        return null;
+      }
+
       const match =
-        seconds.has(candidateDate.getSeconds()) &&
-        minutes.has(candidateDate.getMinutes()) &&
-        hours.has(candidateDate.getHours()) &&
-        days.has(candidateDate.getDate()) &&
-        months.has(candidateDate.getMonth() + 1) &&
-        dows.has(candidateDate.getDay());
+        seconds.has(parts.second) &&
+        minutes.has(parts.minute) &&
+        hours.has(parts.hour) &&
+        days.has(parts.day) &&
+        months.has(parts.month) &&
+        dows.has(parts.dow);
       if (match) {
         return candidateDate.getTime();
       }
@@ -473,15 +515,127 @@ export class StableScheduler<TJob extends { id?: string; schedule?: SchedulerSch
     return /^\d+$/.test(value);
   }
 
+  private getCronDateParts(date: Date, timezone?: string): {
+    second: number;
+    minute: number;
+    hour: number;
+    day: number;
+    month: number;
+    dow: number;
+  } | null {
+    if (!timezone) {
+      return {
+        second: date.getSeconds(),
+        minute: date.getMinutes(),
+        hour: date.getHours(),
+        day: date.getDate(),
+        month: date.getMonth() + 1,
+        dow: date.getDay()
+      };
+    }
+
+    try {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        hour12: false,
+        weekday: 'short',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+
+      const parts = formatter.formatToParts(date);
+      const partMap = new Map(parts.map((part) => [part.type, part.value]));
+
+      const month = Number(partMap.get('month'));
+      const day = Number(partMap.get('day'));
+      const hour = Number(partMap.get('hour'));
+      const minute = Number(partMap.get('minute'));
+      const second = Number(partMap.get('second'));
+      const weekday = partMap.get('weekday');
+
+      if (
+        Number.isNaN(month) ||
+        Number.isNaN(day) ||
+        Number.isNaN(hour) ||
+        Number.isNaN(minute) ||
+        Number.isNaN(second) ||
+        !weekday
+      ) {
+        return null;
+      }
+
+      const weekdayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(weekday);
+      if (weekdayIndex === -1) {
+        return null;
+      }
+
+      return {
+        second,
+        minute,
+        hour,
+        day,
+        month,
+        dow: weekdayIndex
+      };
+    } catch {
+      return null;
+    }
+  }
+
   private createId(prefix: string): string {
-    this.sequence += 1;
-    return `${prefix}-${Date.now()}-${this.sequence}`;
+    return `${prefix}-${this.generateUuid()}-${Date.now()}`;
+  }
+
+  private generateUuid(): string {
+    if (typeof globalThis.crypto?.randomUUID === 'function') {
+      return globalThis.crypto.randomUUID();
+    }
+
+    const bytes = new Uint8Array(16);
+    if (typeof globalThis.crypto?.getRandomValues === 'function') {
+      globalThis.crypto.getRandomValues(bytes);
+    } else {
+      for (let i = 0; i < bytes.length; i += 1) {
+        bytes[i] = Math.floor(Math.random() * 256);
+      }
+    }
+
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0'));
+    return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex
+      .slice(6, 8)
+      .join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10, 16).join('')}`;
   }
 
   private async persistStateIfEnabled(): Promise<void> {
     if (!this.config.persistence.enabled || !this.config.persistence.saveState) {
       return;
     }
+    const debounceMs = this.config.persistenceDebounceMs ?? 0;
+    if (debounceMs > 0) {
+      if (this.persistTimer) {
+        this.persistQueued = true;
+        return;
+      }
+
+      this.persistQueued = false;
+      this.persistTimer = setTimeout(async () => {
+        this.persistTimer = null;
+        const state = this.getState();
+        await this.config.persistence.saveState?.(state);
+        if (this.persistQueued) {
+          void this.persistStateIfEnabled();
+        }
+      }, debounceMs);
+      return;
+    }
+
     const state = this.getState();
     await this.config.persistence.saveState(state);
   }
