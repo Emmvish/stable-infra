@@ -266,6 +266,7 @@
               </button>
             </div>
             <pre class="install-pre" style="white-space: pre-wrap; word-wrap: break-word;"><code>// examples/runner-config.mjs
+              
 import { RunnerJobs } from '@emmvish/stable-request';
 
 export default {
@@ -273,7 +274,10 @@ export default {
   job: {
     kind: RunnerJobs.STABLE_REQUEST,
     options: {
-      reqData: { url: 'https://jsonplaceholder.typicode.com/todos/1' },
+      reqData: { 
+        hostname: 'jsonplaceholder.typicode.com',
+        path: '/todos/1'
+      },
       resReq: true
     }
   }
