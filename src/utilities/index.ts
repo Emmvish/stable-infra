@@ -31,3 +31,4 @@ export { WorkflowGraphBuilder, createLinearWorkflowGraph } from './workflow-grap
 export { validateWorkflowGraph, detectCycles, detectUnreachableNodes, detectOrphanNodes, calculateGraphDepth } from './validate-workflow-graph.js';
 export { executeWorkflowGraph } from './execute-workflow-graph.js';
 export { getNodeCrypto, simpleHashToHex } from './hash-utils.js';
+export { isStableBuffer, withBuffer } from './buffer-utils.js';

@@ -142,3 +142,8 @@ export const SCHEDULER_METRICS_TO_VALIDATE_KEYS = [
     'averageExecutionTime',
     'averageQueueDelay'
 ] as const;
+
+export const STABLE_BUFFER_METRICS_TO_VALIDATE_KEYS = [
+    'totalTransactions',
+    'averageQueueWaitMs'
+] as const;

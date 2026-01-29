@@ -11,7 +11,7 @@ import type {
   ScheduledJob,
   InternalSchedulerConfig
 } from '../types/index.js';
-import { MetricsValidator } from '../utilities/index.js';
+import { isStableBuffer, MetricsValidator } from '../utilities/index.js';
 
 export class StableScheduler<
   TJob extends { id?: string; schedule?: SchedulerSchedule; retry?: SchedulerRetryConfig; executionTimeoutMs?: number }
@@ -193,6 +193,9 @@ export class StableScheduler<
   }
 
   getState(): SchedulerState<TJob> {
+    const sharedBufferSnapshot = isStableBuffer(this.config.sharedBuffer)
+      ? this.config.sharedBuffer.read()
+      : this.config.sharedBuffer;
     return {
       jobs: Array.from(this.jobs.values()).map((job) => ({
         id: job.id,
@@ -212,7 +215,7 @@ export class StableScheduler<
         dropped: this.dropped,
         sequence: this.sequence
       },
-      sharedBuffer: this.config.sharedBuffer
+      sharedBuffer: sharedBufferSnapshot
     };
   }
 
@@ -236,7 +239,11 @@ export class StableScheduler<
     this.dropped = resolvedState.stats.dropped;
     this.sequence = resolvedState.stats.sequence;
     if (resolvedState.sharedBuffer !== undefined) {
-      this.config.sharedBuffer = resolvedState.sharedBuffer;
+      if (isStableBuffer(this.config.sharedBuffer)) {
+        this.config.sharedBuffer.setState(resolvedState.sharedBuffer as Record<string, any>);
+      } else {
+        this.config.sharedBuffer = resolvedState.sharedBuffer;
+      }
     }
 
     resolvedState.jobs.forEach((jobState) => {
@@ -269,18 +276,20 @@ export class StableScheduler<
   private dispatch(job: ScheduledJob<TJob>): void {
     this.runningCount += 1;
     job.isRunning = true;
+    if (job.runOnce) {
+      job.nextRunAt = null;
+    }
     void this.persistStateIfEnabled();
     const startedAt = Date.now();
     const scheduledAtMs = job.nextRunAt ?? startedAt;
     const queueDelay = Math.max(0, startedAt - scheduledAtMs);
     this.totalQueueDelayMs += queueDelay;
-    const context: SchedulerRunContext = {
+    const baseContext: SchedulerRunContext = {
       runId: this.createId('run'),
       jobId: job.id,
       scheduledAt: new Date(job.nextRunAt ?? startedAt).toISOString(),
       startedAt: new Date(startedAt).toISOString(),
-      schedule: job.schedule,
-      sharedBuffer: this.config.sharedBuffer
+      schedule: job.schedule
     };
 
     const retryConfig = this.getRetryConfig(job);
@@ -290,7 +299,24 @@ export class StableScheduler<
 
     let jobError: unknown = null;
 
-    const handlerPromise = this.handler(job.job, context);
+    let handlerPromise: Promise<unknown>;
+    if (isStableBuffer(this.config.sharedBuffer)) {
+      handlerPromise = this.config.sharedBuffer.run((bufferState) =>
+        this.handler(job.job, { ...baseContext, sharedBuffer: bufferState })
+      );
+    } else {
+      try {
+        const result = this.handler(job.job, {
+          ...baseContext,
+          ...(this.config.sharedBuffer !== undefined
+            ? { sharedBuffer: this.config.sharedBuffer as Record<string, any> }
+            : {})
+        });
+        handlerPromise = Promise.resolve(result);
+      } catch (error) {
+        handlerPromise = Promise.reject(error);
+      }
+    }
     const executionPromise = this.withTimeout(handlerPromise, this.getExecutionTimeoutMs(job));
 
     void executionPromise

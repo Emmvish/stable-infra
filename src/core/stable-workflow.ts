@@ -313,7 +313,7 @@ async function executeWorkflowInternal<RequestDataType = any, ResponseDataType =
                     },
                     workflowHookParams?.statePersistence,
                     { workflowId },
-                    options.sharedBuffer || {}
+                    options.sharedBuffer
                 );
             } catch (hookError) {
                 console.error(

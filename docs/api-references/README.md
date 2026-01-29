@@ -92,6 +92,17 @@ Queue-based scheduler with cron/interval/timestamp scheduling and state recovera
 
 ---
 
+### [Stable Buffer](./stable-buffer.md)
+Transactional buffer for concurrency-safe shared state across core modules.
+
+**Key Features:**
+- Serialized updates via `run()`/`transaction()`
+- Snapshot reads with `read()`
+- Works with all `commonBuffer`/`sharedBuffer` options
+- Lightweight in-memory state
+
+---
+
 ## 🛠️ Infrastructure Utilities
 
 ### [Infrastructure Utilities](./infra-utilities.md)
@@ -137,6 +148,9 @@ Config-driven runner for executing Stable Request jobs via JSON or ESM config fi
 
 **Scheduling:**
 - Scheduled execution → [Stable Scheduler](./stable-scheduler.md)
+
+**Shared State:**
+- Transactional shared buffer → [Stable Buffer](./stable-buffer.md)
 
 **Infrastructure:**
 - Caching, circuit breaking, rate limiting → [Infrastructure Utilities](./infra-utilities.md)

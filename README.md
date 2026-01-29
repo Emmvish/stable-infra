@@ -13,6 +13,7 @@ A stability-first production-grade TypeScript framework for resilient API integr
   - [stableWorkflow](#stableworkflow)
   - [stableWorkflowGraph](#stableworkflowgraph)
   - [StableScheduler](#stablescheduler)
+  - [StableBuffer](#stablebuffer)
 - [Stable Runner](#stable-runner)
 - [Resilience Mechanisms](#resilience-mechanisms)
   - [Retry Strategies](#retry-strategies)
@@ -56,6 +57,7 @@ A stability-first production-grade TypeScript framework for resilient API integr
 3. **Graph-based workflows** via `stableWorkflowGraph` for DAG execution with higher parallelism
 4. **Generic function execution** via `stableFunction`, inheriting all resilience guards
 5. **Queue based scheduling** via `StableScheduler`, with option to preserve scheduler state and recover from saved state
+6. **Transactional shared state** via `StableBuffer`, a concurrency-safe buffer you can pass as `commonBuffer` or `sharedBuffer`
 
 All six core modules support the same resilience stack: retries, jitter, circuit breaking, caching, rate/concurrency limits, config cascading, shared buffers, trial mode, comprehensive hooks, and metrics. This uniformity makes it trivial to compose requests and functions in any topology. Finally, `Stable Runner` executes jobs from config.
 
@@ -495,6 +497,10 @@ Queue-based scheduler for cron/interval/timestamp execution with concurrency lim
 - Enforce max-parallel job execution
 - Schedule jobs with cron, interval, or timestamp(s)
 - Persist and restore scheduler state via user-provided handlers
+
+### StableBuffer
+
+Transactional, concurrency-safe shared state. It’s opt-in: pass a `StableBuffer` instance as `commonBuffer` or `sharedBuffer` to serialize updates across concurrent executions.
 
 ---
 
@@ -1557,7 +1563,7 @@ Hierarchy: global → group → phase → branch → item. Lower levels override
 
 ### Shared & State Buffers
 
-Pass mutable state across phases, branches, and items.
+Pass mutable state across phases, branches, and items. For concurrency-safe shared state, pass a `StableBuffer` instance instead of a plain object.
 
 #### Shared Buffer (Workflow/Gateway)
 

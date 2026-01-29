@@ -4,7 +4,7 @@ import { formatLogContext } from './format-log-context.js';
 import { MetricsAggregator } from './metrics-aggregator.js';
 import { MetricsValidator } from './metrics-validator.js';
 import { RequestOrFunction } from '../enums/index.js';
-import { STABLE_WORKFLOW_PHASE, STABLE_WORKFLOW_PHASE_RESULT, PrePhaseExecutionHookOptions } from '../types/index.js';
+import { BufferLike, STABLE_WORKFLOW_PHASE, STABLE_WORKFLOW_PHASE_RESULT, PrePhaseExecutionHookOptions } from '../types/index.js';
 
 export async function executePhase<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
     phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
@@ -16,7 +16,7 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
     handlePhaseCompletion: Function,
     maxSerializableChars: number,
     workflowHookParams: any,
-    sharedBuffer?: Record<string, any>,
+    sharedBuffer?: BufferLike,
     branchId?: string,
     prePhaseExecutionHook?: Function
 ) {
@@ -74,7 +74,7 @@ async function executePhaseInternal<RequestDataType = any, ResponseDataType = an
     handlePhaseCompletion: Function,
     maxSerializableChars: number,
     workflowHookParams: any,
-    sharedBuffer?: Record<string, any>,
+    sharedBuffer?: BufferLike,
     branchId?: string,
     prePhaseExecutionHook?: Function
 ): Promise<STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>> {
@@ -98,7 +98,7 @@ async function executePhaseInternal<RequestDataType = any, ResponseDataType = an
                 hookOptions,
                 phase.statePersistence,
                 { workflowId, branchId, phaseId },
-                sharedBuffer || {}
+                sharedBuffer
             );
             if (result) {
                 modifiedPhase = result;
@@ -218,7 +218,7 @@ async function executePhaseInternal<RequestDataType = any, ResponseDataType = an
                 },
                 modifiedPhase.statePersistence,
                 { workflowId, branchId, phaseId },
-                sharedBuffer || {}
+                sharedBuffer
             );
         } catch (hookError) {
             console.error(

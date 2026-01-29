@@ -131,7 +131,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
           hookOptions,
           branch.statePersistence,
           { workflowId, branchId },
-          sharedBuffer || {}
+          sharedBuffer
         );
         if (result) {
           modifiedBranch = result;
@@ -290,7 +290,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
               },
               branches[winner.index].statePersistence,
               { workflowId, branchId: result.branchResult.branchId },
-              sharedBuffer || {}
+              sharedBuffer
             );
           } catch (hookError) {
             console.error(
@@ -319,39 +319,38 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
         };
         
         errorResult.metrics = MetricsAggregator.extractBranchMetrics(errorResult);
-        
         branchResults.push(errorResult);
         failedRequests = 1;
       }
 
       for (let i = 0; i < branches.length; i++) {
-        if (i !== winner.index) {
-          const cancelledResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
-            workflowId,
-            branchId: branches[i].id,
-            branchIndex: i,
-            success: false,
-            executionTime: 0,
-            completedPhases: 0,
-            phaseResults: [],
-            executionNumber: 1,
-            skipped: true,
-            error: 'stable-request: Cancelled - another branch won the race'
-          };
-          
-          cancelledResult.metrics = MetricsAggregator.extractBranchMetrics(cancelledResult);
-          
-          branchResults.push(cancelledResult);
-          
-          branchExecutionHistory.push({
-            branchId: branches[i].id,
-            branchIndex: i,
-            executionNumber: 1,
-            timestamp: new Date().toISOString(),
-            success: false,
-            executionTime: 0
-          });
+        if (i === winner.index) {
+          continue;
         }
+        const cancelledResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType> = {
+          workflowId,
+          branchId: branches[i].id,
+          branchIndex: i,
+          success: false,
+          executionTime: 0,
+          completedPhases: 0,
+          phaseResults: [],
+          executionNumber: 1,
+          skipped: true,
+          error: 'stable-request: Cancelled - another branch won the race'
+        };
+        
+        cancelledResult.metrics = MetricsAggregator.extractBranchMetrics(cancelledResult);
+        branchResults.push(cancelledResult);
+        
+        branchExecutionHistory.push({
+          branchId: branches[i].id,
+          branchIndex: i,
+          executionNumber: 1,
+          timestamp: new Date().toISOString(),
+          success: false,
+          executionTime: 0
+        });
       }
 
       return {
@@ -367,7 +366,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       };
     } catch (error) {
       console.error(
-        `${formatLogContext({ workflowId })}stable-request: Error during branch racing:`,
+        `${formatLogContext({ workflowId })}stable-request: Branch racing failed:`,
         error
       );
       
@@ -384,7 +383,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       };
     }
   }
-
+                  sharedBuffer
   let currentBranchId: string | null = branches[0]?.id || null;
 
   while (currentBranchId !== null && iterationCount < maxWorkflowIterations) {
@@ -519,7 +518,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
               },
               branch.statePersistence,
               { workflowId, branchId: result.branchResult.branchId },
-              sharedBuffer || {}
+              sharedBuffer
             );
           } catch (hookError) {
             console.error(
@@ -548,7 +547,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
               },
               branch.statePersistence,
               { workflowId, branchId: branch.id },
-              sharedBuffer || {}
+              sharedBuffer
             );
 
             result.branchResult.decision = decision;
@@ -573,7 +572,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
                   { decision, branchResult: result.branchResult, maxSerializableChars },
                   workflowHookParams?.statePersistence,
                   { workflowId, branchId: branch.id },
-                  sharedBuffer || {}
+                  sharedBuffer
                 );
               } catch (hookError) {
                 console.error(
@@ -745,7 +744,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
             },
             currentBranch.statePersistence,
             { workflowId, branchId: currentBranchId },
-            sharedBuffer || {}
+            sharedBuffer
           );
         } catch (hookError) {
           console.error(
@@ -776,7 +775,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
             },
             currentBranch.statePersistence,
             { workflowId, branchId: currentBranchId },
-            sharedBuffer || {}
+            sharedBuffer
           );
 
           result.branchResult.decision = decision;
@@ -808,7 +807,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
                 { decision, branchResult: result.branchResult, maxSerializableChars },
                 workflowHookParams?.statePersistence,
                 { workflowId, branchId: currentBranchId },
-                sharedBuffer || {}
+                sharedBuffer
               );
             } catch (hookError) {
               console.error(

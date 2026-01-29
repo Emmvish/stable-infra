@@ -4,7 +4,8 @@ export {
     stableApiGateway,
     stableWorkflow,
     stableWorkflowGraph,
-    StableScheduler
+    StableScheduler,
+    StableBuffer
 } from './core/index.js';
 
 export {
@@ -155,7 +156,12 @@ export type {
     CreateHash,
     NodeCryptoLike,
     CachedFunctionResponse,
-    InternalSchedulerConfig
+    InternalSchedulerConfig,
+    StableBufferInstance,
+    SchedulerRetryConfig,
+    BufferLike,
+    StableBufferState,
+    StableBufferOptions
 } from './types/index.js';
 
 export {

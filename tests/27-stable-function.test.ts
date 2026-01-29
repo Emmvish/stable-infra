@@ -388,7 +388,7 @@ describe('stable-function', () => {
           preExecutionHook: ({ inputParams, commonBuffer, stableFunctionOptions }) => {
             hookCalls.push({ inputParams, fn: stableFunctionOptions.fn.name });
             if (commonBuffer) {
-              commonBuffer.hookExecuted = true;
+              (commonBuffer as Record<string, any>).hookExecuted = true;
             }
           },
           preExecutionHookParams: { test: 'param' }
@@ -2537,7 +2537,7 @@ describe('Stable Function - Phase Decision Hooks', () => {
                     }
                 ],
                 phaseDecisionHook: async ({ sharedBuffer: buffer }) => {
-                    buffer!.hookModified = true;
+                  (buffer as Record<string, any>).hookModified = true;
                     return { action: PHASE_DECISION_ACTIONS.CONTINUE };
                 }
             },
@@ -2809,7 +2809,9 @@ describe('Stable Workflow Graph - Function Integration Tests', () => {
           const computeResult = results.get('compute');
           const fnResult = computeResult?.responses?.find(r => r.type === RequestOrFunction.FUNCTION);
           const value = fnResult?.data || 0;
-          if (sharedBuffer) sharedBuffer.computedValue = value;
+          if (sharedBuffer) {
+            (sharedBuffer as Record<string, any>).computedValue = value;
+          }
           return value > 75 ? 'high-path' : 'low-path';
         })
         .addPhase('high-path', {

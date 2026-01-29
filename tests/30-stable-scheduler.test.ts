@@ -296,7 +296,7 @@ describe('StableScheduler', () => {
       },
       async (_job, context) => {
         seenBuffer = context.sharedBuffer;
-        context.sharedBuffer!.count += 1;
+        (context.sharedBuffer as Record<string, any>).count += 1;
       }
     );
 

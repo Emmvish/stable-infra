@@ -15,7 +15,8 @@ import {
   CONCURRENCY_LIMITER_METRICS_TO_VALIDATE_KEYS,
   PHASE_METRICS_TO_VALIDATE_KEYS,
   BRANCH_METRICS_TO_VALIDATE_KEYS,
-  SCHEDULER_METRICS_TO_VALIDATE_KEYS
+  SCHEDULER_METRICS_TO_VALIDATE_KEYS,
+  STABLE_BUFFER_METRICS_TO_VALIDATE_KEYS
 } from '../constants/index.js';
 
 export class MetricsValidator {
@@ -443,6 +444,35 @@ export class MetricsValidator {
       { name: SCHEDULER_METRICS_TO_VALIDATE_KEYS[9], value: metrics.throughput, guardrail: schedulerGuardrails.throughput || guardrails.common?.throughput },
       { name: SCHEDULER_METRICS_TO_VALIDATE_KEYS[10], value: metrics.averageExecutionTime, guardrail: schedulerGuardrails.averageExecutionTime || guardrails.common?.executionTime },
       { name: SCHEDULER_METRICS_TO_VALIDATE_KEYS[11], value: metrics.averageQueueDelay, guardrail: schedulerGuardrails.averageQueueDelay }
+    ];
+
+    for (const { name, value, guardrail } of metricsToValidate) {
+      if (value !== undefined && guardrail) {
+        const anomaly = this.validateMetric(name, value, guardrail);
+        if (anomaly) anomalies.push(anomaly);
+      }
+    }
+
+    return {
+      isValid: anomalies.length === 0,
+      anomalies,
+      validatedAt: new Date().toISOString()
+    };
+  }
+
+  static validateStableBufferMetrics(
+    metrics: {
+      totalTransactions?: number;
+      averageQueueWaitMs?: number;
+    },
+    guardrails: MetricsGuardrails
+  ): MetricsValidationResult {
+    const anomalies: MetricAnomaly[] = [];
+    const bufferGuardrails = guardrails.stableBuffer || {};
+
+    const metricsToValidate: Array<{ name: string; value: number | undefined; guardrail: MetricGuardrail | undefined }> = [
+      { name: STABLE_BUFFER_METRICS_TO_VALIDATE_KEYS[0], value: metrics.totalTransactions, guardrail: bufferGuardrails.totalTransactions },
+      { name: STABLE_BUFFER_METRICS_TO_VALIDATE_KEYS[1], value: metrics.averageQueueWaitMs, guardrail: bufferGuardrails.averageQueueWaitMs }
     ];
 
     for (const { name, value, guardrail } of metricsToValidate) {

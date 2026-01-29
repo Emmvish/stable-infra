@@ -20,6 +20,7 @@ import { safelyStringify } from './safely-stringify.js';
 import { MetricsAggregator } from './metrics-aggregator.js';
 import { executeWithPersistence } from './execute-with-persistence.js';
 import { MetricsValidator } from './metrics-validator.js';
+import { withBuffer } from './buffer-utils.js';
 
 export async function executeWorkflowGraph<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
   graph: WorkflowGraph<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
@@ -105,7 +106,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
   const visited = new Set<string>();
   const executionHistory: PhaseExecutionRecord<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[] = [];
   const phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[] = [];
-  const sharedBuffer = options.sharedBuffer || {};
+  const sharedBuffer = options.sharedBuffer;
   
   let totalRequests = 0;
   let successfulRequests = 0;
@@ -171,24 +172,28 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
     
     const edges = graph.edges.get(nodeId) || [];
     for (const edge of edges) {
-      if (edge.condition) {
+      const condition = edge.condition;
+      if (condition) {
         let shouldTraverse = false;
         
-        if (edge.condition.type === WorkflowEdgeConditionTypes.ALWAYS) {
+        if (condition.type === WorkflowEdgeConditionTypes.ALWAYS) {
           shouldTraverse = true;
-        } else if (edge.condition.type === WorkflowEdgeConditionTypes.SUCCESS) {
+        } else if (condition.type === WorkflowEdgeConditionTypes.SUCCESS) {
           const result = results.get(nodeId);
           shouldTraverse = result?.success === true;
-        } else if (edge.condition.type === WorkflowEdgeConditionTypes.FAILURE) {
+        } else if (condition.type === WorkflowEdgeConditionTypes.FAILURE) {
           const result = results.get(nodeId);
           shouldTraverse = result?.success === false;
-        } else if (edge.condition.type === WorkflowEdgeConditionTypes.CUSTOM && edge.condition.evaluate) {
-          shouldTraverse = await edge.condition.evaluate({
-            results,
-            sharedBuffer,
-            executionHistory,
-            currentNodeId: nodeId
-          });
+        } else if (condition.type === WorkflowEdgeConditionTypes.CUSTOM) {
+          const evaluate = condition.evaluate;
+          if (evaluate) {
+            shouldTraverse = await withBuffer(sharedBuffer, (bufferState) => evaluate({
+              results,
+              sharedBuffer: bufferState,
+              executionHistory,
+              currentNodeId: nodeId
+            }));
+          }
         }
         
         if (!shouldTraverse) {

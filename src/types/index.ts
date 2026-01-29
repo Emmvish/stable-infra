@@ -139,6 +139,11 @@ export interface MetricsGuardrailsScheduler {
   averageQueueDelay?: MetricGuardrail;
 }
 
+export interface MetricsGuardrailsStableBuffer {
+  totalTransactions?: MetricGuardrail;
+  averageQueueWaitMs?: MetricGuardrail;
+}
+
 export interface MetricsGuardrails {
   request?: MetricsGuardrailsRequest;
   apiGateway?: MetricsGuardrailsApiGateway;
@@ -148,6 +153,7 @@ export interface MetricsGuardrails {
   infrastructure?: MetricsGuardrailsInfrastructure;
   common?: MetricsGuardrailsCommon;
   scheduler?: MetricsGuardrailsScheduler;
+  stableBuffer?: MetricsGuardrailsStableBuffer;
 }
 
 export interface MetricAnomaly {
@@ -182,12 +188,27 @@ export interface SchedulerMetrics {
   lastUpdated: string;
 }
 
+export interface StableBufferMetrics {
+  totalTransactions: number;
+  averageQueueWaitMs: number;
+  validation?: MetricsValidationResult;
+}
+
 export interface ExecutionContext {
   workflowId?: string;
   branchId?: string;
   phaseId?: string;
   requestId?: string;
 }
+
+export interface StableBufferInstance {
+  run<T>(fn: (state: Record<string, any>) => T | Promise<T>): Promise<T>;
+  read(): Record<string, any>;
+  getState(): Record<string, any>;
+  setState(state: Record<string, any>): void;
+}
+
+export type BufferLike = Record<string, any> | StableBufferInstance;
 
 export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
   commonRequestData?: Partial<REQUEST_DATA<RequestDataType>>;
@@ -230,7 +251,7 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
   concurrentExecution?: boolean;
   requestGroups?: RequestGroup<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
   stopOnFirstError?: boolean;
-  sharedBuffer?: Record<string, any>;
+  sharedBuffer?: BufferLike;
   maxConcurrentRequests?: number;
   rateLimit?: RateLimitConfig;
   circuitBreaker?: CircuitBreakerConfig | CircuitBreaker;
@@ -548,7 +569,7 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   trialMode?: TRIAL_MODE_OPTIONS;
   hookParams?: HookParams;
   preExecution?: RequestPreExecutionOptions;
-  commonBuffer?: Record<string, any>;
+  commonBuffer?: BufferLike;
   cache?: CacheConfig;
   executionContext?: ExecutionContext;
   circuitBreaker?: CircuitBreakerConfig | CircuitBreaker;
@@ -581,7 +602,7 @@ export interface STABLE_FUNCTION<FunctionArgsType extends any[] = any[], Functio
   trialMode?: TRIAL_MODE_OPTIONS;
   hookParams?: FunctionHookParams;
   preExecution?: FunctionPreExecutionOptions<FunctionArgsType, FunctionReturnType>;
-  commonBuffer?: Record<string, any>;
+  commonBuffer?: BufferLike;
   cache?: FunctionCacheConfig<FunctionArgsType, FunctionReturnType>;
   executionContext?: ExecutionContext;
   circuitBreaker?: CircuitBreakerConfig | CircuitBreaker;
@@ -1351,7 +1372,7 @@ export interface SchedulerConfig<TJob = unknown> {
   executionTimeoutMs?: number;
   persistenceDebounceMs?: number;
   metricsGuardrails?: MetricsGuardrails;
-  sharedBuffer?: Record<string, any>;
+  sharedBuffer?: BufferLike;
 }
 
 export interface SchedulerRunContext {
@@ -1384,7 +1405,7 @@ export interface SchedulerState<TJob> {
     dropped: number;
     sequence: number;
   };
-  sharedBuffer?: Record<string, any>;
+  sharedBuffer?: BufferLike;
 }
 
 export type SchedulerJobHandler<TJob> = (job: TJob, context: SchedulerRunContext) => Promise<unknown>;
@@ -1415,7 +1436,7 @@ export interface InternalSchedulerConfig<TJob = any> {
   executionTimeoutMs?: number;
   persistenceDebounceMs?: number;
   metricsGuardrails?: SchedulerConfig<TJob>['metricsGuardrails'];
-  sharedBuffer?: Record<string, any>;
+  sharedBuffer?: BufferLike;
 }
 
 export type RunnerJob =
@@ -1444,3 +1465,12 @@ export type RunnerConfig = {
   jobs?: RunnerScheduledJob[];
   scheduler?: SchedulerConfig;
 };
+
+export type StableBufferState = Record<string, any>;
+
+export interface StableBufferOptions {
+  initialState?: StableBufferState;
+  clone?: (state: StableBufferState) => StableBufferState;
+  metricsGuardrails?: MetricsGuardrailsStableBuffer;
+  transactionTimeoutMs?: number;
+}

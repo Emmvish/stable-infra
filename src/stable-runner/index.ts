@@ -12,6 +12,7 @@ import {
   stableWorkflowGraph
 } from '../core/index.js';
 import type {
+  BufferLike,
   RunnerConfig,
   RunnerJob,
   RunnerScheduledJob,
@@ -173,7 +174,7 @@ const executeJob = async (job: RunnerJob) => {
   }
 };
 
-const applySharedBuffer = (job: RunnerScheduledJob, sharedBuffer: Record<string, any>): RunnerJob => {
+const applySharedBuffer = (job: RunnerScheduledJob, sharedBuffer: BufferLike): RunnerJob => {
   switch (job.kind) {
     case RunnerJobs.STABLE_REQUEST:
       return { ...job, options: { ...job.options, commonBuffer: sharedBuffer } };
@@ -194,7 +195,7 @@ const executeScheduledJob = async (
   job: RunnerScheduledJob,
   context: SchedulerRunContext,
   outputPath: string,
-  sharedBuffer?: Record<string, any>
+  sharedBuffer?: BufferLike
 ) => {
   const startedMs = Date.now();
   try {

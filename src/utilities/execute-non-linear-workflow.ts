@@ -204,7 +204,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
             },
             lastConcurrentPhase.phase.statePersistence,
             { workflowId, branchId, phaseId: lastConcurrentPhase.id },
-            sharedBuffer || {}
+            sharedBuffer
           );
 
           if (!decision || typeof decision !== 'object') {
@@ -225,7 +225,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
                 { decision, phaseResult: lastResult, maxSerializableChars },
                 workflowHookParams?.statePersistence,
                 { workflowId, ...(branchId && { branchId }) },
-                sharedBuffer || {}
+                sharedBuffer
               );
             } catch (hookError) {
               console.error(
@@ -439,7 +439,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
             },
             phase.statePersistence,
             { workflowId, branchId, phaseId },
-            sharedBuffer || {}
+            sharedBuffer
           );
 
           if (!decision || typeof decision !== 'object') {
@@ -463,7 +463,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
                 { decision, phaseResult, maxSerializableChars },
                 workflowHookParams?.statePersistence,
                 { workflowId, ...(branchId && { branchId }), phaseId },
-                sharedBuffer || {}
+                sharedBuffer
               );
             } catch (hookError) {
               console.error(
@@ -647,7 +647,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
           },
           workflowHookParams?.statePersistence,
           { workflowId, ...(branchId && { branchId }), phaseId },
-          sharedBuffer || {}
+          sharedBuffer
         );
       } catch (hookError) {
         console.error(
