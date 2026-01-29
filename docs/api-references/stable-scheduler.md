@@ -6,9 +6,10 @@
 2. [Core Interface: SchedulerConfig](#core-interface-schedulerconfig)
 3. [Core Interface: SchedulerSchedule](#core-interface-schedulerschedule)
 4. [Class: StableScheduler](#class-stablescheduler)
-5. [State Recoverability](#state-recoverability)
-6. [Runner Integration Example](#runner-integration-example)
-7. [Best Practices](#best-practices)
+5. [Retry Behavior](#retry-behavior)
+6. [State Recoverability](#state-recoverability)
+7. [Runner Integration Example](#runner-integration-example)
+8. [Best Practices](#best-practices)
 
 ---
 
@@ -36,12 +37,20 @@ interface SchedulerConfig<TJob = unknown> {
 	queueLimit?: number;
 	timezone?: string;
 	persistence?: SchedulerPersistence<TJob>;
+	retry?: SchedulerRetryConfig;
 }
 
 interface SchedulerPersistence<TJob = unknown> {
 	enabled?: boolean;
 	saveState?: (state: SchedulerState<TJob>) => Promise<void> | void;
 	loadState?: () => Promise<SchedulerState<TJob> | null> | SchedulerState<TJob> | null;
+}
+
+interface SchedulerRetryConfig {
+	maxAttempts?: number;
+	delayMs?: number;
+	backoffMultiplier?: number;
+	maxDelayMs?: number;
 }
 ```
 
@@ -54,6 +63,7 @@ interface SchedulerPersistence<TJob = unknown> {
 | `queueLimit` | `number` | `1000` | Maximum number of queued jobs before dropping. |
 | `timezone` | `string?` | `undefined` | Optional timezone hint for cron parsing (best-effort). |
 | `persistence` | `SchedulerPersistence?` | `undefined` | Custom persistence handlers for state recoverability. |
+| `retry` | `SchedulerRetryConfig?` | `undefined` | Default retry policy applied when a job does not specify `retry`. |
 
 ---
 
@@ -95,6 +105,12 @@ type SchedulerJobHandler<TJob> = (job: TJob, context: SchedulerRunContext) => Pr
 ```
 
 The handler is invoked for each scheduled job and receives execution metadata like `runId`, `jobId`, `scheduledAt`, and `startedAt`.
+
+---
+
+## Retry Behavior
+
+Retries are opt-in. Provide a retry policy in `SchedulerConfig.retry` or per job using `job.retry`. When a job fails, the scheduler retries up to `maxAttempts` (including the initial attempt). The next retry is scheduled after `delayMs` with optional exponential backoff via `backoffMultiplier`, capped by `maxDelayMs`.
 
 ---
 

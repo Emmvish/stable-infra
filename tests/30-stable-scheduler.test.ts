@@ -167,4 +167,40 @@ describe('StableScheduler', () => {
     expect(savedState.jobs.some((job: { id: string }) => job.id === 'job-1')).toBe(true);
     scheduler.stop();
   });
+
+  test('retries failed jobs up to maxAttempts', async () => {
+    let attempts = 0;
+
+    const scheduler = new StableScheduler({ maxParallel: 1, tickIntervalMs: 50 }, async () => {
+      attempts += 1;
+      if (attempts < 3) {
+        throw new Error('temporary failure');
+      }
+    });
+
+    scheduler.addJobs([
+      {
+        id: 'retry-job',
+        retry: { maxAttempts: 3, delayMs: 100 }
+      }
+    ]);
+
+    scheduler.tick();
+    await flushPromises();
+    expect(attempts).toBe(1);
+
+    await jest.advanceTimersByTimeAsync(100);
+    scheduler.tick();
+    await flushPromises();
+    expect(attempts).toBe(2);
+
+    await jest.advanceTimersByTimeAsync(100);
+    scheduler.tick();
+    await flushPromises();
+    expect(attempts).toBe(3);
+
+    const [jobState] = scheduler.getState().jobs;
+    expect(jobState.retryAttempts).toBe(0);
+    scheduler.stop();
+  });
 });

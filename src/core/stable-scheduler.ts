@@ -1,7 +1,15 @@
 import { ScheduleTypes } from '../enums/index.js';
-import type { SchedulerConfig, SchedulerRunContext, SchedulerSchedule, SchedulerState, SchedulerJobHandler, ScheduledJob } from '../types/index.js';
+import type {
+  SchedulerConfig,
+  SchedulerRetryConfig,
+  SchedulerRunContext,
+  SchedulerSchedule,
+  SchedulerState,
+  SchedulerJobHandler,
+  ScheduledJob
+} from '../types/index.js';
 
-export class StableScheduler<TJob extends { id?: string; schedule?: SchedulerSchedule }> {
+export class StableScheduler<TJob extends { id?: string; schedule?: SchedulerSchedule; retry?: SchedulerRetryConfig }> {
   private readonly config: {
     maxParallel: number;
     tickIntervalMs: number;
@@ -12,6 +20,7 @@ export class StableScheduler<TJob extends { id?: string; schedule?: SchedulerSch
       saveState?: (state: SchedulerState<TJob>) => Promise<void> | void;
       loadState?: () => Promise<SchedulerState<TJob> | null> | SchedulerState<TJob> | null;
     };
+    retry?: SchedulerRetryConfig;
   };
   private readonly handler: SchedulerJobHandler<TJob>;
   private readonly jobs = new Map<string, ScheduledJob<TJob>>();
@@ -34,7 +43,8 @@ export class StableScheduler<TJob extends { id?: string; schedule?: SchedulerSch
         enabled: config.persistence?.enabled ?? false,
         saveState: config.persistence?.saveState as ((state: SchedulerState<TJob>) => Promise<void> | void) | undefined,
         loadState: config.persistence?.loadState as (() => Promise<SchedulerState<TJob> | null> | SchedulerState<TJob> | null) | undefined
-      }
+      },
+      retry: config.retry
     };
     this.handler = handler;
   }
@@ -71,7 +81,8 @@ export class StableScheduler<TJob extends { id?: string; schedule?: SchedulerSch
       lastRunAt: null,
       remainingTimestamps,
       runOnce,
-      isRunning: false
+      isRunning: false,
+      retryAttempts: 0
     };
     this.jobs.set(id, scheduledJob);
     void this.persistStateIfEnabled();
@@ -147,7 +158,8 @@ export class StableScheduler<TJob extends { id?: string; schedule?: SchedulerSch
         lastRunAt: job.lastRunAt,
         remainingTimestamps: job.remainingTimestamps ? [...job.remainingTimestamps] : null,
         runOnce: job.runOnce,
-        isRunning: job.isRunning
+        isRunning: job.isRunning,
+        retryAttempts: job.retryAttempts
       })),
       queue: [...this.queue],
       stats: {
@@ -188,7 +200,8 @@ export class StableScheduler<TJob extends { id?: string; schedule?: SchedulerSch
         lastRunAt: jobState.lastRunAt,
         remainingTimestamps: jobState.remainingTimestamps ? [...jobState.remainingTimestamps] : null,
         runOnce: jobState.runOnce,
-        isRunning: false
+        isRunning: false,
+        retryAttempts: jobState.retryAttempts ?? 0
       };
       this.jobs.set(jobState.id, restored);
     });
@@ -218,21 +231,62 @@ export class StableScheduler<TJob extends { id?: string; schedule?: SchedulerSch
       schedule: job.schedule
     };
 
+    const retryConfig = this.getRetryConfig(job);
+    if (retryConfig) {
+      job.retryAttempts += 1;
+    }
+
+    let jobError: unknown = null;
+
     void this.handler(job.job, context)
       .then(() => {
         this.completed += 1;
+        job.retryAttempts = 0;
       })
-      .catch(() => {
+      .catch((error) => {
         this.failed += 1;
+        jobError = error;
       })
       .finally(() => {
+        const scheduledRetry = this.scheduleRetryIfEnabled(job, startedAt, jobError);
         job.isRunning = false;
         job.lastRunAt = startedAt;
         this.runningCount -= 1;
-        this.updateNextRun(job, startedAt);
+        if (!scheduledRetry) {
+          job.retryAttempts = 0;
+          this.updateNextRun(job, startedAt);
+        }
         this.tick();
         void this.persistStateIfEnabled();
       });
+  }
+
+  private getRetryConfig(job: ScheduledJob<TJob>): SchedulerRetryConfig | undefined {
+    return job.job.retry ?? this.config.retry;
+  }
+
+  private scheduleRetryIfEnabled(job: ScheduledJob<TJob>, startedAt: number, error: unknown): boolean {
+    if (!error) {
+      return false;
+    }
+
+    const retryConfig = this.getRetryConfig(job);
+    if (!retryConfig) {
+      return false;
+    }
+
+    const maxAttempts = retryConfig.maxAttempts ?? 1;
+    if (maxAttempts <= 1 || job.retryAttempts >= maxAttempts) {
+      return false;
+    }
+
+    const baseDelay = retryConfig.delayMs ?? 1000;
+    const backoff = retryConfig.backoffMultiplier ?? 1;
+    const calculatedDelay = baseDelay * Math.pow(backoff, Math.max(job.retryAttempts - 1, 0));
+    const delay = retryConfig.maxDelayMs ? Math.min(calculatedDelay, retryConfig.maxDelayMs) : calculatedDelay;
+
+    job.nextRunAt = startedAt + Math.max(0, delay);
+    return true;
   }
 
   private initializeSchedule(schedule: SchedulerSchedule | undefined, now: number): {

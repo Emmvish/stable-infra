@@ -1295,6 +1295,13 @@ export type SchedulerSchedule =
   | { type: ScheduleTypes.TIMESTAMP; at: string | number }
   | { type: ScheduleTypes.TIMESTAMPS; at: Array<string | number> };
 
+export interface SchedulerRetryConfig {
+  maxAttempts?: number;
+  delayMs?: number;
+  backoffMultiplier?: number;
+  maxDelayMs?: number;
+}
+
 export interface SchedulerPersistence<TJob = unknown> {
   enabled?: boolean;
   saveState?: (state: SchedulerState<TJob>) => Promise<void> | void;
@@ -1307,6 +1314,7 @@ export interface SchedulerConfig<TJob = unknown> {
   queueLimit?: number;
   timezone?: string;
   persistence?: SchedulerPersistence<TJob>;
+  retry?: SchedulerRetryConfig;
 }
 
 export interface SchedulerRunContext {
@@ -1326,6 +1334,7 @@ export interface SchedulerJobState<TJob> {
   remainingTimestamps: number[] | null;
   runOnce: boolean;
   isRunning: boolean;
+  retryAttempts: number;
 }
 
 export interface SchedulerState<TJob> {
@@ -1350,6 +1359,7 @@ export type ScheduledJob<TJob extends { id?: string; schedule?: SchedulerSchedul
   remainingTimestamps: number[] | null;
   runOnce: boolean;
   isRunning: boolean;
+  retryAttempts: number;
 };
 
 export type RunnerJob =
@@ -1367,6 +1377,7 @@ export type RunnerJob =
 export type RunnerScheduledJob = RunnerJob & {
   id?: string;
   schedule?: SchedulerSchedule;
+  retry?: SchedulerRetryConfig;
 };
 
 export type RunnerConfig = {
