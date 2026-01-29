@@ -251,4 +251,62 @@ describe('StableScheduler', () => {
     expect(saveCount).toBe(1);
     scheduler.stop();
   });
+
+  test('validates scheduler metrics guardrails', async () => {
+    const scheduler = new StableScheduler(
+      {
+        maxParallel: 1,
+        tickIntervalMs: 50,
+        metricsGuardrails: {
+          scheduler: {
+            failureRate: { max: 0 }
+          }
+        }
+      },
+      async () => {
+        throw new Error('forced failure');
+      }
+    );
+
+    scheduler.addJobs([{ id: 'fail-job' }]);
+    scheduler.tick();
+    await flushPromises();
+
+    const { validation } = scheduler.getMetrics();
+    expect(validation?.isValid).toBe(false);
+    scheduler.stop();
+  });
+
+  test('shares and persists sharedBuffer', async () => {
+    const buffer = { count: 0 };
+    let seenBuffer: Record<string, any> | undefined;
+    let persistedBuffer: Record<string, any> | undefined;
+
+    const scheduler = new StableScheduler(
+      {
+        maxParallel: 1,
+        tickIntervalMs: 50,
+        sharedBuffer: buffer,
+        persistence: {
+          enabled: true,
+          saveState: (state) => {
+            persistedBuffer = state.sharedBuffer;
+          }
+        }
+      },
+      async (_job, context) => {
+        seenBuffer = context.sharedBuffer;
+        context.sharedBuffer!.count += 1;
+      }
+    );
+
+    scheduler.addJobs([{ id: 'buffer-job' }]);
+    scheduler.tick();
+    await flushPromises();
+
+    expect(seenBuffer).toBe(buffer);
+    expect(buffer.count).toBe(1);
+    expect(persistedBuffer).toBe(buffer);
+    scheduler.stop();
+  });
 });

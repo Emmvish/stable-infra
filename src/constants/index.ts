@@ -127,3 +127,18 @@ export const BRANCH_METRICS_TO_VALIDATE_KEYS = [
   'requestSuccessRate',
   'executionTime'
 ] as const;
+
+export const SCHEDULER_METRICS_TO_VALIDATE_KEYS = [
+    'totalJobs',
+    'queued',
+    'running',
+    'completed',
+    'failed',
+    'dropped',
+    'totalRuns',
+    'successRate',
+    'failureRate',
+    'throughput',
+    'averageExecutionTime',
+    'averageQueueDelay'
+] as const;

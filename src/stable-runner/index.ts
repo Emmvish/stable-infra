@@ -37,6 +37,7 @@ let runCount = 0;
 let currentJobId: string | null = null;
 let scheduledRunCount = 0;
 let scheduler: StableScheduler<RunnerScheduledJob> | null = null;
+let writeOutputQueue = Promise.resolve();
 
 const envFallbackCache: Record<string, string> = {};
 
@@ -89,7 +90,8 @@ const resolveSchedulerConfig = async (config?: SchedulerConfig): Promise<Schedul
     tickIntervalMs: parseNumberOrDefault(tickIntervalEnv, config?.tickIntervalMs ?? 500),
     queueLimit: parseNumberOrDefault(queueLimitEnv, config?.queueLimit ?? 1000),
     timezone: timezoneEnv ?? config?.timezone,
-    persistence: config?.persistence
+    persistence: config?.persistence,
+    sharedBuffer: config?.sharedBuffer
   };
 };
 
@@ -111,20 +113,28 @@ const loadConfig = async (): Promise<RunnerConfig> => {
 };
 
 const writeOutput = async (outputPath: string, payload: unknown) => {
-  await fs.mkdir(path.dirname(outputPath), { recursive: true });
+  writeOutputQueue = writeOutputQueue
+    .then(async () => {
+      await fs.mkdir(path.dirname(outputPath), { recursive: true });
 
-  let existing: unknown = [];
-  try {
-    const raw = await fs.readFile(outputPath, 'utf-8');
-    existing = raw.trim().length > 0 ? JSON.parse(raw) : [];
-  } catch (error) {
-    existing = [];
-  }
+      let existing: unknown = [];
+      try {
+        const raw = await fs.readFile(outputPath, 'utf-8');
+        existing = raw.trim().length > 0 ? JSON.parse(raw) : [];
+      } catch (error) {
+        existing = [];
+      }
 
-  const outputArray = Array.isArray(existing) ? existing : [existing];
-  outputArray.push(payload);
+      const outputArray = Array.isArray(existing) ? existing : [existing];
+      outputArray.push(payload);
 
-  await fs.writeFile(outputPath, JSON.stringify(outputArray, null, 2), 'utf-8');
+      await fs.writeFile(outputPath, JSON.stringify(outputArray, null, 2), 'utf-8');
+    })
+    .catch((error) => {
+      console.error('stable-request runner: failed to write output.', error);
+    });
+
+  await writeOutputQueue;
 };
 
 const executeJob = async (job: RunnerJob) => {
@@ -146,10 +156,33 @@ const executeJob = async (job: RunnerJob) => {
   }
 };
 
-const executeScheduledJob = async (job: RunnerScheduledJob, context: SchedulerRunContext, outputPath: string) => {
+const applySharedBuffer = (job: RunnerScheduledJob, sharedBuffer: Record<string, any>): RunnerJob => {
+  switch (job.kind) {
+    case RunnerJobs.STABLE_REQUEST:
+      return { ...job, options: { ...job.options, commonBuffer: sharedBuffer } };
+    case RunnerJobs.STABLE_FUNCTION:
+      return { ...job, options: { ...job.options, commonBuffer: sharedBuffer } };
+    case RunnerJobs.STABLE_API_GATEWAY:
+      return { ...job, options: { ...job.options, sharedBuffer } };
+    case RunnerJobs.STABLE_WORKFLOW:
+      return { ...job, options: { ...(job.options || {}), sharedBuffer } };
+    case RunnerJobs.STABLE_WORKFLOW_GRAPH:
+      return { ...job, options: { ...(job.options || {}), sharedBuffer } };
+    default:
+      return job as RunnerJob;
+  }
+};
+
+const executeScheduledJob = async (
+  job: RunnerScheduledJob,
+  context: SchedulerRunContext,
+  outputPath: string,
+  sharedBuffer?: Record<string, any>
+) => {
   const startedMs = Date.now();
   try {
-    const result = await executeJob(job as RunnerJob);
+    const resolvedJob = sharedBuffer ? applySharedBuffer(job, sharedBuffer) : (job as RunnerJob);
+    const result = await executeJob(resolvedJob);
     const completedAt = new Date().toISOString();
     await writeOutput(outputPath, {
       jobId: job.id ?? currentJobId,
@@ -203,7 +236,7 @@ const runOnce = async () => {
       currentJobId = config.jobId ?? null;
       if (!scheduler) {
         scheduler = new StableScheduler<RunnerScheduledJob>(schedulerConfig, async (job, context) => {
-          await executeScheduledJob(job, context, outputPath);
+          await executeScheduledJob(job, context, outputPath, schedulerConfig.sharedBuffer);
         });
         if (schedulerConfig.persistence?.enabled && schedulerConfig.persistence.loadState) {
           await scheduler.restoreState();

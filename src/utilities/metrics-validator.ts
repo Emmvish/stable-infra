@@ -14,7 +14,8 @@ import {
   RATE_LIMITER_METRICS_TO_VALIDATE_KEYS,
   CONCURRENCY_LIMITER_METRICS_TO_VALIDATE_KEYS,
   PHASE_METRICS_TO_VALIDATE_KEYS,
-  BRANCH_METRICS_TO_VALIDATE_KEYS
+  BRANCH_METRICS_TO_VALIDATE_KEYS,
+  SCHEDULER_METRICS_TO_VALIDATE_KEYS
 } from '../constants/index.js';
 
 export class MetricsValidator {
@@ -402,6 +403,55 @@ export class MetricsValidator {
       }
     }
     
+    return {
+      isValid: anomalies.length === 0,
+      anomalies,
+      validatedAt: new Date().toISOString()
+    };
+  }
+
+  static validateSchedulerMetrics(
+    metrics: {
+      totalJobs?: number;
+      queued?: number;
+      running?: number;
+      completed?: number;
+      failed?: number;
+      dropped?: number;
+      totalRuns?: number;
+      successRate?: number;
+      failureRate?: number;
+      throughput?: number;
+      averageExecutionTime?: number;
+      averageQueueDelay?: number;
+    },
+    guardrails: MetricsGuardrails
+  ): MetricsValidationResult {
+    const anomalies: MetricAnomaly[] = [];
+    const schedulerGuardrails = guardrails.scheduler || {};
+
+    const metricsToValidate: Array<{ name: string; value: number | undefined; guardrail: MetricGuardrail | undefined }> = [
+      { name: SCHEDULER_METRICS_TO_VALIDATE_KEYS[0], value: metrics.totalJobs, guardrail: schedulerGuardrails.totalJobs },
+      { name: SCHEDULER_METRICS_TO_VALIDATE_KEYS[1], value: metrics.queued, guardrail: schedulerGuardrails.queued },
+      { name: SCHEDULER_METRICS_TO_VALIDATE_KEYS[2], value: metrics.running, guardrail: schedulerGuardrails.running },
+      { name: SCHEDULER_METRICS_TO_VALIDATE_KEYS[3], value: metrics.completed, guardrail: schedulerGuardrails.completed },
+      { name: SCHEDULER_METRICS_TO_VALIDATE_KEYS[4], value: metrics.failed, guardrail: schedulerGuardrails.failed },
+      { name: SCHEDULER_METRICS_TO_VALIDATE_KEYS[5], value: metrics.dropped, guardrail: schedulerGuardrails.dropped },
+      { name: SCHEDULER_METRICS_TO_VALIDATE_KEYS[6], value: metrics.totalRuns, guardrail: schedulerGuardrails.totalRuns },
+      { name: SCHEDULER_METRICS_TO_VALIDATE_KEYS[7], value: metrics.successRate, guardrail: schedulerGuardrails.successRate || guardrails.common?.successRate },
+      { name: SCHEDULER_METRICS_TO_VALIDATE_KEYS[8], value: metrics.failureRate, guardrail: schedulerGuardrails.failureRate || guardrails.common?.failureRate },
+      { name: SCHEDULER_METRICS_TO_VALIDATE_KEYS[9], value: metrics.throughput, guardrail: schedulerGuardrails.throughput || guardrails.common?.throughput },
+      { name: SCHEDULER_METRICS_TO_VALIDATE_KEYS[10], value: metrics.averageExecutionTime, guardrail: schedulerGuardrails.averageExecutionTime || guardrails.common?.executionTime },
+      { name: SCHEDULER_METRICS_TO_VALIDATE_KEYS[11], value: metrics.averageQueueDelay, guardrail: schedulerGuardrails.averageQueueDelay }
+    ];
+
+    for (const { name, value, guardrail } of metricsToValidate) {
+      if (value !== undefined && guardrail) {
+        const anomaly = this.validateMetric(name, value, guardrail);
+        if (anomaly) anomalies.push(anomaly);
+      }
+    }
+
     return {
       isValid: anomalies.length === 0,
       anomalies,

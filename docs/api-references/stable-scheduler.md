@@ -40,6 +40,8 @@ interface SchedulerConfig<TJob = unknown> {
 	retry?: SchedulerRetryConfig;
 	executionTimeoutMs?: number;
 	persistenceDebounceMs?: number;
+	metricsGuardrails?: MetricsGuardrails;
+	sharedBuffer?: Record<string, any>;
 }
 
 interface SchedulerPersistence<TJob = unknown> {
@@ -66,8 +68,10 @@ interface SchedulerRetryConfig {
 | `timezone` | `string?` | `undefined` | Optional timezone hint for cron parsing (best-effort). |
 | `persistence` | `SchedulerPersistence?` | `undefined` | Custom persistence handlers for state recoverability. |
 | `retry` | `SchedulerRetryConfig?` | `undefined` | Default retry policy applied when a job does not specify `retry`. |
-| `executionTimeoutMs` | `number?` | `86400000` | Max handler execution time (ms) before timing out and marking failure. |
-| `persistenceDebounceMs` | `number?` | `1000` | Debounce window for persistence writes to reduce rapid saves. |
+| `executionTimeoutMs` | `number?` | `undefined` | Max handler execution time (ms) before timing out and marking failure. |
+| `persistenceDebounceMs` | `number?` | `undefined` | Debounce window for persistence writes to reduce rapid saves. |
+| `metricsGuardrails` | `MetricsGuardrails?` | `undefined` | Guardrails used to validate scheduler metrics. |
+| `sharedBuffer` | `Record<string, any>?` | `undefined` | Shared buffer available to all scheduled jobs. |
 
 ---
 
@@ -99,6 +103,7 @@ const scheduler = new StableScheduler(config, handler);
 - `setJobs(jobs)`
 - `start()` / `stop()`
 - `getStats()`
+- `getMetrics()`
 - `getState()`
 - `restoreState(state?)`
 
@@ -108,7 +113,7 @@ const scheduler = new StableScheduler(config, handler);
 type SchedulerJobHandler<TJob> = (job: TJob, context: SchedulerRunContext) => Promise<unknown>;
 ```
 
-The handler is invoked for each scheduled job and receives execution metadata like `runId`, `jobId`, `scheduledAt`, and `startedAt`.
+The handler is invoked for each scheduled job and receives execution metadata like `runId`, `jobId`, `scheduledAt`, and `startedAt`. When `sharedBuffer` is provided in `SchedulerConfig`, it is included on `SchedulerRunContext.sharedBuffer` and persisted when state persistence is enabled.
 
 ---
 
@@ -117,6 +122,46 @@ The handler is invoked for each scheduled job and receives execution metadata li
 Retries are opt-in. Provide a retry policy in `SchedulerConfig.retry` or per job using `job.retry`. When a job fails, the scheduler retries up to `maxAttempts` (including the initial attempt). The next retry is scheduled after `delayMs` with optional exponential backoff via `backoffMultiplier`, capped by `maxDelayMs`.
 
 Execution timeouts are also opt-in. Set `SchedulerConfig.executionTimeoutMs` to apply a default timeout, or add `executionTimeoutMs` to a job to override it. When a timeout occurs, the run is marked as a failure.
+
+---
+
+## Scheduler Metrics & Guardrails
+
+Use `getMetrics()` to retrieve aggregated scheduler metrics (throughput, average execution time, queue delay, success rate) and guardrail validation results. When `metricsGuardrails` is provided in `SchedulerConfig`, the returned result includes a validation summary with anomalies.
+
+### Metrics Returned
+
+- `totalJobs`: Total registered jobs.
+- `queued`: Jobs currently queued.
+- `running`: Jobs currently executing.
+- `completed`: Total successful runs.
+- `failed`: Total failed runs.
+- `dropped`: Jobs dropped due to queue limits.
+- `totalRuns`: `completed + failed`.
+- `successRate`: Successful runs as a percentage.
+- `failureRate`: Failed runs as a percentage.
+- `throughput`: Runs per second since scheduler start.
+- `averageExecutionTime`: Mean execution time per run (ms).
+- `averageQueueDelay`: Mean delay from scheduled time to start (ms).
+- `startedAt`: Scheduler start timestamp (ISO).
+- `lastUpdated`: Metrics snapshot time (ISO).
+
+### Guardrails Supported
+
+Guardrails use `MetricsGuardrails.scheduler` with the following keys:
+
+- `totalJobs`
+- `queued`
+- `running`
+- `completed`
+- `failed`
+- `dropped`
+- `totalRuns`
+- `successRate`
+- `failureRate`
+- `throughput`
+- `averageExecutionTime`
+- `averageQueueDelay`
 
 ---
 

@@ -4,10 +4,13 @@ import type {
   SchedulerRetryConfig,
   SchedulerRunContext,
   SchedulerSchedule,
+  SchedulerMetrics,
+  MetricsValidationResult,
   SchedulerState,
   SchedulerJobHandler,
   ScheduledJob
 } from '../types/index.js';
+import { MetricsValidator } from '../utilities/index.js';
 
 export class StableScheduler<
   TJob extends { id?: string; schedule?: SchedulerSchedule; retry?: SchedulerRetryConfig; executionTimeoutMs?: number }
@@ -25,6 +28,8 @@ export class StableScheduler<
     retry?: SchedulerRetryConfig;
     executionTimeoutMs?: number;
     persistenceDebounceMs?: number;
+    metricsGuardrails?: SchedulerConfig<TJob>['metricsGuardrails'];
+    sharedBuffer?: Record<string, any>;
   };
   private readonly handler: SchedulerJobHandler<TJob>;
   private readonly jobs = new Map<string, ScheduledJob<TJob>>();
@@ -38,6 +43,9 @@ export class StableScheduler<
   private failed = 0;
   private dropped = 0;
   private sequence = 0;
+  private schedulerStartTime: number | null = null;
+  private totalExecutionTimeMs = 0;
+  private totalQueueDelayMs = 0;
 
   constructor(config: SchedulerConfig, handler: SchedulerJobHandler<TJob>) {
     this.config = {
@@ -51,8 +59,10 @@ export class StableScheduler<
         loadState: config.persistence?.loadState as (() => Promise<SchedulerState<TJob> | null> | SchedulerState<TJob> | null) | undefined
       },
       retry: config.retry,
-      executionTimeoutMs: config.executionTimeoutMs ?? 86400000,
-      persistenceDebounceMs: config.persistenceDebounceMs ?? 1000
+      executionTimeoutMs: config.executionTimeoutMs,
+      persistenceDebounceMs: config.persistenceDebounceMs,
+      metricsGuardrails: config.metricsGuardrails,
+      sharedBuffer: config.sharedBuffer
     };
     this.handler = handler;
   }
@@ -100,6 +110,9 @@ export class StableScheduler<
   start(): void {
     if (this.timer) {
       return;
+    }
+    if (!this.schedulerStartTime) {
+      this.schedulerStartTime = Date.now();
     }
     this.timer = setInterval(() => this.tick(), Math.max(50, this.config.tickIntervalMs));
     this.tick();
@@ -156,6 +169,43 @@ export class StableScheduler<
     };
   }
 
+  getMetrics(): { metrics: SchedulerMetrics; validation?: MetricsValidationResult } {
+    const totalRuns = this.completed + this.failed;
+    const startedAt = this.schedulerStartTime ?? Date.now();
+    const elapsedMs = Math.max(0, Date.now() - startedAt);
+    const successRate = totalRuns > 0 ? (this.completed / totalRuns) * 100 : 0;
+    const failureRate = totalRuns > 0 ? (this.failed / totalRuns) * 100 : 0;
+    const throughput = elapsedMs > 0 ? totalRuns / (elapsedMs / 1000) : 0;
+    const averageExecutionTime = totalRuns > 0 ? this.totalExecutionTimeMs / totalRuns : 0;
+    const averageQueueDelay = totalRuns > 0 ? this.totalQueueDelayMs / totalRuns : 0;
+
+    const metrics: SchedulerMetrics = {
+      totalJobs: this.jobs.size,
+      queued: this.queue.length,
+      running: this.runningCount,
+      completed: this.completed,
+      failed: this.failed,
+      dropped: this.dropped,
+      totalRuns,
+      successRate,
+      failureRate,
+      throughput,
+      averageExecutionTime,
+      averageQueueDelay,
+      startedAt: this.schedulerStartTime ? new Date(this.schedulerStartTime).toISOString() : undefined,
+      lastUpdated: new Date().toISOString()
+    };
+
+    if (!this.config.metricsGuardrails) {
+      return { metrics };
+    }
+
+    return {
+      metrics,
+      validation: MetricsValidator.validateSchedulerMetrics(metrics, this.config.metricsGuardrails)
+    };
+  }
+
   getState(): SchedulerState<TJob> {
     return {
       jobs: Array.from(this.jobs.values()).map((job) => ({
@@ -175,7 +225,8 @@ export class StableScheduler<
         failed: this.failed,
         dropped: this.dropped,
         sequence: this.sequence
-      }
+      },
+      sharedBuffer: this.config.sharedBuffer
     };
   }
 
@@ -198,6 +249,9 @@ export class StableScheduler<
     this.failed = resolvedState.stats.failed;
     this.dropped = resolvedState.stats.dropped;
     this.sequence = resolvedState.stats.sequence;
+    if (resolvedState.sharedBuffer !== undefined) {
+      this.config.sharedBuffer = resolvedState.sharedBuffer;
+    }
 
     resolvedState.jobs.forEach((jobState) => {
       const restored: ScheduledJob<TJob> = {
@@ -231,12 +285,16 @@ export class StableScheduler<
     job.isRunning = true;
     void this.persistStateIfEnabled();
     const startedAt = Date.now();
+    const scheduledAtMs = job.nextRunAt ?? startedAt;
+    const queueDelay = Math.max(0, startedAt - scheduledAtMs);
+    this.totalQueueDelayMs += queueDelay;
     const context: SchedulerRunContext = {
       runId: this.createId('run'),
       jobId: job.id,
       scheduledAt: new Date(job.nextRunAt ?? startedAt).toISOString(),
       startedAt: new Date(startedAt).toISOString(),
-      schedule: job.schedule
+      schedule: job.schedule,
+      sharedBuffer: this.config.sharedBuffer
     };
 
     const retryConfig = this.getRetryConfig(job);
@@ -260,6 +318,8 @@ export class StableScheduler<
       })
       .finally(() => {
         const scheduledRetry = this.scheduleRetryIfEnabled(job, startedAt, jobError);
+        const executionTime = Date.now() - startedAt;
+        this.totalExecutionTimeMs += Math.max(0, executionTime);
         job.isRunning = false;
         job.lastRunAt = startedAt;
         this.runningCount -= 1;

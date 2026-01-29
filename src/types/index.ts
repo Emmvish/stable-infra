@@ -124,6 +124,21 @@ export interface MetricsGuardrailsCommon {
   throughput?: MetricGuardrail;
 }
 
+export interface MetricsGuardrailsScheduler {
+  totalJobs?: MetricGuardrail;
+  queued?: MetricGuardrail;
+  running?: MetricGuardrail;
+  completed?: MetricGuardrail;
+  failed?: MetricGuardrail;
+  dropped?: MetricGuardrail;
+  totalRuns?: MetricGuardrail;
+  successRate?: MetricGuardrail;
+  failureRate?: MetricGuardrail;
+  throughput?: MetricGuardrail;
+  averageExecutionTime?: MetricGuardrail;
+  averageQueueDelay?: MetricGuardrail;
+}
+
 export interface MetricsGuardrails {
   request?: MetricsGuardrailsRequest;
   apiGateway?: MetricsGuardrailsApiGateway;
@@ -132,6 +147,7 @@ export interface MetricsGuardrails {
   branch?: MetricsGuardrailsBranch;
   infrastructure?: MetricsGuardrailsInfrastructure;
   common?: MetricsGuardrailsCommon;
+  scheduler?: MetricsGuardrailsScheduler;
 }
 
 export interface MetricAnomaly {
@@ -147,6 +163,23 @@ export interface MetricsValidationResult {
   isValid: boolean;
   anomalies: MetricAnomaly[];
   validatedAt: string;
+}
+
+export interface SchedulerMetrics {
+  totalJobs: number;
+  queued: number;
+  running: number;
+  completed: number;
+  failed: number;
+  dropped: number;
+  totalRuns: number;
+  successRate: number;
+  failureRate: number;
+  throughput: number;
+  averageExecutionTime: number;
+  averageQueueDelay: number;
+  startedAt?: string;
+  lastUpdated: string;
 }
 
 export interface ExecutionContext {
@@ -1317,6 +1350,8 @@ export interface SchedulerConfig<TJob = unknown> {
   retry?: SchedulerRetryConfig;
   executionTimeoutMs?: number;
   persistenceDebounceMs?: number;
+  metricsGuardrails?: MetricsGuardrails;
+  sharedBuffer?: Record<string, any>;
 }
 
 export interface SchedulerRunContext {
@@ -1325,6 +1360,7 @@ export interface SchedulerRunContext {
   scheduledAt: string;
   startedAt: string;
   schedule?: SchedulerSchedule;
+  sharedBuffer?: Record<string, any>;
 }
 
 export interface SchedulerJobState<TJob> {
@@ -1348,6 +1384,7 @@ export interface SchedulerState<TJob> {
     dropped: number;
     sequence: number;
   };
+  sharedBuffer?: Record<string, any>;
 }
 
 export type SchedulerJobHandler<TJob> = (job: TJob, context: SchedulerRunContext) => Promise<unknown>;
