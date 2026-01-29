@@ -12,6 +12,8 @@ A stability-first production-grade TypeScript framework for resilient API integr
   - [stableApiGateway](#stableapigateway)
   - [stableWorkflow](#stableworkflow)
   - [stableWorkflowGraph](#stableworkflowgraph)
+  - [StableScheduler](#stablescheduler)
+- [Stable Runner](#stable-runner)
 - [Resilience Mechanisms](#resilience-mechanisms)
   - [Retry Strategies](#retry-strategies)
   - [Circuit Breaker](#circuit-breaker)
@@ -53,8 +55,9 @@ A stability-first production-grade TypeScript framework for resilient API integr
 2. **Phased workflows** via `stableWorkflow` for array-based multi-phase execution with dynamic control flow
 3. **Graph-based workflows** via `stableWorkflowGraph` for DAG execution with higher parallelism
 4. **Generic function execution** via `stableFunction`, inheriting all resilience guards
+5. **Queue based scheduling** via `StableScheduler`, with option to preserve scheduler state and recover from saved state
 
-All five execution modes support the same resilience stack: retries, jitter, circuit breaking, caching, rate/concurrency limits, config cascading, shared buffers, trial mode, comprehensive hooks, and metrics. This uniformity makes it trivial to compose requests and functions in any topology.
+All six core modules support the same resilience stack: retries, jitter, circuit breaking, caching, rate/concurrency limits, config cascading, shared buffers, trial mode, comprehensive hooks, and metrics. This uniformity makes it trivial to compose requests and functions in any topology. Finally, `Stable Runner` executes jobs from config.
 
 ---
 
@@ -483,6 +486,21 @@ console.log(`Graph workflow success: ${result.success}`);
 - Validate graph structure (cycle detection, reachability, orphan detection)
 - Provide deterministic execution order
 - Offer higher parallelism than phased workflows for complex topologies
+
+### StableScheduler
+
+Queue-based scheduler for cron/interval/timestamp execution with concurrency limits and recoverable state via custom persistence handlers.
+
+**Key responsibilities:**
+- Enforce max-parallel job execution
+- Schedule jobs with cron, interval, or timestamp(s)
+- Persist and restore scheduler state via user-provided handlers
+
+---
+
+## Stable Runner
+
+Config-driven runner that executes core module jobs from JSON/ESM configs and can use StableScheduler for scheduled jobs.
 
 ---
 

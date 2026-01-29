@@ -3,7 +3,8 @@ export {
     stableFunction,
     stableApiGateway,
     stableWorkflow,
-    stableWorkflowGraph
+    stableWorkflowGraph,
+    StableScheduler
 } from './core/index.js';
 
 export {
@@ -20,7 +21,8 @@ export {
     AnomalySeverity,
     ViolationType,
     PersistenceStage,
-    RunnerJobs
+    RunnerJobs,
+    ScheduleTypes
 } from './enums/index.js';
 
 export type {
@@ -139,6 +141,15 @@ export type {
     WorkflowInfrastructureMetrics,
     RunnerConfig,
     RunnerJob,
+    RunnerScheduledJob,
+    SchedulerConfig,
+    SchedulerPersistence,
+    SchedulerSchedule,
+    SchedulerRunContext,
+    SchedulerJobState,
+    SchedulerState,
+    SchedulerJobHandler,
+    ScheduledJob,
     CreateHash,
     NodeCryptoLike,
     CachedFunctionResponse

@@ -3,6 +3,7 @@ import { statSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { RunnerJobs } from '../enums/index.js';
+import { StableScheduler } from '../core/index.js';
 import {
   stableRequest,
   stableFunction,
@@ -12,7 +13,10 @@ import {
 } from '../core/index.js';
 import type {
   RunnerConfig,
-  RunnerJob
+  RunnerJob,
+  RunnerScheduledJob,
+  SchedulerConfig,
+  SchedulerRunContext
 } from '../types/index.js';
 
 const CONFIG_PATH = process.env.CONFIG_PATH || '';
@@ -31,6 +35,63 @@ let running = false;
 let pending = false;
 let runCount = 0;
 let currentJobId: string | null = null;
+let scheduledRunCount = 0;
+let scheduler: StableScheduler<RunnerScheduledJob> | null = null;
+
+const envFallbackCache: Record<string, string> = {};
+
+const loadEnvFallback = async (): Promise<Record<string, string>> => {
+  if (Object.keys(envFallbackCache).length > 0) {
+    return envFallbackCache;
+  }
+  try {
+    const envPath = path.resolve(process.cwd(), '.env');
+    const raw = await fs.readFile(envPath, 'utf-8');
+    raw.split(/\r?\n/).forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) return;
+      const separatorIndex = trimmed.indexOf('=');
+      if (separatorIndex === -1) return;
+      const key = trimmed.slice(0, separatorIndex).trim();
+      const value = trimmed.slice(separatorIndex + 1).trim().replace(/^['"]|['"]$/g, '');
+      if (!(key in envFallbackCache)) {
+        envFallbackCache[key] = value;
+      }
+    });
+  } catch {
+    return envFallbackCache;
+  }
+  return envFallbackCache;
+};
+
+const getEnvValue = async (key: string): Promise<string | undefined> => {
+  if (process.env[key]) {
+    return process.env[key];
+  }
+  const envFallback = await loadEnvFallback();
+  return envFallback[key];
+};
+
+const parseNumberOrDefault = (value: string | undefined, fallback: number): number => {
+  if (value === undefined) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const resolveSchedulerConfig = async (config?: SchedulerConfig): Promise<SchedulerConfig> => {
+  const maxParallelEnv = await getEnvValue('SCHEDULER_MAX_PARALLEL');
+  const tickIntervalEnv = await getEnvValue('SCHEDULER_TICK_INTERVAL_MS');
+  const queueLimitEnv = await getEnvValue('SCHEDULER_QUEUE_LIMIT');
+  const timezoneEnv = await getEnvValue('SCHEDULER_TIMEZONE');
+
+  return {
+    maxParallel: parseNumberOrDefault(maxParallelEnv, config?.maxParallel ?? 2),
+    tickIntervalMs: parseNumberOrDefault(tickIntervalEnv, config?.tickIntervalMs ?? 500),
+    queueLimit: parseNumberOrDefault(queueLimitEnv, config?.queueLimit ?? 1000),
+    timezone: timezoneEnv ?? config?.timezone,
+    persistence: config?.persistence
+  };
+};
 
 const resolveOutputPath = (config?: RunnerConfig): string => {
   return config?.outputPath || OUTPUT_PATH_ENV || path.resolve(process.cwd(), 'output', 'result.json');
@@ -85,6 +146,44 @@ const executeJob = async (job: RunnerJob) => {
   }
 };
 
+const executeScheduledJob = async (job: RunnerScheduledJob, context: SchedulerRunContext, outputPath: string) => {
+  const startedMs = Date.now();
+  try {
+    const result = await executeJob(job as RunnerJob);
+    const completedAt = new Date().toISOString();
+    await writeOutput(outputPath, {
+      jobId: job.id ?? currentJobId,
+      runId: context.runId,
+      scheduledAt: context.scheduledAt,
+      startedAt: context.startedAt,
+      completedAt,
+      durationMs: Date.now() - startedMs,
+      schedule: job.schedule,
+      result
+    });
+  } catch (error: unknown) {
+    const completedAt = new Date().toISOString();
+    await writeOutput(outputPath, {
+      jobId: job.id ?? currentJobId,
+      runId: context.runId,
+      scheduledAt: context.scheduledAt,
+      startedAt: context.startedAt,
+      completedAt,
+      durationMs: Date.now() - startedMs,
+      schedule: job.schedule,
+      error: {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      }
+    });
+  } finally {
+    scheduledRunCount += 1;
+    if (MAX_RUNS > 0 && scheduledRunCount >= MAX_RUNS) {
+      process.exit(0);
+    }
+  }
+};
+
 const runOnce = async () => {
   if (running) {
     pending = true;
@@ -97,10 +196,37 @@ const runOnce = async () => {
   try {
     const config = await loadConfig();
     const outputPath = resolveOutputPath(config);
+    const jobs = config.jobs ?? [];
+
+    if (jobs.length > 0) {
+      const schedulerConfig = await resolveSchedulerConfig(config.scheduler);
+      currentJobId = config.jobId ?? null;
+      if (!scheduler) {
+        scheduler = new StableScheduler<RunnerScheduledJob>(schedulerConfig, async (job, context) => {
+          await executeScheduledJob(job, context, outputPath);
+        });
+        if (schedulerConfig.persistence?.enabled && schedulerConfig.persistence.loadState) {
+          await scheduler.restoreState();
+        }
+        scheduler.start();
+      }
+      scheduler.setJobs(jobs);
+      return;
+    }
+
+    if (scheduler) {
+      scheduler.stop();
+      scheduler = null;
+    }
+
+    if (!config.job) {
+      throw new Error('stable-request runner: config must include a job or jobs array.');
+    }
+
     const result = await executeJob(config.job);
     const completedAt = new Date().toISOString();
 
-    if(currentJobId && currentJobId !== config.jobId) {
+    if (currentJobId && currentJobId !== config.jobId) {
       console.warn(`stable-request runner: Job ID changed from ${currentJobId} to ${config.jobId}`);
     }
     currentJobId = config.jobId ?? null;

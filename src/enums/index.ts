@@ -88,3 +88,10 @@ export enum RunnerJobs {
   STABLE_WORKFLOW = 'stableWorkflow',
   STABLE_WORKFLOW_GRAPH = 'stableWorkflowGraph'
 }
+
+export enum ScheduleTypes {
+  INTERVAL = 'interval',
+  CRON = 'cron',
+  TIMESTAMP = 'timestamp',
+  TIMESTAMPS = 'timestamps'
+}

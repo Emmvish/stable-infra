@@ -12,7 +12,8 @@ import {
   AnomalySeverity,
   ViolationType,
   PersistenceStage,
-  RunnerJobs
+  RunnerJobs,
+  ScheduleTypes
 } from '../enums/index.js';
 
 import { CircuitBreaker } from '../utilities/index.js';
@@ -1288,6 +1289,69 @@ export interface WorkflowGraphExecutionPlan {
   estimatedDepth: number;
 }
 
+export type SchedulerSchedule =
+  | { type: ScheduleTypes.CRON; expression: string; timezone?: string }
+  | { type: ScheduleTypes.INTERVAL; everyMs: number; startAt?: string | number }
+  | { type: ScheduleTypes.TIMESTAMP; at: string | number }
+  | { type: ScheduleTypes.TIMESTAMPS; at: Array<string | number> };
+
+export interface SchedulerPersistence<TJob = unknown> {
+  enabled?: boolean;
+  saveState?: (state: SchedulerState<TJob>) => Promise<void> | void;
+  loadState?: () => Promise<SchedulerState<TJob> | null> | SchedulerState<TJob> | null;
+}
+
+export interface SchedulerConfig<TJob = unknown> {
+  maxParallel?: number;
+  tickIntervalMs?: number;
+  queueLimit?: number;
+  timezone?: string;
+  persistence?: SchedulerPersistence<TJob>;
+}
+
+export interface SchedulerRunContext {
+  runId: string;
+  jobId: string;
+  scheduledAt: string;
+  startedAt: string;
+  schedule?: SchedulerSchedule;
+}
+
+export interface SchedulerJobState<TJob> {
+  id: string;
+  job: TJob;
+  schedule?: SchedulerSchedule;
+  nextRunAt: number | null;
+  lastRunAt: number | null;
+  remainingTimestamps: number[] | null;
+  runOnce: boolean;
+  isRunning: boolean;
+}
+
+export interface SchedulerState<TJob> {
+  jobs: SchedulerJobState<TJob>[];
+  queue: string[];
+  stats: {
+    completed: number;
+    failed: number;
+    dropped: number;
+    sequence: number;
+  };
+}
+
+export type SchedulerJobHandler<TJob> = (job: TJob, context: SchedulerRunContext) => Promise<unknown>;
+
+export type ScheduledJob<TJob extends { id?: string; schedule?: SchedulerSchedule }> = {
+  id: string;
+  job: TJob;
+  schedule?: SchedulerSchedule;
+  nextRunAt: number | null;
+  lastRunAt: number | null;
+  remainingTimestamps: number[] | null;
+  runOnce: boolean;
+  isRunning: boolean;
+};
+
 export type RunnerJob =
   | { kind: RunnerJobs.STABLE_REQUEST; options: STABLE_REQUEST }
   | { kind: RunnerJobs.STABLE_FUNCTION; options: STABLE_FUNCTION }
@@ -1300,8 +1364,15 @@ export type RunnerJob =
   | { kind: RunnerJobs.STABLE_WORKFLOW; phases: STABLE_WORKFLOW_PHASE[]; options?: STABLE_WORKFLOW_OPTIONS }
   | { kind: RunnerJobs.STABLE_WORKFLOW_GRAPH; graph: WorkflowGraph; options?: WorkflowGraphOptions };
 
+export type RunnerScheduledJob = RunnerJob & {
+  id?: string;
+  schedule?: SchedulerSchedule;
+};
+
 export type RunnerConfig = {
   outputPath?: string;
-  jobId: string;
-  job: RunnerJob;
+  jobId?: string;
+  job?: RunnerJob;
+  jobs?: RunnerScheduledJob[];
+  scheduler?: SchedulerConfig;
 };

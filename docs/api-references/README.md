@@ -81,6 +81,17 @@ Graph-based workflow orchestration with conditional routing, parallel execution,
 
 ---
 
+### [Stable Scheduler](./stable-scheduler.md)
+Queue-based scheduler with cron/interval/timestamp scheduling and state recoverability.
+
+**Key Features:**
+- Concurrency-limited queue execution
+- Cron, interval, and timestamp schedules
+- Recoverable state via persistence handlers
+- Runner integration for scheduled core jobs
+
+---
+
 ## 🛠️ Infrastructure Utilities
 
 ### [Infrastructure Utilities](./infra-utilities.md)
@@ -123,6 +134,9 @@ Config-driven runner for executing Stable Request jobs via JSON or ESM config fi
 **Workflow Orchestration:**
 - Linear/branched workflows → [Stable Workflow](./stable-workflow.md)
 - Complex graph workflows → [Stable Workflow Graph](./stable-workflow-graph.md)
+
+**Scheduling:**
+- Scheduled execution → [Stable Scheduler](./stable-scheduler.md)
 
 **Infrastructure:**
 - Caching, circuit breaking, rate limiting → [Infrastructure Utilities](./infra-utilities.md)

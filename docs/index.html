@@ -102,6 +102,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
           stableWorkflowGraph
         </a>
+        <a href="#tab-stableScheduler" data-tab="stableScheduler">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          StableScheduler
+        </a>
       </nav>
     </div>
     <div class="sidebar-section">
@@ -324,8 +328,8 @@ export default {
     <!-- Core APIs Section -->
     <section class="section" id="core-apis">
       <div class="section-header">
-        <h2><span class="gradient-text">Five Core APIs</span></h2>
-        <p>From single HTTP requests to complex DAG-based workflow orchestration — every execution mode shares the same powerful resilience stack.</p>
+        <h2><span class="gradient-text">Six Core APIs</span></h2>
+        <p>From single HTTP requests to complex DAG-based workflow orchestration and scheduled execution — every execution mode shares the same powerful resilience stack.</p>
       </div>
 
       <div class="tabs-container">
@@ -335,6 +339,7 @@ export default {
           <button class="tab-btn" data-tab="stableApiGateway">stableApiGateway</button>
           <button class="tab-btn" data-tab="stableWorkflow">stableWorkflow</button>
           <button class="tab-btn" data-tab="stableWorkflowGraph">stableWorkflowGraph</button>
+          <button class="tab-btn" data-tab="stableScheduler">stableScheduler</button>
         </div>
 
         <!-- stableRequest Tab -->
@@ -1353,6 +1358,93 @@ console.log(<span class="string">`Path taken: ${result.executionHistory?.map((n)
 <span class="keyword">const</span> inferencePhase = result.phases.find(<span class="keyword">(p) =></span> p.phaseId === <span class="string">'run-inference'</span>);
 <span class="keyword">const</span> needsReview = (inferencePhase?.responses?.[<span class="number">0</span>]?.data <span class="keyword">as</span> <span class="type">InferenceResult</span>)?.confidence < <span class="number">0.85</span>;
 console.log(<span class="string">`Human review needed: ${needsReview}`</span>);
+
+})();</code></pre>
+          </div>
+        </div>
+
+        <!-- stableScheduler Tab -->
+        <div class="tab-content" id="tab-stableScheduler">
+          <div class="tab-info">
+            <h3><code>StableScheduler</code></h3>
+            <p>Schedule any stableRequest, stableFunction, or workflow to run on cron, interval, or timestamp triggers. Includes queue management, safe start/stop controls, and optional state persistence via custom save/load handlers.</p>
+          </div>
+          <div class="problem-statement">
+            <h4>Problem Statement</h4>
+            <p>You need to run a data sync every 15 minutes, trigger a backfill job at a specific timestamp, and keep scheduler state recoverable across restarts. You want a unified scheduling layer that uses the same resilience stack and observability hooks as the rest of the framework.</p>
+          </div>
+          <div class="code-box">
+            <div class="code-box-header">
+              <div class="code-box-dots">
+                <span></span><span></span><span></span>
+              </div>
+              <span class="code-box-lang">TypeScript</span>
+              <button class="copy-btn" onclick="copyCode(this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <pre><code><span class="keyword">import</span> { 
+  StableScheduler,
+  ScheduleTypes,
+  <span class="keyword">type</span> <span class="type">SchedulerSchedule</span>,
+  <span class="keyword">type</span> <span class="type">SchedulerState</span>
+} <span class="keyword">from</span> <span class="string">'@emmvish/stable-request'</span>;
+
+(<span class="keyword">async</span> () => {
+
+<span class="keyword">type</span> <span class="type">SchedulerJob</span> = {
+  <span class="property">id</span>?: <span class="type">string</span>;
+  <span class="property">schedule</span>?: <span class="type">SchedulerSchedule</span>;
+  <span class="property">kind</span>: <span class="string">'sync'</span> | <span class="string">'backfill'</span>;
+  <span class="property">payload</span>?: <span class="type">string</span>;
+};
+
+<span class="comment">// In-memory persistence for demos/tests</span>
+<span class="keyword">let</span> persistedState: <span class="type">SchedulerState</span>&lt;<span class="type">SchedulerJob</span>&gt; | <span class="keyword">null</span> = <span class="keyword">null</span>;
+
+<span class="comment">// Create a scheduler with a typed handler</span>
+<span class="keyword">const</span> scheduler = <span class="keyword">new</span> <span class="function">StableScheduler</span>&lt;<span class="type">SchedulerJob</span>&gt;(
+  {
+    <span class="property">maxParallel</span>: <span class="number">2</span>,
+    <span class="property">persistence</span>: {
+      <span class="property">enabled</span>: <span class="keyword">true</span>,
+      <span class="property">saveState</span>: (<span class="property">state</span>) => {
+        persistedState = state;
+      },
+      <span class="property">loadState</span>: () => persistedState
+    }
+  },
+  <span class="keyword">async</span> (<span class="property">job</span>, <span class="property">context</span>) => {
+    <span class="keyword">if</span> (job.kind === <span class="string">'sync'</span>) {
+      console.log(<span class="string">`Sync job ran (${context.jobId})`</span>, job.payload);
+      <span class="keyword">return</span>;
+    }
+    console.log(<span class="string">`Backfill executed at ${context.scheduledAt}`</span>);
+  }
+);
+
+<span class="keyword">const</span> restored = <span class="keyword">await</span> scheduler.<span class="function">restoreState</span>();
+<span class="keyword">if</span> (!restored) {
+  scheduler.<span class="function">addJobs</span>([
+    {
+      <span class="property">id</span>: <span class="string">'sync-job'</span>,
+      <span class="property">kind</span>: <span class="string">'sync'</span>,
+      <span class="property">payload</span>: <span class="string">'users'</span>,
+      <span class="property">schedule</span>: { <span class="property">type</span>: ScheduleTypes.<span class="property">INTERVAL</span>, <span class="property">everyMs</span>: <span class="number">15</span> * <span class="number">60</span> * <span class="number">1000</span> }
+    },
+    {
+      <span class="property">id</span>: <span class="string">'backfill-job'</span>,
+      <span class="property">kind</span>: <span class="string">'backfill'</span>,
+      <span class="property">schedule</span>: { <span class="property">type</span>: ScheduleTypes.<span class="property">TIMESTAMP</span>, <span class="property">at</span>: Date.now() + <span class="number">60000</span> }
+    }
+  ]);
+}
+
+scheduler.<span class="function">start</span>();
+
+<span class="comment">// Stop after 2 seconds in demo environments</span>
+setTimeout(<span class="keyword">() =></span> scheduler.<span class="function">stop</span>(), <span class="number">2000</span>);
 
 })();</code></pre>
           </div>
