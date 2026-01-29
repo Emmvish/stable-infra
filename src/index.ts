@@ -154,7 +154,8 @@ export type {
     ScheduledJob,
     CreateHash,
     NodeCryptoLike,
-    CachedFunctionResponse
+    CachedFunctionResponse,
+    InternalSchedulerConfig
 } from './types/index.js';
 
 export {

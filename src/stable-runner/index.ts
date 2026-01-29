@@ -38,6 +38,7 @@ let currentJobId: string | null = null;
 let scheduledRunCount = 0;
 let scheduler: StableScheduler<RunnerScheduledJob> | null = null;
 let writeOutputQueue = Promise.resolve();
+let activeSchedulerConfig: SchedulerConfig | null = null;
 
 const envFallbackCache: Record<string, string> = {};
 
@@ -93,6 +94,22 @@ const resolveSchedulerConfig = async (config?: SchedulerConfig): Promise<Schedul
     persistence: config?.persistence,
     sharedBuffer: config?.sharedBuffer
   };
+};
+
+const isSchedulerConfigEqual = (a?: SchedulerConfig | null, b?: SchedulerConfig | null): boolean => {
+  if (!a || !b) return false;
+  return (
+    a.maxParallel === b.maxParallel &&
+    a.tickIntervalMs === b.tickIntervalMs &&
+    a.queueLimit === b.queueLimit &&
+    a.timezone === b.timezone &&
+    a.executionTimeoutMs === b.executionTimeoutMs &&
+    a.persistenceDebounceMs === b.persistenceDebounceMs &&
+    a.sharedBuffer === b.sharedBuffer &&
+    a.metricsGuardrails === b.metricsGuardrails &&
+    a.retry === b.retry &&
+    a.persistence === b.persistence
+  );
 };
 
 const resolveOutputPath = (config?: RunnerConfig): string => {
@@ -234,7 +251,12 @@ const runOnce = async () => {
     if (jobs.length > 0) {
       const schedulerConfig = await resolveSchedulerConfig(config.scheduler);
       currentJobId = config.jobId ?? null;
-      if (!scheduler) {
+      const shouldRecreate = !scheduler || !isSchedulerConfigEqual(activeSchedulerConfig, schedulerConfig);
+      if (shouldRecreate) {
+        if (scheduler) {
+          scheduler.stop();
+          scheduler = null;
+        }
         scheduler = new StableScheduler<RunnerScheduledJob>(schedulerConfig, async (job, context) => {
           await executeScheduledJob(job, context, outputPath, schedulerConfig.sharedBuffer);
         });
@@ -242,6 +264,10 @@ const runOnce = async () => {
           await scheduler.restoreState();
         }
         scheduler.start();
+        activeSchedulerConfig = schedulerConfig;
+      }
+      if (!scheduler) {
+        throw new Error('stable-request runner: scheduler unavailable after initialization.');
       }
       scheduler.setJobs(jobs);
       return;
@@ -250,6 +276,7 @@ const runOnce = async () => {
     if (scheduler) {
       scheduler.stop();
       scheduler = null;
+      activeSchedulerConfig = null;
     }
 
     if (!config.job) {

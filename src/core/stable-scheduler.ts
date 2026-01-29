@@ -8,29 +8,15 @@ import type {
   MetricsValidationResult,
   SchedulerState,
   SchedulerJobHandler,
-  ScheduledJob
+  ScheduledJob,
+  InternalSchedulerConfig
 } from '../types/index.js';
 import { MetricsValidator } from '../utilities/index.js';
 
 export class StableScheduler<
   TJob extends { id?: string; schedule?: SchedulerSchedule; retry?: SchedulerRetryConfig; executionTimeoutMs?: number }
 > {
-  private readonly config: {
-    maxParallel: number;
-    tickIntervalMs: number;
-    queueLimit: number;
-    timezone?: string;
-    persistence: {
-      enabled: boolean;
-      saveState?: (state: SchedulerState<TJob>) => Promise<void> | void;
-      loadState?: () => Promise<SchedulerState<TJob> | null> | SchedulerState<TJob> | null;
-    };
-    retry?: SchedulerRetryConfig;
-    executionTimeoutMs?: number;
-    persistenceDebounceMs?: number;
-    metricsGuardrails?: SchedulerConfig<TJob>['metricsGuardrails'];
-    sharedBuffer?: Record<string, any>;
-  };
+  private readonly config: InternalSchedulerConfig<TJob>;
   private readonly handler: SchedulerJobHandler<TJob>;
   private readonly jobs = new Map<string, ScheduledJob<TJob>>();
   private readonly queue: string[] = [];

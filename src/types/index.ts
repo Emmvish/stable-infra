@@ -1401,6 +1401,23 @@ export type ScheduledJob<TJob extends { id?: string; schedule?: SchedulerSchedul
   retryAttempts: number;
 };
 
+export interface InternalSchedulerConfig<TJob = any> {
+  maxParallel: number;
+  tickIntervalMs: number;
+  queueLimit: number;
+  timezone?: string;
+  persistence: {
+    enabled: boolean;
+    saveState?: (state: SchedulerState<TJob>) => Promise<void> | void;
+    loadState?: () => Promise<SchedulerState<TJob> | null> | SchedulerState<TJob> | null;
+  };
+  retry?: SchedulerRetryConfig;
+  executionTimeoutMs?: number;
+  persistenceDebounceMs?: number;
+  metricsGuardrails?: SchedulerConfig<TJob>['metricsGuardrails'];
+  sharedBuffer?: Record<string, any>;
+}
+
 export type RunnerJob =
   | { kind: RunnerJobs.STABLE_REQUEST; options: STABLE_REQUEST }
   | { kind: RunnerJobs.STABLE_FUNCTION; options: STABLE_FUNCTION }
