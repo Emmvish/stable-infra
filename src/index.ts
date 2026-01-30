@@ -212,5 +212,7 @@ export {
     TimeoutError,
     executeWithTimeout,
     getNodeCrypto,
-    simpleHashToHex
+    simpleHashToHex,
+    isStableBuffer,
+    withBuffer
 } from './utilities/index.js';
