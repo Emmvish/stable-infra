@@ -59,7 +59,7 @@ A stability-first production-grade TypeScript framework for resilient API integr
 5. **Queue based scheduling** via `StableScheduler`, with option to preserve scheduler state and recover from saved state
 6. **Transactional shared state** via `StableBuffer`, a concurrency-safe buffer you can pass as `commonBuffer` or `sharedBuffer`
 
-All six core modules support the same resilience stack: retries, jitter, circuit breaking, caching, rate/concurrency limits, config cascading, shared buffers, trial mode, comprehensive hooks, and metrics. This uniformity makes it trivial to compose requests and functions in any topology. Finally, `Stable Runner` executes jobs from config.
+All seven core modules support the same resilience stack: retries, jitter, circuit breaking, caching, rate/concurrency limits, config cascading, shared buffers, trial mode, comprehensive hooks, and metrics. This uniformity makes it trivial to compose requests and functions in any topology. Finally, `Stable Runner` executes jobs from config.
 
 ---
 
