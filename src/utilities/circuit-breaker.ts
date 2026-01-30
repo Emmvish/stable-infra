@@ -1,9 +1,10 @@
-import { CircuitBreakerConfig } from '../types/index.js';
+import { CircuitBreakerConfig, CircuitBreakerPersistedState, InfrastructurePersistence } from '../types/index.js';
 import { CircuitBreakerState } from '../enums/index.js';
 
 export class CircuitBreaker {
     private state: CircuitBreakerState = CircuitBreakerState.CLOSED;
-    private readonly config: Required<CircuitBreakerConfig>;
+    private readonly config: Required<Omit<CircuitBreakerConfig, 'persistence'>>;
+    private readonly persistence?: InfrastructurePersistence<CircuitBreakerPersistedState>;
     
     private totalRequests: number = 0;
     private failedRequests: number = 0;
@@ -27,6 +28,8 @@ export class CircuitBreaker {
     private recoveryAttempts: number = 0;
     private successfulRecoveries: number = 0;
     private failedRecoveries: number = 0;
+    
+    private initialized: boolean = false;
 
     constructor(config: CircuitBreakerConfig) {
         this.config = {
@@ -37,6 +40,81 @@ export class CircuitBreaker {
             halfOpenMaxRequests: config.halfOpenMaxRequests ?? 5,
             trackIndividualAttempts: config.trackIndividualAttempts ?? false
         };
+        this.persistence = config.persistence;
+    }
+
+    async initialize(): Promise<void> {
+        if (this.initialized) return;
+        
+        if (this.persistence?.load) {
+            try {
+                const persistedState = await this.persistence.load();
+                if (persistedState) {
+                    this.restoreState(persistedState);
+                }
+            } catch (error) {
+                console.warn('stable-request: Unable to load circuit breaker state from persistence.');
+            }
+        }
+        this.initialized = true;
+    }
+
+    private restoreState(persistedState: CircuitBreakerPersistedState): void {
+        this.state = persistedState.state;
+        this.totalRequests = persistedState.totalRequests;
+        this.failedRequests = persistedState.failedRequests;
+        this.successfulRequests = persistedState.successfulRequests;
+        this.totalAttempts = persistedState.totalAttempts;
+        this.failedAttempts = persistedState.failedAttempts;
+        this.successfulAttempts = persistedState.successfulAttempts;
+        this.lastFailureTime = persistedState.lastFailureTime;
+        this.halfOpenRequests = persistedState.halfOpenRequests;
+        this.halfOpenSuccesses = persistedState.halfOpenSuccesses;
+        this.halfOpenFailures = persistedState.halfOpenFailures;
+        this.stateTransitions = persistedState.stateTransitions;
+        this.lastStateChangeTime = persistedState.lastStateChangeTime;
+        this.openCount = persistedState.openCount;
+        this.halfOpenCount = persistedState.halfOpenCount;
+        this.totalOpenDuration = persistedState.totalOpenDuration;
+        this.lastOpenTime = persistedState.lastOpenTime;
+        this.recoveryAttempts = persistedState.recoveryAttempts;
+        this.successfulRecoveries = persistedState.successfulRecoveries;
+        this.failedRecoveries = persistedState.failedRecoveries;
+    }
+
+    private getPersistedState(): CircuitBreakerPersistedState {
+        return {
+            state: this.state,
+            totalRequests: this.totalRequests,
+            failedRequests: this.failedRequests,
+            successfulRequests: this.successfulRequests,
+            totalAttempts: this.totalAttempts,
+            failedAttempts: this.failedAttempts,
+            successfulAttempts: this.successfulAttempts,
+            lastFailureTime: this.lastFailureTime,
+            halfOpenRequests: this.halfOpenRequests,
+            halfOpenSuccesses: this.halfOpenSuccesses,
+            halfOpenFailures: this.halfOpenFailures,
+            stateTransitions: this.stateTransitions,
+            lastStateChangeTime: this.lastStateChangeTime,
+            openCount: this.openCount,
+            halfOpenCount: this.halfOpenCount,
+            totalOpenDuration: this.totalOpenDuration,
+            lastOpenTime: this.lastOpenTime,
+            recoveryAttempts: this.recoveryAttempts,
+            successfulRecoveries: this.successfulRecoveries,
+            failedRecoveries: this.failedRecoveries
+        };
+    }
+
+    private async persistState(): Promise<void> {
+        if (this.persistence?.store) {
+            try {
+                await this.persistence.store(this.getPersistedState());
+            } catch (error) {
+                console.warn('stable-request: Unable to store circuit breaker state to persistence.');
+            }
+        }
     }
 
     async canExecute(): Promise<boolean> {
@@ -73,6 +151,8 @@ export class CircuitBreaker {
                 this.resetCounters();
             }
         }
+        
+        this.persistState();
     }
 
     recordFailure(): void {
@@ -87,6 +167,8 @@ export class CircuitBreaker {
         } else if (this.state === CircuitBreakerState.CLOSED) {
             this.checkThreshold();
         }
+        
+        this.persistState();
     }
 
     recordAttemptSuccess(): void {
@@ -101,6 +183,8 @@ export class CircuitBreaker {
                 this.resetCounters();
             }
         }
+        
+        this.persistState();
     }
 
     recordAttemptFailure(): void {
@@ -113,6 +197,8 @@ export class CircuitBreaker {
                 this.checkAttemptThreshold();
             }
         }
+        
+        this.persistState();
     }
 
     private checkThreshold(): void {
@@ -164,6 +250,7 @@ export class CircuitBreaker {
         this.stateTransitions++;
         this.resetCounters();
         this.resetHalfOpenCounters();
+        this.persistState();
     }
 
     private transitionToOpen(): void {
@@ -177,6 +264,7 @@ export class CircuitBreaker {
         this.stateTransitions++;
         this.openCount++;
         this.resetHalfOpenCounters();
+        this.persistState();
     }
 
     private transitionToHalfOpen(): void {
@@ -190,6 +278,7 @@ export class CircuitBreaker {
         this.halfOpenCount++;
         this.recoveryAttempts++;
         this.resetHalfOpenCounters();
+        this.persistState();
     }
 
     private shouldResetCounters(): boolean {
@@ -224,7 +313,7 @@ export class CircuitBreaker {
         failedAttempts: number;
         successfulAttempts: number;
         attemptFailurePercentage: number;
-        config: Required<CircuitBreakerConfig>;
+        config: Required<Omit<CircuitBreakerConfig, 'persistence'>>;
         stateTransitions: number;
         lastStateChangeTime: number;
         openCount: number;
@@ -278,6 +367,7 @@ export class CircuitBreaker {
         this.resetCounters();
         this.resetHalfOpenCounters();
         this.lastFailureTime = 0;
+        this.persistState();
     }
 
     async execute<T>(fn: () => Promise<T>): Promise<T> {

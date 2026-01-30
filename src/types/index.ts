@@ -13,7 +13,8 @@ import {
   ViolationType,
   PersistenceStage,
   RunnerJobs,
-  ScheduleTypes
+  ScheduleTypes,
+  CircuitBreakerState
 } from '../enums/index.js';
 
 import { CircuitBreaker, RateLimiter, ConcurrencyLimiter, CacheManager } from '../utilities/index.js';
@@ -878,9 +879,93 @@ export interface HandlePhaseDecisionHookOptions<RequestDataType = any, ResponseD
   maxSerializableChars?: number;
 }
 
+export interface InfrastructurePersistence<TState> {
+  load?: () => TState | null | undefined | Promise<TState | null | undefined>;
+  store?: (state: TState) => void | Promise<void>;
+}
+
+export interface CircuitBreakerPersistedState {
+  state: CircuitBreakerState;
+  totalRequests: number;
+  failedRequests: number;
+  successfulRequests: number;
+  totalAttempts: number;
+  failedAttempts: number;
+  successfulAttempts: number;
+  lastFailureTime: number;
+  halfOpenRequests: number;
+  halfOpenSuccesses: number;
+  halfOpenFailures: number;
+  stateTransitions: number;
+  lastStateChangeTime: number;
+  openCount: number;
+  halfOpenCount: number;
+  totalOpenDuration: number;
+  lastOpenTime: number;
+  recoveryAttempts: number;
+  successfulRecoveries: number;
+  failedRecoveries: number;
+}
+
+export interface RateLimiterPersistedState {
+  tokens: number;
+  lastRefillTime: number;
+  totalRequests: number;
+  throttledRequests: number;
+  completedRequests: number;
+  peakQueueLength: number;
+  totalQueueWaitTime: number;
+  peakRequestRate: number;
+  requestsInCurrentWindow: number;
+  windowStartTime: number;
+}
+
+export interface ConcurrencyLimiterPersistedState {
+  totalRequests: number;
+  completedRequests: number;
+  failedRequests: number;
+  queuedRequests: number;
+  peakConcurrency: number;
+  peakQueueLength: number;
+  totalQueueWaitTime: number;
+  totalExecutionTime: number;
+}
+
+export interface CacheManagerPersistedState {
+  entries: Array<{
+    key: string;
+    value: CachedResponse;
+  }>;
+  accessOrder: string[];
+  hits: number;
+  misses: number;
+  sets: number;
+  evictions: number;
+  expirations: number;
+}
+
+export interface FunctionCacheManagerPersistedState {
+  entries: Array<{
+    key: string;
+    value: CachedFunctionResponse;
+  }>;
+  stats: {
+    hits: number;
+    misses: number;
+    sets: number;
+    evictions: number;
+  };
+}
+
 export interface RateLimitConfig {
   maxRequests: number;
   windowMs: number;
+  persistence?: InfrastructurePersistence<RateLimiterPersistedState>;
+}
+
+export interface ConcurrencyLimiterConfig {
+  limit: number;
+  persistence?: InfrastructurePersistence<ConcurrencyLimiterPersistedState>;
 }
 
 export interface CircuitBreakerConfig {
@@ -890,6 +975,7 @@ export interface CircuitBreakerConfig {
   successThresholdPercentage?: number;
   halfOpenMaxRequests?: number;
   trackIndividualAttempts?: boolean;
+  persistence?: InfrastructurePersistence<CircuitBreakerPersistedState>;
 }
 
 export interface CacheConfig {
@@ -900,6 +986,7 @@ export interface CacheConfig {
   maxSize?: number;
   excludeMethods?: REQUEST_METHODS[];
   keyGenerator?: (config: AxiosRequestConfig) => string;
+  persistence?: InfrastructurePersistence<CacheManagerPersistedState>;
 }
 
 export interface FunctionCacheConfig<TArgs extends any[] = any[], TReturn = any> {
@@ -907,6 +994,7 @@ export interface FunctionCacheConfig<TArgs extends any[] = any[], TReturn = any>
   ttl?: number;
   maxSize?: number;
   keyGenerator?: (fn: (...args: TArgs) => any, args: TArgs) => string;
+  persistence?: InfrastructurePersistence<FunctionCacheManagerPersistedState>;
 }
 
 export interface CachedResponse<T = any> {
@@ -1217,7 +1305,7 @@ export interface CircuitBreakerDashboardMetrics {
   successfulRecoveries: number;
   failedRecoveries: number;
   recoverySuccessRate: number;
-  config: Required<CircuitBreakerConfig>;
+  config: Required<Omit<CircuitBreakerConfig, 'persistence'>>;
 }
 
 export interface CacheDashboardMetrics {

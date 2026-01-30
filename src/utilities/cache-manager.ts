@@ -1,13 +1,13 @@
 import { AxiosRequestConfig } from 'axios';
 import { REQUEST_METHODS } from '../enums/index.js';
-import { CachedResponse, CacheConfig } from '../types/index.js';
+import { CachedResponse, CacheConfig, CacheManagerPersistedState, InfrastructurePersistence } from '../types/index.js';
 import { getNodeCrypto, simpleHashToHex } from './hash-utils.js';
 
 const nodeCrypto = getNodeCrypto();
 
 export class CacheManager {
     private cache: Map<string, CachedResponse>;
-    private config: Required<Omit<CacheConfig, 'keyGenerator'>> & { keyGenerator?: CacheConfig['keyGenerator'] };
+    private config: Required<Omit<CacheConfig, 'keyGenerator' | 'persistence'>> & { keyGenerator?: CacheConfig['keyGenerator'] };
     private accessOrder: string[] = [];
     private hits: number = 0;
     private misses: number = 0;
@@ -15,7 +15,9 @@ export class CacheManager {
     private evictions: number = 0;
     private expirations: number = 0;
     private totalGetTime: number = 0;
-    private totalSetTime: number = 0; 
+    private totalSetTime: number = 0;
+    private readonly persistence?: InfrastructurePersistence<CacheManagerPersistedState>;
+    private initialized: boolean = false;
 
     constructor(config: CacheConfig) {
         this.cache = new Map();
@@ -28,6 +30,62 @@ export class CacheManager {
             excludeMethods: config.excludeMethods ?? [REQUEST_METHODS.POST, REQUEST_METHODS.PUT, REQUEST_METHODS.PATCH, REQUEST_METHODS.DELETE],
             keyGenerator: config.keyGenerator
         };
+        this.persistence = config.persistence;
+    }
+
+    async initialize(): Promise<void> {
+        if (this.initialized) return;
+        
+        if (this.persistence?.load) {
+            try {
+                const persistedState = await this.persistence.load();
+                if (persistedState) {
+                    this.restoreState(persistedState);
+                }
+            } catch (error) {
+                console.warn('stable-request: Unable to load cache manager state from persistence.');
+            }
+        }
+        this.initialized = true;
+    }
+
+    private restoreState(persistedState: CacheManagerPersistedState): void {
+        this.cache.clear();
+        for (const entry of persistedState.entries) {
+            this.cache.set(entry.key, entry.value);
+        }
+        this.accessOrder = persistedState.accessOrder;
+        this.hits = persistedState.hits;
+        this.misses = persistedState.misses;
+        this.sets = persistedState.sets;
+        this.evictions = persistedState.evictions;
+        this.expirations = persistedState.expirations;
+    }
+
+    private getPersistedState(): CacheManagerPersistedState {
+        const entries: CacheManagerPersistedState['entries'] = [];
+        for (const [key, value] of this.cache.entries()) {
+            entries.push({ key, value });
+        }
+        return {
+            entries,
+            accessOrder: this.accessOrder,
+            hits: this.hits,
+            misses: this.misses,
+            sets: this.sets,
+            evictions: this.evictions,
+            expirations: this.expirations
+        };
+    }
+
+    private async persistState(): Promise<void> {
+        if (this.persistence?.store) {
+            try {
+                await this.persistence.store(this.getPersistedState());
+            } catch (error) {
+                console.warn('stable-request: Unable to store cache manager state to persistence.');
+            }
+        }
     }
 
     private generateKey(reqConfig: AxiosRequestConfig): string {
@@ -186,17 +244,23 @@ export class CacheManager {
         this.accessOrder.push(key);
         this.sets++;
         this.totalSetTime += (Date.now() - startTime);
+        this.persistState();
     }
 
     clear(): void {
         this.cache.clear();
         this.accessOrder = [];
+        this.persistState();
     }
 
     delete(reqConfig: AxiosRequestConfig): boolean {
         const key = this.generateKey(reqConfig);
         this.accessOrder = this.accessOrder.filter(k => k !== key);
-        return this.cache.delete(key);
+        const deleted = this.cache.delete(key);
+        if (deleted) {
+            this.persistState();
+        }
+        return deleted;
     }
 
     getStats() {
@@ -246,6 +310,10 @@ export class CacheManager {
                 this.accessOrder = this.accessOrder.filter(k => k !== key);
                 prunedCount++;
             }
+        }
+
+        if (prunedCount > 0) {
+            this.persistState();
         }
 
         return prunedCount;

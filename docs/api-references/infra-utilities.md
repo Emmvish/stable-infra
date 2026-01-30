@@ -38,6 +38,7 @@ The `@emmvish/stable-request` library provides a suite of infrastructure utiliti
 - ✅ **Production-Ready**: Battle-tested patterns from industry best practices
 - ✅ **Observable**: Rich state inspection for monitoring and debugging
 - ✅ **Configurable**: Flexible configuration for different use cases
+- ✅ **Persistence Support**: Optional load/store functions for state persistence across restarts
 
 ---
 
@@ -60,6 +61,7 @@ interface CacheConfig {
   maxSize?: number;
   excludeMethods?: string[];
   keyGenerator?: (reqConfig: AxiosRequestConfig) => string;
+  persistence?: InfrastructurePersistence<CacheManagerPersistedState>;
 }
 ```
 
@@ -74,6 +76,7 @@ interface CacheConfig {
 | `maxSize` | `number?` | `100` | Maximum number of cached responses. |
 | `excludeMethods` | `REQUEST_METHODS[]?` | `['POST', 'PUT', 'PATCH', 'DELETE']` | HTTP methods excluded from caching. |
 | `keyGenerator` | `Function?` | SHA-256 hash | Custom cache key generator function. |
+| `persistence` | `InfrastructurePersistence?` | `undefined` | Optional persistence with `load()` and `store()` functions. |
 
 ### Class Methods
 
@@ -87,6 +90,14 @@ const cache = new CacheManager({
   ttl: 300000,
   maxSize: 100
 });
+```
+
+#### async initialize(): Promise<void>
+
+Load persisted state if persistence is configured. Call this after construction to restore state.
+
+```typescript
+await cache.initialize();
 ```
 
 #### get<T>(reqConfig: AxiosRequestConfig): CachedResponse<T> | null
@@ -244,6 +255,7 @@ interface CircuitBreakerConfig {
   successThresholdPercentage?: number;
   halfOpenMaxRequests?: number;
   trackIndividualAttempts?: boolean;
+  persistence?: InfrastructurePersistence<CircuitBreakerPersistedState>;
 }
 ```
 
@@ -257,6 +269,7 @@ interface CircuitBreakerConfig {
 | `successThresholdPercentage` | `number?` | `50` | Success percentage to close circuit in HALF_OPEN (0-100). |
 | `halfOpenMaxRequests` | `number?` | `5` | Maximum requests allowed in HALF_OPEN state. |
 | `trackIndividualAttempts` | `boolean?` | `false` | Track individual retry attempts vs. final request results. |
+| `persistence` | `InfrastructurePersistence?` | `undefined` | Optional persistence with `load()` and `store()` functions. |
 
 ### Class Methods
 
@@ -270,6 +283,14 @@ const breaker = new CircuitBreaker({
   minimumRequests: 10,
   recoveryTimeoutMs: 60000
 });
+```
+
+#### async initialize(): Promise<void>
+
+Load persisted state if persistence is configured. Call this after construction to restore state.
+
+```typescript
+await breaker.initialize();
 ```
 
 #### async canExecute(): Promise<boolean>
@@ -416,21 +437,41 @@ The `RateLimiter` class implements token bucket algorithm with sliding window fo
 ### Configuration
 
 ```typescript
+// Simple constructor
 const limiter = new RateLimiter(maxRequests, windowMs);
+
+// Config object constructor (with optional persistence)
+const limiter = new RateLimiter({
+  maxRequests: 100,
+  windowMs: 60000,
+  persistence: { load, store }
+});
 ```
 
 **Parameters:**
 - `maxRequests`: Maximum requests allowed per window (minimum: 1)
 - `windowMs`: Time window in milliseconds (minimum: 100)
+- `persistence`: Optional persistence with `load()` and `store()` functions
 
 ### Class Methods
 
-#### constructor(maxRequests: number, windowMs: number)
+#### constructor(maxRequests: number, windowMs: number) or constructor(config: RateLimitConfig)
 
 Create a new rate limiter instance.
 
 ```typescript
 const limiter = new RateLimiter(100, 60000); // 100 requests per minute
+
+// Or with persistence
+const limiter = new RateLimiter({
+  maxRequests: 100,
+  windowMs: 60000,
+  persistence: {
+    load: async () => await loadFromRedis('rate-limiter'),
+    store: async (state) => await saveToRedis('rate-limiter', state)
+  }
+});
+await limiter.initialize();
 ```
 
 #### async execute<T>(fn: () => Promise<T>): Promise<T>
@@ -510,20 +551,38 @@ The `ConcurrencyLimiter` class implements semaphore pattern to limit concurrent 
 ### Configuration
 
 ```typescript
+// Simple constructor
 const limiter = new ConcurrencyLimiter(maxConcurrent);
+
+// Config object constructor (with optional persistence)
+const limiter = new ConcurrencyLimiter({
+  limit: 10,
+  persistence: { load, store }
+});
 ```
 
 **Parameters:**
 - `maxConcurrent`: Maximum concurrent operations allowed (minimum: 1)
+- `persistence`: Optional persistence with `load()` and `store()` functions
 
 ### Class Methods
 
-#### constructor(limit: number)
+#### constructor(limit: number) or constructor(config: ConcurrencyLimiterConfig)
 
 Create a new concurrency limiter instance.
 
 ```typescript
 const limiter = new ConcurrencyLimiter(10); // Max 10 concurrent operations
+
+// Or with persistence
+const limiter = new ConcurrencyLimiter({
+  limit: 10,
+  persistence: {
+    load: async () => await loadFromRedis('concurrency-limiter'),
+    store: async (state) => await saveToRedis('concurrency-limiter', state)
+  }
+});
+await limiter.initialize();
 ```
 
 #### async execute<T>(fn: () => Promise<T>): Promise<T>
@@ -608,6 +667,7 @@ interface FunctionCacheConfig<TArgs extends any[], TReturn> {
   ttl?: number;
   maxSize?: number;
   keyGenerator?: (fn: (...args: TArgs) => any, args: TArgs) => string;
+  persistence?: InfrastructurePersistence<FunctionCacheManagerPersistedState>;
 }
 ```
 
@@ -619,6 +679,7 @@ interface FunctionCacheConfig<TArgs extends any[], TReturn> {
 | `ttl` | `number?` | `300000` | Time-to-live in milliseconds (5 minutes). |
 | `maxSize` | `number?` | `1000` | Maximum cached function results. |
 | `keyGenerator` | `Function?` | MD5 hash | Custom cache key generator. |
+| `persistence` | `InfrastructurePersistence?` | `undefined` | Optional persistence with `load()` and `store()` functions. |
 
 ### Class Methods
 
@@ -632,6 +693,14 @@ const cache = new FunctionCacheManager({
   ttl: 300000,
   maxSize: 1000
 });
+```
+
+#### async initialize(): Promise<void>
+
+Load persisted state if persistence is configured. Call this after construction to restore state.
+
+```typescript
+await cache.initialize();
 ```
 
 #### get<TArgs, TReturn>(fn, args): CachedFunctionResponse<TReturn> | null

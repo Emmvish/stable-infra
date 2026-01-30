@@ -1,3 +1,5 @@
+import { RateLimitConfig, RateLimiterPersistedState, InfrastructurePersistence } from '../types/index.js';
+
 export class RateLimiter {
     private readonly maxRequests: number;
     private readonly windowMs: number;
@@ -12,12 +14,77 @@ export class RateLimiter {
     private peakRequestRate: number = 0;
     private requestsInCurrentWindow: number = 0;
     private windowStartTime: number = Date.now();
+    private readonly persistence?: InfrastructurePersistence<RateLimiterPersistedState>;
+    private initialized: boolean = false;
 
-    constructor(maxRequests: number, windowMs: number) {
-        this.maxRequests = Math.max(1, Math.floor(maxRequests));
-        this.windowMs = Math.max(100, windowMs);
+    constructor(maxRequests: number, windowMs: number, persistence?: InfrastructurePersistence<RateLimiterPersistedState>);
+    constructor(config: RateLimitConfig);
+    constructor(maxRequestsOrConfig: number | RateLimitConfig, windowMs?: number, persistence?: InfrastructurePersistence<RateLimiterPersistedState>) {
+        if (typeof maxRequestsOrConfig === 'object') {
+            this.maxRequests = Math.max(1, Math.floor(maxRequestsOrConfig.maxRequests));
+            this.windowMs = Math.max(100, maxRequestsOrConfig.windowMs);
+            this.persistence = maxRequestsOrConfig.persistence;
+        } else {
+            this.maxRequests = Math.max(1, Math.floor(maxRequestsOrConfig));
+            this.windowMs = Math.max(100, windowMs!);
+            this.persistence = persistence;
+        }
         this.tokens = this.maxRequests;
         this.lastRefillTime = Date.now();
+    }
+
+    async initialize(): Promise<void> {
+        if (this.initialized) return;
+        
+        if (this.persistence?.load) {
+            try {
+                const persistedState = await this.persistence.load();
+                if (persistedState) {
+                    this.restoreState(persistedState);
+                }
+            } catch (error) {
+                console.warn('stable-request: Unable to load rate limiter state from persistence.');
+            }
+        }
+        this.initialized = true;
+    }
+
+    private restoreState(persistedState: RateLimiterPersistedState): void {
+        this.tokens = persistedState.tokens;
+        this.lastRefillTime = persistedState.lastRefillTime;
+        this.totalRequests = persistedState.totalRequests;
+        this.throttledRequests = persistedState.throttledRequests;
+        this.completedRequests = persistedState.completedRequests;
+        this.peakQueueLength = persistedState.peakQueueLength;
+        this.totalQueueWaitTime = persistedState.totalQueueWaitTime;
+        this.peakRequestRate = persistedState.peakRequestRate;
+        this.requestsInCurrentWindow = persistedState.requestsInCurrentWindow;
+        this.windowStartTime = persistedState.windowStartTime;
+    }
+
+    private getPersistedState(): RateLimiterPersistedState {
+        return {
+            tokens: this.tokens,
+            lastRefillTime: this.lastRefillTime,
+            totalRequests: this.totalRequests,
+            throttledRequests: this.throttledRequests,
+            completedRequests: this.completedRequests,
+            peakQueueLength: this.peakQueueLength,
+            totalQueueWaitTime: this.totalQueueWaitTime,
+            peakRequestRate: this.peakRequestRate,
+            requestsInCurrentWindow: this.requestsInCurrentWindow,
+            windowStartTime: this.windowStartTime
+        };
+    }
+
+    private async persistState(): Promise<void> {
+        if (this.persistence?.store) {
+            try {
+                await this.persistence.store(this.getPersistedState());
+            } catch (error) {
+                console.warn('stable-request: Unable to store rate limiter state to persistence.');
+            }
+        }
     }
 
     private refillTokens(): void {
@@ -41,6 +108,7 @@ export class RateLimiter {
             this.tokens--;
             this.requestsInCurrentWindow++;
             this.peakRequestRate = Math.max(this.peakRequestRate, this.requestsInCurrentWindow);
+            this.persistState();
             return Promise.resolve();
         }
 
@@ -53,6 +121,7 @@ export class RateLimiter {
                 resolve();
             });
             this.peakQueueLength = Math.max(this.peakQueueLength, this.queue.length);
+            this.persistState();
             this.scheduleRefill();
         });
     }
@@ -81,6 +150,8 @@ export class RateLimiter {
         if (this.queue.length > 0) {
             this.scheduleRefill();
         }
+        
+        this.persistState();
     }
 
     async execute<T>(fn: () => Promise<T>): Promise<T> {
@@ -88,9 +159,11 @@ export class RateLimiter {
         try {
             const result = await fn();
             this.completedRequests++;
+            this.persistState();
             return result;
         } catch (error) {
             this.completedRequests++;
+            this.persistState();
             throw error;
         }
     }

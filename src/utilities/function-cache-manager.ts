@@ -1,11 +1,11 @@
-import { FunctionCacheConfig, CachedFunctionResponse } from '../types/index.js';
+import { FunctionCacheConfig, CachedFunctionResponse, FunctionCacheManagerPersistedState, InfrastructurePersistence } from '../types/index.js';
 import { getNodeCrypto, simpleHashToHex } from './hash-utils.js';
 
 const nodeCrypto = getNodeCrypto();
 
 export class FunctionCacheManager {
   private cache: Map<string, CachedFunctionResponse>;
-  private config: FunctionCacheConfig<any, any>;
+  private config: Omit<FunctionCacheConfig<any, any>, 'persistence'>;
   private stats = {
     hits: 0,
     misses: 0,
@@ -14,14 +14,71 @@ export class FunctionCacheManager {
     getTimes: [] as number[],
     setTimes: [] as number[]
   };
+  private readonly persistence?: InfrastructurePersistence<FunctionCacheManagerPersistedState>;
+  private initialized: boolean = false;
 
   constructor(config: FunctionCacheConfig<any, any>) {
     this.cache = new Map();
     this.config = {
-      ttl: 300000,
-      maxSize: 1000,
-      ...config
+      enabled: config.enabled,
+      ttl: config.ttl ?? 300000,
+      maxSize: config.maxSize ?? 1000,
+      keyGenerator: config.keyGenerator
     };
+    this.persistence = config.persistence;
+  }
+
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+    
+    if (this.persistence?.load) {
+      try {
+        const persistedState = await this.persistence.load();
+        if (persistedState) {
+          this.restoreState(persistedState);
+        }
+      } catch (error) {
+        console.warn('stable-request: Unable to load function cache manager state from persistence.');
+      }
+    }
+    this.initialized = true;
+  }
+
+  private restoreState(persistedState: FunctionCacheManagerPersistedState): void {
+    this.cache.clear();
+    for (const entry of persistedState.entries) {
+      this.cache.set(entry.key, entry.value);
+    }
+    this.stats.hits = persistedState.stats.hits;
+    this.stats.misses = persistedState.stats.misses;
+    this.stats.sets = persistedState.stats.sets;
+    this.stats.evictions = persistedState.stats.evictions;
+  }
+
+  private getPersistedState(): FunctionCacheManagerPersistedState {
+    const entries: FunctionCacheManagerPersistedState['entries'] = [];
+    for (const [key, value] of this.cache.entries()) {
+      entries.push({ key, value });
+    }
+    return {
+      entries,
+      stats: {
+        hits: this.stats.hits,
+        misses: this.stats.misses,
+        sets: this.stats.sets,
+        evictions: this.stats.evictions
+      }
+    };
+  }
+
+  private async persistState(): Promise<void> {
+    if (this.persistence?.store) {
+      try {
+        await this.persistence.store(this.getPersistedState());
+      } catch (error) {
+        console.warn('stable-request: Unable to store function cache manager state to persistence.');
+      }
+    }
   }
 
   private generateKey<TArgs extends any[]>(fn: (...args: TArgs) => any, args: TArgs): string {
@@ -96,6 +153,7 @@ export class FunctionCacheManager {
       });
 
       this.stats.sets++;
+      this.persistState();
     } finally {
       this.stats.setTimes.push(Date.now() - startTime);
     }
@@ -103,6 +161,7 @@ export class FunctionCacheManager {
 
   clear(): void {
     this.cache.clear();
+    this.persistState();
   }
 
   getStats() {

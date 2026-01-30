@@ -1,3 +1,5 @@
+import { ConcurrencyLimiterConfig, ConcurrencyLimiterPersistedState, InfrastructurePersistence } from '../types/index.js';
+
 export class ConcurrencyLimiter {
     private readonly limit: number;
     private running: number = 0;
@@ -11,9 +13,69 @@ export class ConcurrencyLimiter {
     private totalQueueWaitTime: number = 0;
     private totalExecutionTime: number = 0;
     private queueWaitTimes: number[] = [];
+    private readonly persistence?: InfrastructurePersistence<ConcurrencyLimiterPersistedState>;
+    private initialized: boolean = false;
 
-    constructor(limit: number) {
-        this.limit = Math.max(1, Math.floor(limit));
+    constructor(limit: number, persistence?: InfrastructurePersistence<ConcurrencyLimiterPersistedState>);
+    constructor(config: ConcurrencyLimiterConfig);
+    constructor(limitOrConfig: number | ConcurrencyLimiterConfig, persistence?: InfrastructurePersistence<ConcurrencyLimiterPersistedState>) {
+        if (typeof limitOrConfig === 'object') {
+            this.limit = Math.max(1, Math.floor(limitOrConfig.limit));
+            this.persistence = limitOrConfig.persistence;
+        } else {
+            this.limit = Math.max(1, Math.floor(limitOrConfig));
+            this.persistence = persistence;
+        }
+    }
+    
+    async initialize(): Promise<void> {
+        if (this.initialized) return;
+        
+        if (this.persistence?.load) {
+            try {
+                const persistedState = await this.persistence.load();
+                if (persistedState) {
+                    this.restoreState(persistedState);
+                }
+            } catch (error) {
+                console.warn('stable-request: Unable to load concurrency limiter state from persistence.');
+            }
+        }
+        this.initialized = true;
+    }
+
+    private restoreState(persistedState: ConcurrencyLimiterPersistedState): void {
+        this.totalRequests = persistedState.totalRequests;
+        this.completedRequests = persistedState.completedRequests;
+        this.failedRequests = persistedState.failedRequests;
+        this.queuedRequests = persistedState.queuedRequests;
+        this.peakConcurrency = persistedState.peakConcurrency;
+        this.peakQueueLength = persistedState.peakQueueLength;
+        this.totalQueueWaitTime = persistedState.totalQueueWaitTime;
+        this.totalExecutionTime = persistedState.totalExecutionTime;
+    }
+
+    private getPersistedState(): ConcurrencyLimiterPersistedState {
+        return {
+            totalRequests: this.totalRequests,
+            completedRequests: this.completedRequests,
+            failedRequests: this.failedRequests,
+            queuedRequests: this.queuedRequests,
+            peakConcurrency: this.peakConcurrency,
+            peakQueueLength: this.peakQueueLength,
+            totalQueueWaitTime: this.totalQueueWaitTime,
+            totalExecutionTime: this.totalExecutionTime
+        };
+    }
+
+    private async persistState(): Promise<void> {
+        if (this.persistence?.store) {
+            try {
+                await this.persistence.store(this.getPersistedState());
+            } catch (error) {
+                console.warn('stable-request: Unable to store concurrency limiter state to persistence.');
+            }
+        }
     }
 
     private async acquire(): Promise<{ queueWaitTime: number }> {
@@ -58,11 +120,13 @@ export class ConcurrencyLimiter {
             const executionTime = Date.now() - executionStartTime;
             this.totalExecutionTime += executionTime;
             this.completedRequests++;
+            this.persistState();
             return result;
         } catch (error) {
             const executionTime = Date.now() - executionStartTime;
             this.totalExecutionTime += executionTime;
             this.failedRequests++;
+            this.persistState();
             throw error;
         } finally {
             this.release();
