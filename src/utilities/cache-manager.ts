@@ -2,6 +2,7 @@ import { AxiosRequestConfig } from 'axios';
 import { REQUEST_METHODS } from '../enums/index.js';
 import { CachedResponse, CacheConfig, CacheManagerPersistedState, InfrastructurePersistence } from '../types/index.js';
 import { getNodeCrypto, simpleHashToHex } from './hash-utils.js';
+import { InfrastructurePersistenceCoordinator } from './infrastructure-persistence.js';
 
 const nodeCrypto = getNodeCrypto();
 
@@ -17,6 +18,7 @@ export class CacheManager {
     private totalGetTime: number = 0;
     private totalSetTime: number = 0;
     private readonly persistence?: InfrastructurePersistence<CacheManagerPersistedState>;
+    private readonly persistenceCoordinator?: InfrastructurePersistenceCoordinator<CacheManagerPersistedState>;
     private initialized: boolean = false;
 
     constructor(config: CacheConfig) {
@@ -31,14 +33,17 @@ export class CacheManager {
             keyGenerator: config.keyGenerator
         };
         this.persistence = config.persistence;
+        this.persistenceCoordinator = this.persistence
+            ? new InfrastructurePersistenceCoordinator(this.persistence, 'cache-manager')
+            : undefined;
     }
 
     async initialize(): Promise<void> {
         if (this.initialized) return;
         
-        if (this.persistence?.load) {
+        if (this.persistenceCoordinator) {
             try {
-                const persistedState = await this.persistence.load();
+                const persistedState = await this.persistenceCoordinator.load();
                 if (persistedState) {
                     this.restoreState(persistedState);
                 }
@@ -79,9 +84,9 @@ export class CacheManager {
     }
 
     private async persistState(): Promise<void> {
-        if (this.persistence?.store) {
+        if (this.persistenceCoordinator) {
             try {
-                await this.persistence.store(this.getPersistedState());
+                await this.persistenceCoordinator.store(this.getPersistedState());
             } catch (error) {
                 console.warn('stable-request: Unable to store cache manager state to persistence.');
             }

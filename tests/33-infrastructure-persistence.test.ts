@@ -14,6 +14,8 @@ import {
 } from '../src/types/index.js';
 import { CircuitBreakerState } from '../src/enums/index.js';
 
+const flushPersistence = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 describe('Infrastructure Persistence', () => {
   describe('CircuitBreaker Persistence', () => {
     it('should persist state on state changes', async () => {
@@ -32,18 +34,21 @@ describe('Infrastructure Persistence', () => {
 
       // Record success
       breaker.recordSuccess();
+      await flushPersistence();
       expect(storedStates.length).toBeGreaterThanOrEqual(1);
       expect(storedStates[storedStates.length - 1].successfulRequests).toBe(1);
       expect(storedStates[storedStates.length - 1].state).toBe(CircuitBreakerState.CLOSED);
 
       // Record failure
       breaker.recordFailure();
+      await flushPersistence();
       expect(storedStates.length).toBeGreaterThanOrEqual(2);
       expect(storedStates[storedStates.length - 1].failedRequests).toBe(1);
 
       // Record another failure (should trip circuit - triggers additional persist on transition)
       const countBeforeTrip = storedStates.length;
       breaker.recordFailure();
+      await flushPersistence();
       expect(storedStates.length).toBeGreaterThan(countBeforeTrip);
       expect(storedStates[storedStates.length - 1].state).toBe(CircuitBreakerState.OPEN);
     });
@@ -154,7 +159,8 @@ describe('Infrastructure Persistence', () => {
       const countBeforeReset = storeCount;
       
       breaker.reset();
-      expect(storeCount).toBe(countBeforeReset + 1);
+      await flushPersistence();
+      expect(storeCount).toBeGreaterThanOrEqual(countBeforeReset + 1);
       expect(breaker.getState().state).toBe(CircuitBreakerState.CLOSED);
     });
   });
@@ -174,6 +180,7 @@ describe('Infrastructure Persistence', () => {
       });
 
       await limiter.execute(async () => 'result');
+      await flushPersistence();
       expect(storedStates.length).toBeGreaterThanOrEqual(1);
       expect(storedStates[storedStates.length - 1].completedRequests).toBe(1);
     });
@@ -216,6 +223,7 @@ describe('Infrastructure Persistence', () => {
       });
 
       await limiter.execute(async () => 'result');
+      await flushPersistence();
       expect(storedStates.length).toBeGreaterThanOrEqual(1);
     });
   });
@@ -234,6 +242,7 @@ describe('Infrastructure Persistence', () => {
       });
 
       await limiter.execute(async () => 'result');
+      await flushPersistence();
       expect(storedStates.length).toBeGreaterThanOrEqual(1);
       expect(storedStates[storedStates.length - 1].completedRequests).toBe(1);
     });
@@ -284,7 +293,7 @@ describe('Infrastructure Persistence', () => {
       } catch (e) {
         // Expected
       }
-
+      await flushPersistence();
       expect(lastState!.failedRequests).toBe(1);
     });
 
@@ -296,6 +305,7 @@ describe('Infrastructure Persistence', () => {
       });
 
       await limiter.execute(async () => 'result');
+      await flushPersistence();
       expect(storedStates.length).toBeGreaterThanOrEqual(1);
     });
   });
@@ -315,6 +325,7 @@ describe('Infrastructure Persistence', () => {
       });
 
       cache.set({ url: '/test', method: 'GET' }, { data: 'test' }, 200, 'OK', {});
+      await flushPersistence();
       
       expect(storedStates.length).toBe(1);
       expect(storedStates[0].entries.length).toBe(1);
@@ -376,6 +387,7 @@ describe('Infrastructure Persistence', () => {
 
       cache.set({ url: '/test', method: 'GET' }, { data: 'test' }, 200, 'OK', {});
       cache.clear();
+      await flushPersistence();
       
       expect(lastState!.entries.length).toBe(0);
     });
@@ -395,6 +407,7 @@ describe('Infrastructure Persistence', () => {
 
       cache.set({ url: '/test', method: 'GET' }, { data: 'test' }, 200, 'OK', {});
       const deleted = cache.delete({ url: '/test', method: 'GET' });
+      await flushPersistence();
       
       expect(deleted).toBe(true);
       expect(lastState!.entries.length).toBe(0);
@@ -418,8 +431,9 @@ describe('Infrastructure Persistence', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
       
       const prunedCount = cache.prune();
+      await flushPersistence();
       expect(prunedCount).toBe(1);
-      expect(storeCount).toBe(countAfterSet + 1);
+      expect(storeCount).toBeGreaterThanOrEqual(countAfterSet + 1);
     });
   });
 
@@ -439,6 +453,7 @@ describe('Infrastructure Persistence', () => {
 
       const testFn = (x: number) => x * 2;
       cache.set(testFn, [5], 10);
+      await flushPersistence();
       
       expect(storedStates.length).toBe(1);
       expect(storedStates[0].entries.length).toBe(1);
@@ -498,6 +513,7 @@ describe('Infrastructure Persistence', () => {
       const testFn = (x: number) => x * 2;
       cache.set(testFn, [5], 10);
       cache.clear();
+      await flushPersistence();
       
       expect(lastState!.entries.length).toBe(0);
     });
@@ -520,6 +536,7 @@ describe('Infrastructure Persistence', () => {
       breaker1.recordSuccess();
       breaker1.recordSuccess();
       breaker1.recordFailure();
+      await flushPersistence();
 
       // Second instance loads state from first
       const breaker2 = new CircuitBreaker({

@@ -1,10 +1,12 @@
 import { CircuitBreakerConfig, CircuitBreakerPersistedState, InfrastructurePersistence } from '../types/index.js';
 import { CircuitBreakerState } from '../enums/index.js';
+import { InfrastructurePersistenceCoordinator } from './infrastructure-persistence.js';
 
 export class CircuitBreaker {
     private state: CircuitBreakerState = CircuitBreakerState.CLOSED;
     private readonly config: Required<Omit<CircuitBreakerConfig, 'persistence'>>;
     private readonly persistence?: InfrastructurePersistence<CircuitBreakerPersistedState>;
+    private readonly persistenceCoordinator?: InfrastructurePersistenceCoordinator<CircuitBreakerPersistedState>;
     
     private totalRequests: number = 0;
     private failedRequests: number = 0;
@@ -41,14 +43,17 @@ export class CircuitBreaker {
             trackIndividualAttempts: config.trackIndividualAttempts ?? false
         };
         this.persistence = config.persistence;
+        this.persistenceCoordinator = this.persistence
+            ? new InfrastructurePersistenceCoordinator(this.persistence, 'circuit-breaker')
+            : undefined;
     }
 
     async initialize(): Promise<void> {
         if (this.initialized) return;
         
-        if (this.persistence?.load) {
+        if (this.persistenceCoordinator) {
             try {
-                const persistedState = await this.persistence.load();
+                const persistedState = await this.persistenceCoordinator.load();
                 if (persistedState) {
                     this.restoreState(persistedState);
                 }
@@ -108,9 +113,9 @@ export class CircuitBreaker {
     }
 
     private async persistState(): Promise<void> {
-        if (this.persistence?.store) {
+        if (this.persistenceCoordinator) {
             try {
-                await this.persistence.store(this.getPersistedState());
+                await this.persistenceCoordinator.store(this.getPersistedState());
             } catch (error) {
                 console.warn('stable-request: Unable to store circuit breaker state to persistence.');
             }

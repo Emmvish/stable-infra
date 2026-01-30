@@ -1,4 +1,5 @@
 import { RateLimitConfig, RateLimiterPersistedState, InfrastructurePersistence } from '../types/index.js';
+import { InfrastructurePersistenceCoordinator } from './infrastructure-persistence.js';
 
 export class RateLimiter {
     private readonly maxRequests: number;
@@ -15,6 +16,7 @@ export class RateLimiter {
     private requestsInCurrentWindow: number = 0;
     private windowStartTime: number = Date.now();
     private readonly persistence?: InfrastructurePersistence<RateLimiterPersistedState>;
+    private readonly persistenceCoordinator?: InfrastructurePersistenceCoordinator<RateLimiterPersistedState>;
     private initialized: boolean = false;
 
     constructor(maxRequests: number, windowMs: number, persistence?: InfrastructurePersistence<RateLimiterPersistedState>);
@@ -29,6 +31,9 @@ export class RateLimiter {
             this.windowMs = Math.max(100, windowMs!);
             this.persistence = persistence;
         }
+        this.persistenceCoordinator = this.persistence
+            ? new InfrastructurePersistenceCoordinator(this.persistence, 'rate-limiter')
+            : undefined;
         this.tokens = this.maxRequests;
         this.lastRefillTime = Date.now();
     }
@@ -36,9 +41,9 @@ export class RateLimiter {
     async initialize(): Promise<void> {
         if (this.initialized) return;
         
-        if (this.persistence?.load) {
+        if (this.persistenceCoordinator) {
             try {
-                const persistedState = await this.persistence.load();
+                const persistedState = await this.persistenceCoordinator.load();
                 if (persistedState) {
                     this.restoreState(persistedState);
                 }
@@ -78,9 +83,9 @@ export class RateLimiter {
     }
 
     private async persistState(): Promise<void> {
-        if (this.persistence?.store) {
+        if (this.persistenceCoordinator) {
             try {
-                await this.persistence.store(this.getPersistedState());
+                await this.persistenceCoordinator.store(this.getPersistedState());
             } catch (error) {
                 console.warn('stable-request: Unable to store rate limiter state to persistence.');
             }

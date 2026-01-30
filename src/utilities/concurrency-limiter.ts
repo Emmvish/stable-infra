@@ -1,4 +1,5 @@
 import { ConcurrencyLimiterConfig, ConcurrencyLimiterPersistedState, InfrastructurePersistence } from '../types/index.js';
+import { InfrastructurePersistenceCoordinator } from './infrastructure-persistence.js';
 
 export class ConcurrencyLimiter {
     private readonly limit: number;
@@ -14,6 +15,7 @@ export class ConcurrencyLimiter {
     private totalExecutionTime: number = 0;
     private queueWaitTimes: number[] = [];
     private readonly persistence?: InfrastructurePersistence<ConcurrencyLimiterPersistedState>;
+    private readonly persistenceCoordinator?: InfrastructurePersistenceCoordinator<ConcurrencyLimiterPersistedState>;
     private initialized: boolean = false;
 
     constructor(limit: number, persistence?: InfrastructurePersistence<ConcurrencyLimiterPersistedState>);
@@ -26,14 +28,17 @@ export class ConcurrencyLimiter {
             this.limit = Math.max(1, Math.floor(limitOrConfig));
             this.persistence = persistence;
         }
+        this.persistenceCoordinator = this.persistence
+            ? new InfrastructurePersistenceCoordinator(this.persistence, 'concurrency-limiter')
+            : undefined;
     }
     
     async initialize(): Promise<void> {
         if (this.initialized) return;
         
-        if (this.persistence?.load) {
+        if (this.persistenceCoordinator) {
             try {
-                const persistedState = await this.persistence.load();
+                const persistedState = await this.persistenceCoordinator.load();
                 if (persistedState) {
                     this.restoreState(persistedState);
                 }
@@ -69,9 +74,9 @@ export class ConcurrencyLimiter {
     }
 
     private async persistState(): Promise<void> {
-        if (this.persistence?.store) {
+        if (this.persistenceCoordinator) {
             try {
-                await this.persistence.store(this.getPersistedState());
+                await this.persistenceCoordinator.store(this.getPersistedState());
             } catch (error) {
                 console.warn('stable-request: Unable to store concurrency limiter state to persistence.');
             }

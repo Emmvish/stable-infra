@@ -1,5 +1,6 @@
 import { FunctionCacheConfig, CachedFunctionResponse, FunctionCacheManagerPersistedState, InfrastructurePersistence } from '../types/index.js';
 import { getNodeCrypto, simpleHashToHex } from './hash-utils.js';
+import { InfrastructurePersistenceCoordinator } from './infrastructure-persistence.js';
 
 const nodeCrypto = getNodeCrypto();
 
@@ -15,6 +16,7 @@ export class FunctionCacheManager {
     setTimes: [] as number[]
   };
   private readonly persistence?: InfrastructurePersistence<FunctionCacheManagerPersistedState>;
+  private readonly persistenceCoordinator?: InfrastructurePersistenceCoordinator<FunctionCacheManagerPersistedState>;
   private initialized: boolean = false;
 
   constructor(config: FunctionCacheConfig<any, any>) {
@@ -26,14 +28,17 @@ export class FunctionCacheManager {
       keyGenerator: config.keyGenerator
     };
     this.persistence = config.persistence;
+    this.persistenceCoordinator = this.persistence
+      ? new InfrastructurePersistenceCoordinator(this.persistence, 'function-cache-manager')
+      : undefined;
   }
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
     
-    if (this.persistence?.load) {
+    if (this.persistenceCoordinator) {
       try {
-        const persistedState = await this.persistence.load();
+        const persistedState = await this.persistenceCoordinator.load();
         if (persistedState) {
           this.restoreState(persistedState);
         }
@@ -72,9 +77,9 @@ export class FunctionCacheManager {
   }
 
   private async persistState(): Promise<void> {
-    if (this.persistence?.store) {
+    if (this.persistenceCoordinator) {
       try {
-        await this.persistence.store(this.getPersistedState());
+        await this.persistenceCoordinator.store(this.getPersistedState());
       } catch (error) {
         console.warn('stable-request: Unable to store function cache manager state to persistence.');
       }

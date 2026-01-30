@@ -66,6 +66,9 @@ export type {
     RateLimitConfig,
     ConcurrencyLimiterConfig,
     InfrastructurePersistence,
+    InfrastructurePersistenceOperationType,
+    InfrastructurePersistenceOperation,
+    InfrastructurePersistenceTransactionResult,
     CircuitBreakerPersistedState,
     RateLimiterPersistedState,
     ConcurrencyLimiterPersistedState,
@@ -223,5 +226,6 @@ export {
     getNodeCrypto,
     simpleHashToHex,
     isStableBuffer,
-    withBuffer
+    withBuffer,
+    InfrastructurePersistenceCoordinator
 } from './utilities/index.js';

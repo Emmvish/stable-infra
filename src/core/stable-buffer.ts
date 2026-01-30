@@ -1,8 +1,6 @@
 import type { MetricsGuardrailsStableBuffer, StableBufferMetrics, StableBufferState, StableBufferOptions } from '../types/index.js';
 import { MetricsValidator } from '../utilities/index.js';
 
-
-
 export class StableBuffer {
   private state: StableBufferState;
   private queue: Promise<unknown> = Promise.resolve();

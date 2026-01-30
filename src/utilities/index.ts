@@ -32,3 +32,4 @@ export { validateWorkflowGraph, detectCycles, detectUnreachableNodes, detectOrph
 export { executeWorkflowGraph } from './execute-workflow-graph.js';
 export { getNodeCrypto, simpleHashToHex } from './hash-utils.js';
 export { isStableBuffer, withBuffer } from './buffer-utils.js';
+export { InfrastructurePersistenceCoordinator } from './infrastructure-persistence.js'

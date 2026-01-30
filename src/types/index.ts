@@ -879,9 +879,27 @@ export interface HandlePhaseDecisionHookOptions<RequestDataType = any, ResponseD
   maxSerializableChars?: number;
 }
 
+export type InfrastructurePersistenceOperationType = 'load' | 'store';
+
+export interface InfrastructurePersistenceOperation<TState> {
+  operationId: string;
+  type: InfrastructurePersistenceOperationType;
+  timestamp: number;
+  state?: TState;
+}
+
+export type InfrastructurePersistenceTransactionResult<TState> =
+  | { state?: TState | null; skipped?: boolean }
+  | TState
+  | null
+  | undefined
+  | void;
+
 export interface InfrastructurePersistence<TState> {
   load?: () => TState | null | undefined | Promise<TState | null | undefined>;
   store?: (state: TState) => void | Promise<void>;
+  transaction?: (operation: InfrastructurePersistenceOperation<TState>) => InfrastructurePersistenceTransactionResult<TState> | Promise<InfrastructurePersistenceTransactionResult<TState>>;
+  buffer?: BufferLike;
 }
 
 export interface CircuitBreakerPersistedState {
