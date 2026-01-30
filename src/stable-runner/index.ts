@@ -93,8 +93,28 @@ const resolveSchedulerConfig = async (config?: SchedulerConfig): Promise<Schedul
     queueLimit: parseNumberOrDefault(queueLimitEnv, config?.queueLimit ?? 1000),
     timezone: timezoneEnv ?? config?.timezone,
     persistence: config?.persistence,
-    sharedBuffer: config?.sharedBuffer
+    sharedBuffer: config?.sharedBuffer,
+    sharedInfrastructure: config?.sharedInfrastructure,
+    metricsGuardrails: config?.metricsGuardrails,
+    retry: config?.retry,
+    executionTimeoutMs: config?.executionTimeoutMs,
   };
+};
+
+const deepEqual = (a: unknown, b: unknown): boolean => {
+  if (a === b) return true;
+  if (a === null || b === null) return a === b;
+  if (typeof a !== 'object' || typeof b !== 'object') return false;
+  
+  const keysA = Object.keys(a as object);
+  const keysB = Object.keys(b as object);
+  
+  if (keysA.length !== keysB.length) return false;
+  
+  return keysA.every(key => 
+    Object.prototype.hasOwnProperty.call(b, key) && 
+    deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])
+  );
 };
 
 const isSchedulerConfigEqual = (a?: SchedulerConfig | null, b?: SchedulerConfig | null): boolean => {
@@ -105,11 +125,12 @@ const isSchedulerConfigEqual = (a?: SchedulerConfig | null, b?: SchedulerConfig 
     a.queueLimit === b.queueLimit &&
     a.timezone === b.timezone &&
     a.executionTimeoutMs === b.executionTimeoutMs &&
-    a.persistenceDebounceMs === b.persistenceDebounceMs &&
+    a.persistence?.persistenceDebounceMs === b.persistence?.persistenceDebounceMs &&
     a.sharedBuffer === b.sharedBuffer &&
-    a.metricsGuardrails === b.metricsGuardrails &&
-    a.retry === b.retry &&
-    a.persistence === b.persistence
+    a.sharedInfrastructure === b.sharedInfrastructure &&
+    deepEqual(a.metricsGuardrails, b.metricsGuardrails) &&
+    deepEqual(a.retry, b.retry) &&
+    deepEqual(a.persistence, b.persistence)
   );
 };
 

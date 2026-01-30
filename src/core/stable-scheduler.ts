@@ -9,9 +9,17 @@ import type {
   SchedulerState,
   SchedulerJobHandler,
   ScheduledJob,
-  InternalSchedulerConfig
+  InternalSchedulerConfig,
+  SchedulerSharedInfrastructure
 } from '../types/index.js';
-import { isStableBuffer, MetricsValidator } from '../utilities/index.js';
+import { 
+  isStableBuffer, 
+  MetricsValidator, 
+  CircuitBreaker, 
+  RateLimiter, 
+  ConcurrencyLimiter, 
+  CacheManager 
+} from '../utilities/index.js';
 
 export class StableScheduler<
   TJob extends { id?: string; schedule?: SchedulerSchedule; retry?: SchedulerRetryConfig; executionTimeoutMs?: number }
@@ -42,13 +50,14 @@ export class StableScheduler<
       persistence: {
         enabled: config.persistence?.enabled ?? false,
         saveState: config.persistence?.saveState as ((state: SchedulerState<TJob>) => Promise<void> | void) | undefined,
-        loadState: config.persistence?.loadState as (() => Promise<SchedulerState<TJob> | null> | SchedulerState<TJob> | null) | undefined
+        loadState: config.persistence?.loadState as (() => Promise<SchedulerState<TJob> | null> | SchedulerState<TJob> | null) | undefined,
+        persistenceDebounceMs: config.persistence?.persistenceDebounceMs
       },
       retry: config.retry,
       executionTimeoutMs: config.executionTimeoutMs,
-      persistenceDebounceMs: config.persistenceDebounceMs,
       metricsGuardrails: config.metricsGuardrails,
-      sharedBuffer: config.sharedBuffer
+      sharedBuffer: config.sharedBuffer,
+      sharedInfrastructure: config.sharedInfrastructure
     };
     this.handler = handler;
   }
@@ -155,6 +164,28 @@ export class StableScheduler<
     };
   }
 
+  getSharedInfrastructure(): SchedulerSharedInfrastructure | undefined {
+    return this.config.sharedInfrastructure;
+  }
+
+  getInfrastructureMetrics(): {
+    circuitBreaker?: ReturnType<CircuitBreaker['getState']>;
+    rateLimiter?: ReturnType<RateLimiter['getState']>;
+    concurrencyLimiter?: ReturnType<ConcurrencyLimiter['getState']>;
+    cacheManager?: ReturnType<CacheManager['getStats']>;
+  } {
+    const infra = this.config.sharedInfrastructure;
+    if (!infra) {
+      return {};
+    }
+    return {
+      ...(infra.circuitBreaker ? { circuitBreaker: infra.circuitBreaker.getState() } : {}),
+      ...(infra.rateLimiter ? { rateLimiter: infra.rateLimiter.getState() } : {}),
+      ...(infra.concurrencyLimiter ? { concurrencyLimiter: infra.concurrencyLimiter.getState() } : {}),
+      ...(infra.cacheManager ? { cacheManager: infra.cacheManager.getStats() } : {})
+    };
+  }
+
   getMetrics(): { metrics: SchedulerMetrics; validation?: MetricsValidationResult } {
     const totalRuns = this.completed + this.failed;
     const startedAt = this.schedulerStartTime ?? Date.now();
@@ -164,6 +195,9 @@ export class StableScheduler<
     const throughput = elapsedMs > 0 ? totalRuns / (elapsedMs / 1000) : 0;
     const averageExecutionTime = totalRuns > 0 ? this.totalExecutionTimeMs / totalRuns : 0;
     const averageQueueDelay = totalRuns > 0 ? this.totalQueueDelayMs / totalRuns : 0;
+
+    const infra = this.config.sharedInfrastructure;
+    const infrastructureMetrics = this.buildInfrastructureMetrics(infra);
 
     const metrics: SchedulerMetrics = {
       totalJobs: this.jobs.size,
@@ -179,17 +213,129 @@ export class StableScheduler<
       averageExecutionTime,
       averageQueueDelay,
       startedAt: this.schedulerStartTime ? new Date(this.schedulerStartTime).toISOString() : undefined,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
+      ...(Object.keys(infrastructureMetrics).length > 0 ? { infrastructure: infrastructureMetrics } : {})
     };
 
     if (!this.config.metricsGuardrails) {
       return { metrics };
     }
 
+    const schedulerValidation = MetricsValidator.validateSchedulerMetrics(metrics, this.config.metricsGuardrails);
+    
+    const infraValidation = this.validateInfrastructureMetrics(infrastructureMetrics);
+    
+    const combinedAnomalies = [
+      ...schedulerValidation.anomalies,
+      ...infraValidation.anomalies
+    ];
+
     return {
       metrics,
-      validation: MetricsValidator.validateSchedulerMetrics(metrics, this.config.metricsGuardrails)
+      validation: {
+        isValid: combinedAnomalies.length === 0,
+        anomalies: combinedAnomalies,
+        validatedAt: new Date().toISOString()
+      }
     };
+  }
+
+  private buildInfrastructureMetrics(infra: SchedulerSharedInfrastructure | undefined): NonNullable<SchedulerMetrics['infrastructure']> {
+    const result: NonNullable<SchedulerMetrics['infrastructure']> = {};
+    
+    if (!infra) return result;
+
+    if (infra.circuitBreaker) {
+      const cbState = infra.circuitBreaker.getState();
+      result.circuitBreaker = {
+        state: cbState.state,
+        totalRequests: cbState.totalRequests,
+        failedRequests: cbState.failedRequests,
+        successfulRequests: cbState.successfulRequests,
+        failurePercentage: cbState.failurePercentage
+      };
+    }
+
+    if (infra.rateLimiter) {
+      const rlState = infra.rateLimiter.getState();
+      result.rateLimiter = {
+        totalRequests: rlState.totalRequests,
+        throttledRequests: rlState.throttledRequests,
+        throttleRate: rlState.throttleRate,
+        queueLength: rlState.queueLength,
+        averageQueueWaitTime: rlState.averageQueueWaitTime
+      };
+    }
+
+    if (infra.concurrencyLimiter) {
+      const clState = infra.concurrencyLimiter.getState();
+      result.concurrencyLimiter = {
+        totalRequests: clState.totalRequests,
+        completedRequests: clState.completedRequests,
+        queuedRequests: clState.queuedRequests,
+        queueLength: clState.queueLength,
+        averageQueueWaitTime: clState.averageQueueWaitTime,
+        utilizationPercentage: clState.utilizationPercentage
+      };
+    }
+
+    if (infra.cacheManager) {
+      const cacheStats = infra.cacheManager.getStats();
+      result.cacheManager = {
+        hits: cacheStats.hits,
+        misses: cacheStats.misses,
+        hitRate: cacheStats.hitRate,
+        missRate: cacheStats.missRate,
+        utilizationPercentage: cacheStats.utilizationPercentage,
+        evictions: cacheStats.evictions
+      };
+    }
+
+    return result;
+  }
+
+  private validateInfrastructureMetrics(infraMetrics: NonNullable<SchedulerMetrics['infrastructure']>): MetricsValidationResult {
+    if (!this.config.metricsGuardrails?.infrastructure || Object.keys(infraMetrics).length === 0) {
+      return { isValid: true, anomalies: [], validatedAt: new Date().toISOString() };
+    }
+
+    const transformedMetrics: Parameters<typeof MetricsValidator.validateInfrastructureMetrics>[0] = {};
+
+    if (infraMetrics.circuitBreaker) {
+      transformedMetrics.circuitBreaker = {
+        failureRate: infraMetrics.circuitBreaker.failurePercentage,
+        totalRequests: infraMetrics.circuitBreaker.totalRequests,
+        failedRequests: infraMetrics.circuitBreaker.failedRequests
+      };
+    }
+
+    if (infraMetrics.cacheManager) {
+      transformedMetrics.cache = {
+        hitRate: infraMetrics.cacheManager.hitRate,
+        missRate: infraMetrics.cacheManager.missRate,
+        utilizationPercentage: infraMetrics.cacheManager.utilizationPercentage,
+        evictionRate: infraMetrics.cacheManager.evictions > 0 ? 
+          (infraMetrics.cacheManager.evictions / (infraMetrics.cacheManager.hits + infraMetrics.cacheManager.misses)) * 100 : 0
+      };
+    }
+
+    if (infraMetrics.rateLimiter) {
+      transformedMetrics.rateLimiter = {
+        throttleRate: infraMetrics.rateLimiter.throttleRate,
+        queueLength: infraMetrics.rateLimiter.queueLength,
+        averageQueueWaitTime: infraMetrics.rateLimiter.averageQueueWaitTime
+      };
+    }
+
+    if (infraMetrics.concurrencyLimiter) {
+      transformedMetrics.concurrencyLimiter = {
+        utilizationPercentage: infraMetrics.concurrencyLimiter.utilizationPercentage,
+        queueLength: infraMetrics.concurrencyLimiter.queueLength,
+        averageQueueWaitTime: infraMetrics.concurrencyLimiter.averageQueueWaitTime
+      };
+    }
+
+    return MetricsValidator.validateInfrastructureMetrics(transformedMetrics, this.config.metricsGuardrails);
   }
 
   getState(): SchedulerState<TJob> {
@@ -284,12 +430,15 @@ export class StableScheduler<
     const scheduledAtMs = job.nextRunAt ?? startedAt;
     const queueDelay = Math.max(0, startedAt - scheduledAtMs);
     this.totalQueueDelayMs += queueDelay;
+    
+    const sharedInfra = this.config.sharedInfrastructure;
     const baseContext: SchedulerRunContext = {
       runId: this.createId('run'),
       jobId: job.id,
       scheduledAt: new Date(job.nextRunAt ?? startedAt).toISOString(),
       startedAt: new Date(startedAt).toISOString(),
-      schedule: job.schedule
+      schedule: job.schedule,
+      ...(sharedInfra ? { sharedInfrastructure: sharedInfra } : {})
     };
 
     const retryConfig = this.getRetryConfig(job);
@@ -299,8 +448,43 @@ export class StableScheduler<
 
     let jobError: unknown = null;
 
+    const executeHandler = async (): Promise<unknown> => {
+      if (sharedInfra?.circuitBreaker) {
+        const canExecute = await sharedInfra.circuitBreaker.canExecute();
+        if (!canExecute) {
+          throw new Error('Circuit breaker is open');
+        }
+      }
+
+      if (sharedInfra?.rateLimiter) {
+        await sharedInfra.rateLimiter.execute(async () => {});
+      }
+
+      const runHandler = async (): Promise<unknown> => {
+        if (isStableBuffer(this.config.sharedBuffer)) {
+          return this.config.sharedBuffer.run((bufferState) =>
+            this.handler(job.job, { ...baseContext, sharedBuffer: bufferState })
+          );
+        } else {
+          return this.handler(job.job, {
+            ...baseContext,
+            ...(this.config.sharedBuffer !== undefined
+              ? { sharedBuffer: this.config.sharedBuffer as Record<string, any> }
+              : {})
+          });
+        }
+      };
+
+      if (sharedInfra?.concurrencyLimiter) {
+        return sharedInfra.concurrencyLimiter.execute(runHandler);
+      }
+      return runHandler();
+    };
+
     let handlerPromise: Promise<unknown>;
-    if (isStableBuffer(this.config.sharedBuffer)) {
+    if (sharedInfra?.circuitBreaker || sharedInfra?.rateLimiter || sharedInfra?.concurrencyLimiter) {
+      handlerPromise = executeHandler();
+    } else if (isStableBuffer(this.config.sharedBuffer)) {
       handlerPromise = this.config.sharedBuffer.run((bufferState) =>
         this.handler(job.job, { ...baseContext, sharedBuffer: bufferState })
       );
@@ -323,10 +507,16 @@ export class StableScheduler<
       .then(() => {
         this.completed += 1;
         job.retryAttempts = 0;
+        if (sharedInfra?.circuitBreaker) {
+          sharedInfra.circuitBreaker.recordSuccess();
+        }
       })
       .catch((error) => {
         this.failed += 1;
         jobError = error;
+        if (sharedInfra?.circuitBreaker) {
+          sharedInfra.circuitBreaker.recordFailure();
+        }
       })
       .finally(() => {
         const scheduledRetry = this.scheduleRetryIfEnabled(job, startedAt, jobError);
@@ -689,7 +879,7 @@ export class StableScheduler<
     if (!this.config.persistence.enabled || !this.config.persistence.saveState) {
       return;
     }
-    const debounceMs = this.config.persistenceDebounceMs ?? 0;
+    const debounceMs = this.config.persistence?.persistenceDebounceMs ?? 0;
     if (debounceMs > 0) {
       if (this.persistTimer) {
         this.persistQueued = true;

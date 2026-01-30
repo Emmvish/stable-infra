@@ -16,7 +16,7 @@ import {
   ScheduleTypes
 } from '../enums/index.js';
 
-import { CircuitBreaker } from '../utilities/index.js';
+import { CircuitBreaker, RateLimiter, ConcurrencyLimiter, CacheManager } from '../utilities/index.js';
 
 export type CreateHash = (algorithm: string) => { update: (data: string) => { digest: (encoding: 'hex') => string } };
 export type NodeCryptoLike = { createHash?: CreateHash };
@@ -171,6 +171,39 @@ export interface MetricsValidationResult {
   validatedAt: string;
 }
 
+export interface SchedulerInfrastructureMetrics {
+  circuitBreaker?: {
+    state: string;
+    totalRequests: number;
+    failedRequests: number;
+    successfulRequests: number;
+    failurePercentage: number;
+  };
+  rateLimiter?: {
+    totalRequests: number;
+    throttledRequests: number;
+    throttleRate: number;
+    queueLength: number;
+    averageQueueWaitTime: number;
+  };
+  concurrencyLimiter?: {
+    totalRequests: number;
+    completedRequests: number;
+    queuedRequests: number;
+    queueLength: number;
+    averageQueueWaitTime: number;
+    utilizationPercentage: number;
+  };
+  cacheManager?: {
+    hits: number;
+    misses: number;
+    hitRate: number;
+    missRate: number;
+    utilizationPercentage: number;
+    evictions: number;
+  };
+}
+
 export interface SchedulerMetrics {
   totalJobs: number;
   queued: number;
@@ -186,6 +219,7 @@ export interface SchedulerMetrics {
   averageQueueDelay: number;
   startedAt?: string;
   lastUpdated: string;
+  infrastructure?: SchedulerInfrastructureMetrics;
 }
 
 export interface StableBufferMetrics {
@@ -1360,6 +1394,14 @@ export interface SchedulerPersistence<TJob = unknown> {
   enabled?: boolean;
   saveState?: (state: SchedulerState<TJob>) => Promise<void> | void;
   loadState?: () => Promise<SchedulerState<TJob> | null> | SchedulerState<TJob> | null;
+  persistenceDebounceMs?: number;
+}
+
+export interface SchedulerSharedInfrastructure {
+  circuitBreaker?: CircuitBreaker;
+  rateLimiter?: RateLimiter;
+  concurrencyLimiter?: ConcurrencyLimiter;
+  cacheManager?: CacheManager;
 }
 
 export interface SchedulerConfig<TJob = unknown> {
@@ -1370,9 +1412,9 @@ export interface SchedulerConfig<TJob = unknown> {
   persistence?: SchedulerPersistence<TJob>;
   retry?: SchedulerRetryConfig;
   executionTimeoutMs?: number;
-  persistenceDebounceMs?: number;
   metricsGuardrails?: MetricsGuardrails;
   sharedBuffer?: BufferLike;
+  sharedInfrastructure?: SchedulerSharedInfrastructure;
 }
 
 export interface SchedulerRunContext {
@@ -1382,6 +1424,7 @@ export interface SchedulerRunContext {
   startedAt: string;
   schedule?: SchedulerSchedule;
   sharedBuffer?: Record<string, any>;
+  sharedInfrastructure?: SchedulerSharedInfrastructure;
 }
 
 export interface SchedulerJobState<TJob> {
@@ -1431,12 +1474,13 @@ export interface InternalSchedulerConfig<TJob = any> {
     enabled: boolean;
     saveState?: (state: SchedulerState<TJob>) => Promise<void> | void;
     loadState?: () => Promise<SchedulerState<TJob> | null> | SchedulerState<TJob> | null;
+    persistenceDebounceMs?: number;
   };
   retry?: SchedulerRetryConfig;
   executionTimeoutMs?: number;
-  persistenceDebounceMs?: number;
   metricsGuardrails?: SchedulerConfig<TJob>['metricsGuardrails'];
   sharedBuffer?: BufferLike;
+  sharedInfrastructure?: SchedulerSharedInfrastructure;
 }
 
 export type RunnerJob =

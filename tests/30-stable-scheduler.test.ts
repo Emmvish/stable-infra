@@ -227,12 +227,12 @@ describe('StableScheduler', () => {
       {
         maxParallel: 1,
         tickIntervalMs: 50,
-        persistenceDebounceMs: 200,
         persistence: {
           enabled: true,
           saveState: () => {
             saveCount += 1;
-          }
+          },
+          persistenceDebounceMs: 200
         }
       },
       async () => {}

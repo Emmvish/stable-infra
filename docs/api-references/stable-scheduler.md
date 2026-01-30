@@ -39,7 +39,6 @@ interface SchedulerConfig<TJob = unknown> {
 	persistence?: SchedulerPersistence<TJob>;
 	retry?: SchedulerRetryConfig;
 	executionTimeoutMs?: number;
-	persistenceDebounceMs?: number;
 	metricsGuardrails?: MetricsGuardrails;
 	sharedBuffer?: Record<string, any>;
 }
@@ -48,6 +47,7 @@ interface SchedulerPersistence<TJob = unknown> {
 	enabled?: boolean;
 	saveState?: (state: SchedulerState<TJob>) => Promise<void> | void;
 	loadState?: () => Promise<SchedulerState<TJob> | null> | SchedulerState<TJob> | null;
+	persistenceDebounceMs?: number;
 }
 
 interface SchedulerRetryConfig {
@@ -69,7 +69,6 @@ interface SchedulerRetryConfig {
 | `persistence` | `SchedulerPersistence?` | `undefined` | Custom persistence handlers for state recoverability. |
 | `retry` | `SchedulerRetryConfig?` | `undefined` | Default retry policy applied when a job does not specify `retry`. |
 | `executionTimeoutMs` | `number?` | `undefined` | Max handler execution time (ms) before timing out and marking failure. |
-| `persistenceDebounceMs` | `number?` | `undefined` | Debounce window for persistence writes to reduce rapid saves. |
 | `metricsGuardrails` | `MetricsGuardrails?` | `undefined` | Guardrails used to validate scheduler metrics. |
 | `sharedBuffer` | `Record<string, any>?` | `undefined` | Shared buffer available to all scheduled jobs. |
 
