@@ -36,6 +36,7 @@ type StableBufferOptions = {
 	clone?: (state: Record<string, any>) => Record<string, any>;
 	metricsGuardrails?: MetricsGuardrailsStableBuffer;
 	transactionTimeoutMs?: number;
+	logTransaction?: (log: StableBufferTransactionLog) => void | Promise<void>;
 };
 ```
 
@@ -47,6 +48,7 @@ type StableBufferOptions = {
 | `clone` | `(state) => state` | No | Custom clone function for `read()`. Defaults to `structuredClone` or JSON cloning. |
 | `metricsGuardrails` | `MetricsGuardrailsStableBuffer` | No | Guardrails for metrics validation. |
 | `transactionTimeoutMs` | `number` | No | Timeout for each transaction. `0` or `undefined` disables timeouts. |
+| `logTransaction` | `(log) => void \\| Promise<void>` | No | Optional transaction logger receiving `StableBufferTransactionLog`. |
 
 ---
 
@@ -67,9 +69,9 @@ setState(state: Record<string, any>): void
 ## Transactions
 
 ```ts
-run<T>(fn: (state) => T | Promise<T>): Promise<T>
-update(mutator: (state) => void | Promise<void>): Promise<void>
-transaction<T>(fn: (state) => T | Promise<T>): Promise<T>
+run<T>(fn: (state) => T | Promise<T>, options?: StableBufferTransactionOptions): Promise<T>
+update(mutator: (state) => void | Promise<void>, options?: StableBufferTransactionOptions): Promise<void>
+transaction<T>(fn: (state) => T | Promise<T>, options?: StableBufferTransactionOptions): Promise<T>
 ```
 
 - `run()` is the core queued executor.
@@ -77,6 +79,51 @@ transaction<T>(fn: (state) => T | Promise<T>): Promise<T>
 - `transaction()` is an alias of `run()`.
 
 Transactions are serialized using a single promise queue. Even if multiple calls are started concurrently, they execute one-by-one against the same state.
+
+### Transaction Logging
+
+You can pass metadata per transaction via `StableBufferTransactionOptions` and enable logging with `logTransaction`.
+
+```ts
+type StableBufferTransactionOptions = ExecutionContext & {
+	activity?: string;
+	hookName?: string;
+    hookParams?: any;
+};
+
+type StableBufferTransactionLog = StableBufferTransactionOptions & {
+	transactionId: string;
+	queuedAt: string;
+	startedAt: string;
+	finishedAt: string;
+	durationMs: number;
+	queueWaitMs: number;
+	success: boolean;
+	errorMessage?: string;
+	stateBefore: Record<string, any>;
+	stateAfter: Record<string, any>;
+};
+```
+
+Example:
+
+```ts
+const buffer = new StableBuffer({
+	logTransaction: async (log) => {
+		// persist log entry
+	}
+});
+
+await buffer.run(
+	(state) => {
+		state.count = (state.count ?? 0) + 1;
+	},
+	{
+		activity: 'workflow-phase',
+		hookName: 'phase-1'
+	}
+);
+```
 
 ---
 

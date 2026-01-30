@@ -1,4 +1,11 @@
-import type { MetricsGuardrailsStableBuffer, StableBufferMetrics, StableBufferState, StableBufferOptions } from '../types/index.js';
+import type {
+  MetricsGuardrailsStableBuffer,
+  StableBufferMetrics,
+  StableBufferState,
+  StableBufferOptions,
+  StableBufferTransactionOptions,
+  StableBufferTransactionLogger
+} from '../types/index.js';
 import { MetricsValidator } from '../utilities/index.js';
 
 export class StableBuffer {
@@ -6,9 +13,11 @@ export class StableBuffer {
   private queue: Promise<unknown> = Promise.resolve();
   private totalTransactions = 0;
   private totalWaitMs = 0;
+  private transactionSequence = 0;
   private cloneState: (state: StableBufferState) => StableBufferState;
   private metricsGuardrails?: MetricsGuardrailsStableBuffer;
   private transactionTimeoutMs?: number;
+  private logTransaction?: StableBufferTransactionLogger;
 
   constructor(options: StableBufferOptions = {}) {
     this.state = options.initialState ? { ...options.initialState } : {};
@@ -20,6 +29,7 @@ export class StableBuffer {
     });
     this.metricsGuardrails = options.metricsGuardrails;
     this.transactionTimeoutMs = options.transactionTimeoutMs ?? 0;
+    this.logTransaction = options.logTransaction;
   }
 
   read(): StableBufferState {
@@ -34,13 +44,48 @@ export class StableBuffer {
     this.state = nextState;
   }
 
-  async run<T>(fn: (state: StableBufferState) => T | Promise<T>): Promise<T> {
+  async run<T>(fn: (state: StableBufferState) => T | Promise<T>, options: StableBufferTransactionOptions = {}): Promise<T> {
     const queuedAt = Date.now();
+    const transactionId = this.createTransactionId();
     const task = async () => {
       const startAt = Date.now();
-      this.totalWaitMs += Math.max(0, startAt - queuedAt);
+      const queueWaitMs = Math.max(0, startAt - queuedAt);
+      this.totalWaitMs += queueWaitMs;
       this.totalTransactions += 1;
-      return fn(this.state);
+      const stateBefore = this.cloneState(this.state);
+      let success = false;
+      let errorMessage: string | undefined;
+      try {
+        const result = await fn(this.state);
+        success = true;
+        return result;
+      } catch (error) {
+        errorMessage = error instanceof Error ? error.message : String(error);
+        throw error;
+      } finally {
+        const finishedAt = Date.now();
+        const stateAfter = this.cloneState(this.state);
+        if (this.logTransaction) {
+          const logEntry = {
+            ...options,
+            transactionId,
+            queuedAt: new Date(queuedAt).toISOString(),
+            startedAt: new Date(startAt).toISOString(),
+            finishedAt: new Date(finishedAt).toISOString(),
+            durationMs: Math.max(0, finishedAt - startAt),
+            queueWaitMs,
+            success,
+            errorMessage,
+            stateBefore,
+            stateAfter
+          };
+          try {
+            await this.logTransaction(logEntry);
+          } catch {
+            // Swallow logging errors to avoid breaking transactions
+          }
+        }
+      }
     };
 
     const executionPromise = this.queue.then(task, task);
@@ -72,14 +117,19 @@ export class StableBuffer {
     });
   }
 
-  async update(mutator: (state: StableBufferState) => void | Promise<void>): Promise<void> {
+  async update(mutator: (state: StableBufferState) => void | Promise<void>, options?: StableBufferTransactionOptions): Promise<void> {
     await this.run(async (state) => {
       await mutator(state);
-    });
+    }, options);
   }
 
-  async transaction<T>(fn: (state: StableBufferState) => T | Promise<T>): Promise<T> {
-    return this.run(fn);
+  async transaction<T>(fn: (state: StableBufferState) => T | Promise<T>, options?: StableBufferTransactionOptions): Promise<T> {
+    return this.run(fn, options);
+  }
+
+  private createTransactionId(): string {
+    this.transactionSequence += 1;
+    return `stable-buffer-${Date.now()}-${this.transactionSequence}`;
   }
 
   getMetrics(): StableBufferMetrics {

@@ -229,6 +229,27 @@ export interface StableBufferMetrics {
   validation?: MetricsValidationResult;
 }
 
+export interface StableBufferTransactionOptions extends ExecutionContext {
+  activity?: string;
+  hookName?: string;
+  hookParams?: any;
+}
+
+export interface StableBufferTransactionLog extends StableBufferTransactionOptions {
+  transactionId: string;
+  queuedAt: string;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  queueWaitMs: number;
+  success: boolean;
+  errorMessage?: string;
+  stateBefore: Record<string, any>;
+  stateAfter: Record<string, any>;
+}
+
+export type StableBufferTransactionLogger = (log: StableBufferTransactionLog) => void | Promise<void>;
+
 export interface ExecutionContext {
   workflowId?: string;
   branchId?: string;
@@ -237,7 +258,7 @@ export interface ExecutionContext {
 }
 
 export interface StableBufferInstance {
-  run<T>(fn: (state: Record<string, any>) => T | Promise<T>): Promise<T>;
+  run<T>(fn: (state: Record<string, any>) => T | Promise<T>, options?: StableBufferTransactionOptions): Promise<T>;
   read(): Record<string, any>;
   getState(): Record<string, any>;
   setState(state: Record<string, any>): void;
@@ -1623,4 +1644,5 @@ export interface StableBufferOptions {
   clone?: (state: StableBufferState) => StableBufferState;
   metricsGuardrails?: MetricsGuardrailsStableBuffer;
   transactionTimeoutMs?: number;
+  logTransaction?: StableBufferTransactionLogger;
 }

@@ -1,5 +1,5 @@
 import { PersistenceStage } from '../enums/index.js';
-import { BufferLike, StatePersistenceConfig, ExecutionContext } from '../types/index.js';
+import { BufferLike, StatePersistenceConfig, ExecutionContext, StableBufferTransactionOptions } from '../types/index.js';
 import { safelyExecuteUnknownFunction } from './safely-execute-unknown-function.js';
 import { formatLogContext } from './format-log-context.js';
 import { withBuffer } from './buffer-utils.js';
@@ -9,8 +9,18 @@ export async function executeWithPersistence<T = any>(
   hookOptions: any,
   persistenceConfig?: StatePersistenceConfig,
   executionContext: ExecutionContext = {},
-  buffer?: BufferLike
+  buffer?: BufferLike,
+  bufferTransactionOptions: StableBufferTransactionOptions = {}
 ): Promise<T> {
+  const hookName = typeof hookFn === 'function' && hookFn.name ? hookFn.name : 'anonymous-hook';
+  const resolvedTransactionOptions: StableBufferTransactionOptions = {
+    ...executionContext,
+    ...bufferTransactionOptions,
+    activity: bufferTransactionOptions.activity ?? 'hook',
+    hookName: bufferTransactionOptions.hookName ?? hookName,
+    hookParams: bufferTransactionOptions.hookParams ?? hookOptions
+  };
+
   return withBuffer(buffer, async (bufferState) => {
     if (persistenceConfig?.loadBeforeHooks && persistenceConfig.persistenceFunction) {
       try {
@@ -68,5 +78,5 @@ export async function executeWithPersistence<T = any>(
     }
 
     return result;
-  });
+  }, resolvedTransactionOptions);
 }

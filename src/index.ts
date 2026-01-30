@@ -173,7 +173,9 @@ export type {
     SchedulerRetryConfig,
     BufferLike,
     StableBufferState,
-    StableBufferOptions
+    StableBufferOptions,
+    StableBufferTransactionLog,
+    StableBufferTransactionOptions
 } from './types/index.js';
 
 export {
