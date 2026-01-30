@@ -548,6 +548,7 @@ p {
   border-radius: 16px;
   border: 1px solid var(--border-color);
   overflow: hidden;
+  max-width: 100%;
 }
 
 .tabs-header {
@@ -555,21 +556,23 @@ p {
   background: var(--bg-darker);
   border-bottom: 1px solid var(--border-color);
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tab-btn {
-  flex: 1;
-  min-width: 140px;
-  padding: 1rem 1.5rem;
+  flex: 1 1 auto;
+  min-width: fit-content;
+  padding: 1rem 1.25rem;
   background: transparent;
   border: none;
   color: var(--text-secondary);
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: all var(--transition-fast);
   position: relative;
   white-space: nowrap;
+  text-align: center;
 }
 
 .tab-btn:hover {
@@ -596,6 +599,8 @@ p {
   display: none;
   padding: 2rem;
   animation: fadeIn 0.3s ease;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .tab-content.active {
@@ -649,6 +654,7 @@ p {
   border-radius: 12px;
   border: 1px solid var(--border-color);
   overflow: hidden;
+  max-width: 100%;
 }
 
 .code-box-header {
@@ -717,6 +723,7 @@ p {
   overflow: auto;
   padding: 1.25rem;
   margin: 0;
+  max-width: 100%;
 }
 
 .code-box code {
@@ -724,6 +731,8 @@ p {
   font-size: 0.8rem;
   line-height: 1.6;
   color: var(--text-secondary);
+  white-space: pre;
+  word-wrap: normal;
 }
 
 /* Syntax highlighting */
@@ -1008,13 +1017,14 @@ p {
   
   .tabs-header {
     flex-wrap: wrap;
+    overflow-x: hidden;
   }
   
   .tab-btn {
     min-width: auto;
     flex: 1 1 calc(33.33% - 2px);
     padding: 0.75rem 0.5rem;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     text-align: center;
   }
   
@@ -1045,7 +1055,7 @@ p {
   .tab-btn {
     flex: 1 1 calc(50% - 2px);
     padding: 0.6rem 0.4rem;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
   }
 }
 
