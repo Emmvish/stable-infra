@@ -502,6 +502,45 @@ Queue-based scheduler for cron/interval/timestamp execution with concurrency lim
 
 Transactional, concurrency-safe shared state. It’s opt-in: pass a `StableBuffer` instance as `commonBuffer` or `sharedBuffer` to serialize updates across concurrent executions.
 
+Key features:
+- Serialized transactions via FIFO queue
+- Snapshot reads with `read()`
+- Optional transaction timeouts
+- Optional transaction logging with `logTransaction`
+
+```ts
+import { StableBuffer } from '@emmvish/stable-request';
+
+const buffer = new StableBuffer({
+  initialState: { counter: 0 },
+  transactionTimeoutMs: 500,
+  logTransaction: (log) => {
+    // persist log.transactionId, log.activity, log.hookName, log.stateBefore, log.stateAfter
+  }
+});
+
+await buffer.run(
+  (state) => { state.counter += 1; },
+  { activity: 'workflow-phase', hookName: 'phase-1', workflowId: 'wf-1' }
+);
+```
+
+Replay utility (transaction logs → deterministic state replay):
+
+```ts
+import { replayStableBufferTransactions } from '@emmvish/stable-request';
+
+const replay = await replayStableBufferTransactions({
+  logs, // StableBufferTransactionLog[]
+  handlers: {
+    'phase-1': (state) => { state.counter += 1; }
+  },
+  initialState: { counter: 0 }
+});
+
+console.log(replay.buffer.getState());
+```
+
 ---
 
 ## Stable Runner

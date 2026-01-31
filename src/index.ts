@@ -175,7 +175,10 @@ export type {
     StableBufferState,
     StableBufferOptions,
     StableBufferTransactionLog,
-    StableBufferTransactionOptions
+    StableBufferTransactionOptions,
+    StableBufferReplayHandler,
+    StableBufferReplayOptions,
+    StableBufferReplayResult
 } from './types/index.js';
 
 export {
@@ -229,5 +232,6 @@ export {
     simpleHashToHex,
     isStableBuffer,
     withBuffer,
-    InfrastructurePersistenceCoordinator
+    InfrastructurePersistenceCoordinator,
+    replayStableBufferTransactions
 } from './utilities/index.js';

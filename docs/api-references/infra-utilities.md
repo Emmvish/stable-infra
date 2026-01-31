@@ -8,6 +8,7 @@
 4. [Rate Limiter](#rate-limiter)
 5. [Concurrency Limiter](#concurrency-limiter)
 6. [Function Cache Manager](#function-cache-manager)
+7. [Stable Buffer Replay](#stable-buffer-replay)
 7. [Metrics Aggregator](#metrics-aggregator)
 8. [Metrics Validator](#metrics-validator)
 9. [Configuration Examples](#configuration-examples)
@@ -27,6 +28,7 @@ The `@emmvish/stable-request` library provides a suite of infrastructure utiliti
 - **Rate Limiter**: Sliding-window rate limiting for controlled throughput
 - **Concurrency Limiter**: Semaphore-based concurrency control with queuing
 - **Function Cache Manager**: Function result caching for expensive computations
+- **Stable Buffer Replay**: Transaction log replay for deterministic buffer reconstruction
 - **Metrics Aggregator**: Comprehensive metrics extraction and aggregation
 - **Metrics Validator**: Real-time metrics validation against configurable guardrails
 
@@ -771,6 +773,46 @@ const cache = getGlobalFunctionCacheManager({
   maxSize: 500
 });
 ```
+
+---
+
+## Stable Buffer Replay
+
+Deterministic replay utility for re-applying `StableBuffer` transaction logs.
+
+### Overview
+
+Use `replayStableBufferTransactions` to rebuild buffer state from transaction logs. Supply a handler map keyed by `hookName` to re-apply mutations in order.
+
+### Usage
+
+```typescript
+import { replayStableBufferTransactions } from '@emmvish/stable-request';
+
+const replay = await replayStableBufferTransactions({
+  logs,
+  handlers: {
+    'phase-1': (state, log) => { state.counter = (state.counter ?? 0) + 1; },
+    'phase-2': (state, log) => { state.counter += 2; }
+  },
+  initialState: { counter: 0 }
+});
+
+console.log(replay.buffer.getState());
+```
+
+### Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `logs` | `StableBufferTransactionLog[]` | Required | Transaction logs to replay. |
+| `handlers` | `Record<string, StableBufferReplayHandler>` | Required | Handlers keyed by `hookName`. |
+| `buffer` | `BufferLike?` | `undefined` | Optional buffer instance to replay into. |
+| `initialState` | `Record<string, any>?` | `{}` | Initial state if no buffer provided. |
+| `sort` | `boolean?` | `true` | Sort logs by `startedAt`, `queuedAt`, `transactionId`. |
+| `dedupe` | `boolean?` | `true` | Deduplicate by `transactionId`. |
+| `allowUnknownHooks` | `boolean?` | `false` | Skip logs without handlers instead of erroring. |
+| `activityFilter` | `(log) => boolean` | `undefined` | Filter logs before applying. |
 
 ---
 

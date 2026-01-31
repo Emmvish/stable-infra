@@ -100,6 +100,8 @@ Transactional buffer for concurrency-safe shared state across core modules.
 - Snapshot reads with `read()`
 - Works with all `commonBuffer`/`sharedBuffer` options
 - Lightweight in-memory state
+- Optional transaction logging with `logTransaction`
+- Per-transaction metadata (`activity`, `hookName`, `hookParams`, `executionContext`)
 
 ---
 
@@ -115,6 +117,7 @@ Production-ready infrastructure components for building resilient systems.
 - **Concurrency Limiter**: Semaphore-based concurrency control
 - **Function Cache Manager**: Memoization for expensive computations
 - **Metrics Aggregator**: Comprehensive metrics extraction and aggregation
+- **Stable Buffer Replay**: Transaction log replay utility for deterministic state reconstruction
 
 ---
 

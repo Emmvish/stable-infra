@@ -250,6 +250,29 @@ export interface StableBufferTransactionLog extends StableBufferTransactionOptio
 
 export type StableBufferTransactionLogger = (log: StableBufferTransactionLog) => void | Promise<void>;
 
+export type StableBufferReplayHandler = (state: Record<string, any>, log: StableBufferTransactionLog) => void | Promise<void>;
+
+export interface StableBufferReplayOptions {
+  logs: StableBufferTransactionLog[];
+  handlers: Record<string, StableBufferReplayHandler>;
+  buffer?: BufferLike;
+  initialState?: Record<string, any>;
+  sort?: boolean;
+  dedupe?: boolean;
+  allowUnknownHooks?: boolean;
+  activityFilter?: (log: StableBufferTransactionLog) => boolean;
+  onApply?: (log: StableBufferTransactionLog) => void;
+  onSkip?: (log: StableBufferTransactionLog, reason: 'filtered' | 'duplicate' | 'missing-handler') => void;
+  onError?: (log: StableBufferTransactionLog, error: unknown) => void;
+}
+
+export interface StableBufferReplayResult {
+  buffer: StableBufferInstance;
+  applied: number;
+  skipped: number;
+  errors: Array<{ log: StableBufferTransactionLog; error: unknown }>;
+}
+
 export interface ExecutionContext {
   workflowId?: string;
   branchId?: string;
