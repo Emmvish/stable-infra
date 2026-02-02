@@ -56,11 +56,90 @@ The job must specify a `kind` and the associated payload for that kind.
 
 ```ts
 type RunnerJob =
-	| { kind: RunnerJobs.STABLE_REQUEST; options: STABLE_REQUEST }
-	| { kind: RunnerJobs.STABLE_FUNCTION; options: STABLE_FUNCTION }
-	| { kind: RunnerJobs.STABLE_API_GATEWAY; requests: API_GATEWAY_REQUEST[]; functions?: API_GATEWAY_FUNCTION[]; options?: API_GATEWAY_OPTIONS }
-	| { kind: RunnerJobs.STABLE_WORKFLOW; phases: STABLE_WORKFLOW_PHASE[]; options?: STABLE_WORKFLOW_OPTIONS }
-	| { kind: RunnerJobs.STABLE_WORKFLOW_GRAPH; graph: WorkflowGraph; options?: WorkflowGraphOptions };
+	| RunnerRequestJob
+	| RunnerFunctionJob
+	| RunnerApiGatewayJob
+	| RunnerWorkflowJob
+	| RunnerWorkflowGraphJob;
+```
+
+### Type-Safe Job Interfaces
+
+Each job type has a dedicated generic interface for full type safety:
+
+```ts
+// Type-safe stableRequest job
+interface RunnerRequestJob<RequestDataType = any, ResponseDataType = any> {
+	kind: RunnerJobs.STABLE_REQUEST;
+	options: STABLE_REQUEST<RequestDataType, ResponseDataType>;
+}
+
+// Type-safe stableFunction job
+interface RunnerFunctionJob<FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
+	kind: RunnerJobs.STABLE_FUNCTION;
+	options: STABLE_FUNCTION<FunctionArgsType, FunctionReturnType>;
+}
+
+// Type-safe stableApiGateway job
+interface RunnerApiGatewayJob<
+	RequestDataType = any,
+	ResponseDataType = any,
+	FunctionArgsType extends any[] = any[],
+	FunctionReturnType = any
+> {
+	kind: RunnerJobs.STABLE_API_GATEWAY;
+	requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[];
+	options: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
+	functions?: API_GATEWAY_FUNCTION<FunctionArgsType, FunctionReturnType>[];
+}
+
+// Type-safe stableWorkflow job
+interface RunnerWorkflowJob<
+	RequestDataType = any,
+	ResponseDataType = any,
+	FunctionArgsType extends any[] = any[],
+	FunctionReturnType = any
+> {
+	kind: RunnerJobs.STABLE_WORKFLOW;
+	phases: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
+	options?: STABLE_WORKFLOW_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
+}
+
+// Type-safe stableWorkflowGraph job
+interface RunnerWorkflowGraphJob<
+	RequestDataType = any,
+	ResponseDataType = any,
+	FunctionArgsType extends any[] = any[],
+	FunctionReturnType = any
+> {
+	kind: RunnerJobs.STABLE_WORKFLOW_GRAPH;
+	graph: WorkflowGraph<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
+	options?: WorkflowGraphOptions<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
+}
+```
+
+### Usage with Generics
+
+```ts
+import { RunnerJobs, RunnerRequestJob, RunnerConfig, REQUEST_METHODS } from '@emmvish/stable-request';
+
+interface MyRequest { userId: number; }
+interface MyResponse { id: number; name: string; }
+
+// Fully typed job
+const job: RunnerRequestJob<MyRequest, MyResponse> = {
+	kind: RunnerJobs.STABLE_REQUEST,
+	options: {
+		reqData: { hostname: 'abc.com', method: REQUEST_METHODS.GET, data: { userId: 1 } },
+		responseAnalyzer: ({ data }) => data.id > 0  // data is typed as MyResponse
+	}
+};
+
+// Typed config
+const config: RunnerConfig<RunnerRequestJob<MyRequest, MyResponse>> = {
+	jobId: 'typed-job',
+	job
+};
 ```
 
 **Notes**

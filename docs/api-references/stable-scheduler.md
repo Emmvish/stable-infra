@@ -235,6 +235,34 @@ export default {
 };
 ```
 
+### Type-Safe Scheduled Jobs
+
+For full type safety in scheduled jobs, use the typed job interfaces:
+
+```ts
+import {
+	RunnerJobs,
+	ScheduleTypes,
+	RunnerScheduledJob,
+	RunnerRequestJob,
+    REQUEST_METHODS
+} from '@emmvish/stable-request';
+
+interface MyRequest { query: string; }
+interface MyResponse { results: string[]; }
+
+// Typed scheduled job
+const job: RunnerScheduledJob<RunnerRequestJob<MyRequest, MyResponse>> = {
+	id: 'search-job',
+	kind: RunnerJobs.STABLE_REQUEST,
+	schedule: { type: ScheduleTypes.INTERVAL, everyMs: 60000 },
+	options: {
+		reqData: { hostname: 'api.example.com', method: REQUEST_METHODS.POST, data: { query: 'test' } },
+		responseAnalyzer: ({ data }) => data.results.length > 0  // typed
+	}
+};
+```
+
 ---
 
 ## Best Practices

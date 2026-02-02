@@ -1633,30 +1633,69 @@ export interface InternalSchedulerConfig<TJob = any> {
   sharedInfrastructure?: SchedulerSharedInfrastructure;
 }
 
-export type RunnerJob =
-  | { kind: RunnerJobs.STABLE_REQUEST; options: STABLE_REQUEST }
-  | { kind: RunnerJobs.STABLE_FUNCTION; options: STABLE_FUNCTION }
-  | {
-      kind: RunnerJobs.STABLE_API_GATEWAY;
-      requests: API_GATEWAY_REQUEST[] | API_GATEWAY_ITEM[];
-      options: API_GATEWAY_OPTIONS;
-      functions?: API_GATEWAY_FUNCTION[];
-    }
-  | { kind: RunnerJobs.STABLE_WORKFLOW; phases: STABLE_WORKFLOW_PHASE[]; options?: STABLE_WORKFLOW_OPTIONS }
-  | { kind: RunnerJobs.STABLE_WORKFLOW_GRAPH; graph: WorkflowGraph; options?: WorkflowGraphOptions };
+export interface RunnerRequestJob<RequestDataType = any, ResponseDataType = any> {
+  kind: RunnerJobs.STABLE_REQUEST;
+  options: STABLE_REQUEST<RequestDataType, ResponseDataType>;
+}
 
-export type RunnerScheduledJob = RunnerJob & {
+export interface RunnerFunctionJob<FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
+  kind: RunnerJobs.STABLE_FUNCTION;
+  options: STABLE_FUNCTION<FunctionArgsType, FunctionReturnType>;
+}
+
+export interface RunnerApiGatewayJob<
+  RequestDataType = any,
+  ResponseDataType = any,
+  FunctionArgsType extends any[] = any[],
+  FunctionReturnType = any
+> {
+  kind: RunnerJobs.STABLE_API_GATEWAY;
+  requests: API_GATEWAY_REQUEST<RequestDataType, ResponseDataType>[] | API_GATEWAY_ITEM<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
+  options: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
+  functions?: API_GATEWAY_FUNCTION<FunctionArgsType, FunctionReturnType>[];
+}
+
+export interface RunnerWorkflowJob<
+  RequestDataType = any,
+  ResponseDataType = any,
+  FunctionArgsType extends any[] = any[],
+  FunctionReturnType = any
+> {
+  kind: RunnerJobs.STABLE_WORKFLOW;
+  phases: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[];
+  options?: STABLE_WORKFLOW_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
+}
+
+export interface RunnerWorkflowGraphJob<
+  RequestDataType = any,
+  ResponseDataType = any,
+  FunctionArgsType extends any[] = any[],
+  FunctionReturnType = any
+> {
+  kind: RunnerJobs.STABLE_WORKFLOW_GRAPH;
+  graph: WorkflowGraph<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
+  options?: WorkflowGraphOptions<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
+}
+
+export type RunnerJob =
+  | RunnerRequestJob
+  | RunnerFunctionJob
+  | RunnerApiGatewayJob
+  | RunnerWorkflowJob
+  | RunnerWorkflowGraphJob;
+
+export type RunnerScheduledJob<T extends RunnerJob = RunnerJob> = T & {
   id?: string;
   schedule?: SchedulerSchedule;
   retry?: SchedulerRetryConfig;
   executionTimeoutMs?: number;
 };
 
-export type RunnerConfig = {
+export type RunnerConfig<T extends RunnerJob = RunnerJob> = {
   outputPath?: string;
   jobId?: string;
-  job?: RunnerJob;
-  jobs?: RunnerScheduledJob[];
+  job?: T;
+  jobs?: RunnerScheduledJob<T>[];
   scheduler?: SchedulerConfig;
 };
 
