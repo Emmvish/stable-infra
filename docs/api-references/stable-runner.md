@@ -197,7 +197,7 @@ If a job fails, the `error` field is written:
 ### ESM Config (runner-config.mjs)
 
 ```js
-import { RunnerJobs } from '@emmvish/stable-request';
+import { RunnerJobs, REQUEST_METHODS } from '@emmvish/stable-request';
 
 export default {
 	jobId: 'demo-001',
@@ -206,8 +206,9 @@ export default {
 		kind: RunnerJobs.STABLE_REQUEST,
 		options: {
 			reqData: {
-				url: 'https://jsonplaceholder.typicode.com/todos/1',
-				method: 'GET'
+                hostname: 'jsonplaceholder.typicode.com',
+                path: '/todos/1',
+				method: REQUEST_METHODS.GET
 			},
 			resReq: true
 		}
@@ -224,7 +225,8 @@ export default {
 		"kind": "stable_request",
 		"options": {
 			"reqData": {
-				"url": "https://jsonplaceholder.typicode.com/todos/1",
+                "hostname": "jsonplaceholder.typicode.com",
+                "path": "/todos/1",
 				"method": "GET"
 			},
 			"resReq": true
