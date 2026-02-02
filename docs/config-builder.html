@@ -1,0 +1,1696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Config Builder - Generate production-ready configurations for Stable Request modules.">
+  <title>Config Builder | Stable Request</title>
+  <link rel="icon" type="image/svg+xml" href="img/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/index.css">
+  <link rel="stylesheet" href="css/config-builder.css">
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="navbar-left">
+      <a href="index.html" class="brand">
+        <img src="img/icon.svg" alt="Stable Request" class="brand-icon">
+        <span class="brand-name">Stable Request</span>
+      </a>
+    </div>
+    <div class="navbar-right">
+      <a href="index.html" class="nav-link" title="Home">
+        <span class="nav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.182V22h18V10.182L12 2 3 10.182z"/><path d="M9 22V14h6v8"/><path d="M1 10l11-8 11 8"/></svg>
+        </span>
+        <span>Home</span>
+      </a>
+      <a href="https://www.npmjs.com/package/@emmvish/stable-request" target="_blank" rel="noopener" class="nav-link" title="NPM Package">
+        <span class="nav-icon">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M1.763 0C.786 0 0 .786 0 1.763v20.474C0 23.214.786 24 1.763 24h20.474c.977 0 1.763-.786 1.763-1.763V1.763C24 .786 23.214 0 22.237 0zM5.13 5.323l13.837.019-.009 13.836h-3.464l.01-10.382h-3.456L12.04 19.17H5.113z"/>
+          </svg>
+        </span>
+        <span>NPM</span>
+      </a>
+      <a href="https://github.com/emmvish/stable-request" target="_blank" rel="noopener" class="nav-link" title="GitHub Repository">
+        <span class="nav-icon">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+          </svg>
+        </span>
+        <span>GitHub</span>
+      </a>
+      <a href="https://github.com/Emmvish/stable-request/tree/main/docs/api-references" target="_blank" class="nav-link" title="API References">
+        <span class="nav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+        </span>
+        <span>API Docs</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main-content" id="mainContent">
+    <section class="config-builder-section">
+      <div class="section-header">
+        <h2><span class="gradient-text">Config Builder</span></h2>
+        <p>Generate production-ready configurations for Stable Request modules. Configure all options visually and export TypeScript code ready to use.</p>
+      </div>
+
+      <div class="builder-tabs-container">
+        <div class="builder-module-selector">
+          <label for="builder-module-select">Select Module:</label>
+          <select id="builder-module-select" class="builder-select module-select">
+            <option value="stableRequest">stableRequest</option>
+            <option value="stableFunction">stableFunction</option>
+            <option value="stableApiGateway">stableApiGateway</option>
+            <option value="StableBuffer">StableBuffer</option>
+            <option value="stableWorkflow">stableWorkflow</option>
+            <option value="stableWorkflowGraph">stableWorkflowGraph</option>
+            <option value="StableScheduler">StableScheduler</option>
+          </select>
+          <span class="module-status" id="module-status"></span>
+        </div>
+
+        <!-- stableRequest Config Builder -->
+        <div class="builder-content active" id="builder-stableRequest">
+          <div class="builder-layout">
+            <!-- Form Panel -->
+            <div class="builder-form-panel">
+              <!-- Legend for required fields -->
+              <div class="builder-legend">
+                <span class="legend-item"><span class="required-critical">**</span> Required for config to work</span>
+                <span class="legend-item"><span class="required-feature">*</span> Required for this feature only</span>
+              </div>
+              
+              <!-- TypeScript Generics -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+                  TypeScript Generics
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <p class="section-description">Define TypeScript types for strong typing. Leave empty for <code>any</code>.</p>
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sr-generic-request">Request Data Type</label>
+                      <input type="text" id="sr-generic-request" placeholder="{ userId: string; action: string }" class="builder-input code-input">
+                      <span class="field-hint">Type for request body data</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-generic-response">Response Data Type</label>
+                      <input type="text" id="sr-generic-response" placeholder="{ id: number; name: string; email: string }" class="builder-input code-input">
+                      <span class="field-hint">Type for expected response data</span>
+                    </div>
+                  </div>
+                  <div class="field-group">
+                    <label class="checkbox-label">
+                      <input type="checkbox" id="sr-generic-define-types" onchange="toggleTypeDefinitions()">
+                      <span class="checkbox-custom"></span>
+                      Define types as interfaces
+                    </label>
+                    <span class="field-hint">Generate interface definitions above the function call</span>
+                  </div>
+                  <div id="typeDefinitionFields" class="conditional-fields disabled" style="margin-top: 1rem;">
+                    <div class="field-group">
+                      <label for="sr-generic-request-name">Request Type Name</label>
+                      <input type="text" id="sr-generic-request-name" value="RequestData" class="builder-input" disabled>
+                      <span class="field-hint">Interface name for request type</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-generic-response-name">Response Type Name</label>
+                      <input type="text" id="sr-generic-response-name" value="ResponseData" class="builder-input" disabled>
+                      <span class="field-hint">Interface name for response type</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Request Data -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
+                  Request Data <span class="required-badge">Required</span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sr-hostname">Hostname <span class="required-critical">**</span></label>
+                      <input type="text" id="sr-hostname" value="localhost" placeholder="api.example.com" class="builder-input">
+                      <span class="field-hint">Target server hostname without protocol (required)</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-path">Path</label>
+                      <div class="input-with-prefix">
+                        <span class="input-prefix">/</span>
+                        <input type="text" id="sr-path" value="" placeholder="api/users" class="builder-input has-prefix">
+                      </div>
+                      <span class="field-hint">URL path (leading / is automatic)</span>
+                    </div>
+                  </div>
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sr-method">Method</label>
+                      <select id="sr-method" class="builder-select">
+                        <option value="GET" selected>GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="PATCH">PATCH</option>
+                        <option value="DELETE">DELETE</option>
+                      </select>
+                      <span class="field-hint">HTTP method</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-protocol">Protocol</label>
+                      <select id="sr-protocol" class="builder-select">
+                        <option value="https" selected>HTTPS</option>
+                        <option value="http">HTTP</option>
+                      </select>
+                      <span class="field-hint">Request protocol</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-port">Port</label>
+                      <input type="number" id="sr-port" value="443" class="builder-input" min="1" max="65535">
+                      <span class="field-hint">Port number</span>
+                    </div>
+                  </div>
+                  <div class="field-group">
+                    <label for="sr-headers">Headers <span class="json-badge">JSON</span></label>
+                    <textarea id="sr-headers" placeholder='{"Authorization": "Bearer token"}' class="builder-textarea" rows="3"></textarea>
+                    <span class="field-hint">Request headers as JSON object</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sr-body">Request Body <span class="json-badge">JSON</span></label>
+                    <textarea id="sr-body" placeholder='{"key": "value"}' class="builder-textarea" rows="3"></textarea>
+                    <span class="field-hint">Request body for POST/PUT/PATCH</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sr-query">Query Parameters <span class="json-badge">JSON</span></label>
+                    <textarea id="sr-query" placeholder='{"page": 1, "limit": 10}' class="builder-textarea" rows="2"></textarea>
+                    <span class="field-hint">URL query parameters as JSON object</span>
+                  </div>
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sr-timeout">Request Timeout (ms)</label>
+                      <input type="number" id="sr-timeout" placeholder="30000" class="builder-input" min="0">
+                      <span class="field-hint">Individual request timeout</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Retry Configuration -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                  Retry Configuration
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sr-attempts">Attempts</label>
+                      <input type="number" id="sr-attempts" value="1" class="builder-input" min="1" max="20">
+                      <span class="field-hint">Total number of attempts</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-retryStrategy">Retry Strategy</label>
+                      <select id="sr-retryStrategy" class="builder-select">
+                        <option value="fixed" selected>Fixed</option>
+                        <option value="linear">Linear</option>
+                        <option value="exponential">Exponential</option>
+                      </select>
+                      <span class="field-hint">Delay growth pattern</span>
+                    </div>
+                  </div>
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sr-wait">Base Wait (ms)</label>
+                      <input type="number" id="sr-wait" value="1000" class="builder-input" min="0">
+                      <span class="field-hint">Initial delay between retries</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-maxAllowedWait">Max Wait (ms)</label>
+                      <input type="number" id="sr-maxAllowedWait" value="60000" class="builder-input" min="0">
+                      <span class="field-hint">Maximum delay cap</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-jitter">Jitter (ms)</label>
+                      <input type="number" id="sr-jitter" value="0" class="builder-input" min="0">
+                      <span class="field-hint">Random delay variation</span>
+                    </div>
+                  </div>
+                  <div class="field-row">
+                    <div class="field-group checkbox-group">
+                      <label class="checkbox-label">
+                        <input type="checkbox" id="sr-performAllAttempts">
+                        <span class="checkbox-custom"></span>
+                        Perform All Attempts
+                      </label>
+                      <span class="field-hint">Continue all attempts even on success</span>
+                    </div>
+                    <div class="field-group checkbox-group">
+                      <label class="checkbox-label">
+                        <input type="checkbox" id="sr-throwOnFailedErrorAnalysis">
+                        <span class="checkbox-custom"></span>
+                        Throw on Failed Error Analysis
+                      </label>
+                      <span class="field-hint">Throw error if finalErrorAnalyzer returns false</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Response Options -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                  Response Options
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-row">
+                    <div class="field-group checkbox-group">
+                      <label class="checkbox-label">
+                        <input type="checkbox" id="sr-resReq">
+                        <span class="checkbox-custom"></span>
+                        Return Response Data (resReq)
+                      </label>
+                      <span class="field-hint">Include full response data instead of boolean</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pre-Execution Hook -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+                  Pre-Execution Hook
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-group">
+                    <label for="sr-preExecution-hook">Pre-Execution Hook <span class="required-feature">*</span> <span class="func-badge">Function</span></label>
+                    <textarea id="sr-preExecution-hook" placeholder="({ inputParams, commonBuffer, stableRequestOptions }) => {}" class="builder-textarea code-textarea" rows="4" oninput="togglePreExecutionFields()"></textarea>
+                    <span class="field-hint">Runs before main execution</span>
+                  </div>
+                  <div id="preExecutionDependentFields" class="conditional-fields disabled">
+                    <div class="field-group">
+                      <label for="sr-preExecution-params">Pre-Execution Params <span class="json-badge">JSON</span></label>
+                      <textarea id="sr-preExecution-params" placeholder="{}" class="builder-textarea" rows="2" disabled></textarea>
+                      <span class="field-hint">Custom parameters for the hook</span>
+                    </div>
+                    <div class="field-row">
+                      <div class="field-group checkbox-group">
+                        <label class="checkbox-label">
+                          <input type="checkbox" id="sr-preExecution-applyOverride" disabled>
+                          <span class="checkbox-custom"></span>
+                          Apply Config Override
+                        </label>
+                        <span class="field-hint">Apply hook's return config</span>
+                      </div>
+                      <div class="field-group checkbox-group">
+                        <label class="checkbox-label">
+                          <input type="checkbox" id="sr-preExecution-continueOnFailure" disabled>
+                          <span class="checkbox-custom"></span>
+                          Continue on Failure
+                        </label>
+                        <span class="field-hint">Continue if hook fails</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Analysis Hooks -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                  Analysis Hooks
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-group">
+                    <label for="sr-responseAnalyzer">Response Analyzer <span class="func-badge">Function</span></label>
+                    <textarea id="sr-responseAnalyzer" placeholder="({ data, reqData, trialMode }) => true" class="builder-textarea code-textarea" rows="4"></textarea>
+                    <span class="field-hint">Validate response and determine retry</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sr-finalErrorAnalyzer">Final Error Analyzer <span class="func-badge">Function</span></label>
+                    <textarea id="sr-finalErrorAnalyzer" placeholder="({ error, reqData, trialMode }) => false" class="builder-textarea code-textarea" rows="4"></textarea>
+                    <span class="field-hint">Analyze final error after all attempts</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Observability Hooks -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  Observability Hooks
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-group checkbox-group">
+                    <label class="checkbox-label">
+                      <input type="checkbox" id="sr-logAllErrors" onchange="toggleObservabilityHook('errors')">
+                      <span class="checkbox-custom"></span>
+                      Log All Errors
+                    </label>
+                    <span class="field-hint">Collect all error logs</span>
+                  </div>
+                  <div class="field-group checkbox-group">
+                    <label class="checkbox-label">
+                      <input type="checkbox" id="sr-logAllSuccessfulAttempts" onchange="toggleObservabilityHook('success')">
+                      <span class="checkbox-custom"></span>
+                      Log All Successful Attempts
+                    </label>
+                    <span class="field-hint">Collect successful attempt data</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sr-handleErrors">Handle Errors Hook <span class="func-badge">Function</span></label>
+                    <textarea id="sr-handleErrors" placeholder="({ errorLog, reqData, maxSerializableChars, executionContext }) => console.error(errorLog)" class="builder-textarea code-textarea" rows="3" disabled></textarea>
+                    <span class="field-hint">Called on each error (requires Log All Errors)</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sr-handleSuccessfulAttemptData">Handle Success Hook <span class="func-badge">Function</span></label>
+                    <textarea id="sr-handleSuccessfulAttemptData" placeholder="({ successfulAttemptData, reqData, maxSerializableChars, executionContext }) => console.info(successfulAttemptData)" class="builder-textarea code-textarea" rows="3" disabled></textarea>
+                    <span class="field-hint">Called on each successful attempt (requires Log All Successful Attempts)</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sr-maxSerializableChars">Maximum Serializable Chars</label>
+                    <input type="number" id="sr-maxSerializableChars" value="1000" class="builder-input" min="0">
+                    <span class="field-hint">Limit for serialized data in hooks</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Hook Parameters -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                  Hook Parameters
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-group">
+                    <label for="sr-hookParams-responseAnalyzer">Response Analyzer Parameters <span class="json-badge">JSON</span></label>
+                    <textarea id="sr-hookParams-responseAnalyzer" placeholder="{}" class="builder-textarea" rows="2"></textarea>
+                    <span class="field-hint">Params passed to responseAnalyzer hook</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sr-hookParams-handleSuccessfulAttemptData">Handle Successful Attempt Data Parameters <span class="json-badge">JSON</span></label>
+                    <textarea id="sr-hookParams-handleSuccessfulAttemptData" placeholder="{}" class="builder-textarea" rows="2"></textarea>
+                    <span class="field-hint">Params passed to handleSuccessfulAttemptData hook</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sr-hookParams-handleErrors">Handle Errors Parameters <span class="json-badge">JSON</span></label>
+                    <textarea id="sr-hookParams-handleErrors" placeholder="{}" class="builder-textarea" rows="2"></textarea>
+                    <span class="field-hint">Params passed to handleErrors hook</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sr-hookParams-finalErrorAnalyzer">Final Error Analyzer Parameters <span class="json-badge">JSON</span></label>
+                    <textarea id="sr-hookParams-finalErrorAnalyzer" placeholder="{}" class="builder-textarea" rows="2"></textarea>
+                    <span class="field-hint">Params passed to finalErrorAnalyzer hook</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Caching -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                  Caching
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-row">
+                    <div class="field-group checkbox-group">
+                      <label class="checkbox-label">
+                        <input type="checkbox" id="sr-cache-enabled" onchange="toggleCacheFields()">
+                        <span class="checkbox-custom"></span>
+                        Enable Cache <span class="required-feature">*</span>
+                      </label>
+                      <span class="field-hint">Cache successful responses</span>
+                    </div>
+                  </div>
+                  <div id="cacheConfigFields" class="conditional-fields disabled">
+                    <div class="field-row">
+                      <div class="field-group checkbox-group">
+                        <label class="checkbox-label">
+                          <input type="checkbox" id="sr-cache-respectCacheControl" checked disabled>
+                          <span class="checkbox-custom"></span>
+                          Respect Cache-Control
+                        </label>
+                        <span class="field-hint">Honor HTTP cache headers (default: enabled)</span>
+                      </div>
+                    </div>
+                    <div class="field-row">
+                      <div class="field-group">
+                        <label for="sr-cache-ttl">TTL (ms)</label>
+                        <input type="number" id="sr-cache-ttl" value="300000" class="builder-input" min="0" disabled>
+                        <span class="field-hint">Cache entry time-to-live</span>
+                      </div>
+                      <div class="field-group">
+                        <label for="sr-cache-maxSize">Max Size</label>
+                        <input type="number" id="sr-cache-maxSize" value="100" class="builder-input" min="1" disabled>
+                        <span class="field-hint">Maximum cached entries</span>
+                      </div>
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-cache-cacheableStatusCodes">Cacheable Status Codes</label>
+                      <input type="text" id="sr-cache-cacheableStatusCodes" value="200, 203, 204, 206, 300, 301, 404, 405, 410, 414, 501" class="builder-input" disabled>
+                      <span class="field-hint">Comma-separated HTTP status codes</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-cache-excludeMethods">Exclude Methods</label>
+                      <div class="checkbox-row">
+                        <label class="checkbox-label inline"><input type="checkbox" id="sr-cache-excludeGET" disabled><span class="checkbox-custom"></span>GET</label>
+                        <label class="checkbox-label inline"><input type="checkbox" id="sr-cache-excludePOST" disabled><span class="checkbox-custom"></span>POST</label>
+                        <label class="checkbox-label inline"><input type="checkbox" id="sr-cache-excludePUT" disabled><span class="checkbox-custom"></span>PUT</label>
+                        <label class="checkbox-label inline"><input type="checkbox" id="sr-cache-excludePATCH" disabled><span class="checkbox-custom"></span>PATCH</label>
+                        <label class="checkbox-label inline"><input type="checkbox" id="sr-cache-excludeDELETE" disabled><span class="checkbox-custom"></span>DELETE</label>
+                      </div>
+                      <span class="field-hint">Methods excluded from caching</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-cache-keyGenerator">Key Generator <span class="func-badge">Function</span></label>
+                      <textarea id="sr-cache-keyGenerator" placeholder="(config) => `${config.method}:${config.url}`" class="builder-textarea code-textarea" rows="3" disabled></textarea>
+                      <span class="field-hint">Custom cache key generation</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Circuit Breaker -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  Circuit Breaker
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sr-cb-failureThresholdPercentage">Failure Threshold (%) <span class="required-feature">*</span></label>
+                      <input type="number" id="sr-cb-failureThresholdPercentage" placeholder="e.g., 50" class="builder-input" min="1" max="100">
+                      <span class="field-hint">Percentage to trip breaker</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-cb-minimumRequests">Minimum Requests <span class="required-feature">*</span></label>
+                      <input type="number" id="sr-cb-minimumRequests" placeholder="e.g., 5" class="builder-input" min="1">
+                      <span class="field-hint">Min requests before evaluation</span>
+                    </div>
+                  </div>
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sr-cb-recoveryTimeoutMs">Recovery Timeout (ms) <span class="required-feature">*</span></label>
+                      <input type="number" id="sr-cb-recoveryTimeoutMs" placeholder="e.g., 30000" class="builder-input" min="100">
+                      <span class="field-hint">Time before half-open state</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-cb-halfOpenMaxRequests">Half-Open (Max) Requests</label>
+                      <input type="number" id="sr-cb-halfOpenMaxRequests" value="5" class="builder-input" min="1">
+                      <span class="field-hint">Test requests in half-open</span>
+                    </div>
+                  </div>
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sr-cb-successThresholdPercentage">Success Threshold (%)</label>
+                      <input type="number" id="sr-cb-successThresholdPercentage" value="50" class="builder-input" min="1" max="100">
+                      <span class="field-hint">Success rate to close breaker</span>
+                    </div>
+                    <div class="field-group checkbox-group">
+                      <label class="checkbox-label">
+                        <input type="checkbox" id="sr-cb-trackIndividualAttempts">
+                        <span class="checkbox-custom"></span>
+                        Track Individual Attempts
+                      </label>
+                      <span class="field-hint">Track each attempt as request</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Common Buffer -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>
+                  Common Buffer
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-group">
+                    <label for="sr-buffer-initialState">Initial State <span class="json-badge">JSON</span> <span class="required-feature">*</span></label>
+                    <textarea id="sr-buffer-initialState" placeholder="{}" class="builder-textarea" rows="3" oninput="toggleCommonBufferFields()"></textarea>
+                    <span class="field-hint">Initial buffer state object (required to enable buffer options)</span>
+                  </div>
+                  <div id="commonBufferDependentFields" class="conditional-fields disabled">
+                  <div class="field-group checkbox-group" style="margin-top: 1rem;">
+                    <label class="checkbox-label">
+                      <input type="checkbox" id="sr-useStableBuffer" onchange="toggleStableBufferFields()" disabled>
+                      <span class="checkbox-custom"></span>
+                      Use StableBuffer
+                    </label>
+                    <span class="field-hint">Wrap in a StableBuffer instance for transactional state management</span>
+                  </div>
+                  <div id="stableBufferFields" class="conditional-fields disabled">
+                    <div class="field-group">
+                      <label for="sr-buffer-transactionTimeoutMs">Transaction Timeout (ms)</label>
+                      <input type="number" id="sr-buffer-transactionTimeoutMs" value="0" class="builder-input" min="0" disabled>
+                      <span class="field-hint">Timeout for buffer transactions (0 = no timeout)</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-buffer-clone">Clone Function <span class="func-badge">Function</span></label>
+                      <textarea id="sr-buffer-clone" placeholder="(state) => structuredClone(state)" class="builder-textarea code-textarea" rows="2" disabled></textarea>
+                      <span class="field-hint">Custom clone function for read(). Defaults to structuredClone or JSON cloning.</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-buffer-logTransactionFn">Transaction Logger <span class="func-badge">Function</span></label>
+                      <textarea id="sr-buffer-logTransactionFn" placeholder="(log) => console.log(log)" class="builder-textarea code-textarea" rows="2" disabled></textarea>
+                      <span class="field-hint">Optional function to log buffer transactions (receives StableBufferTransactionLog)</span>
+                    </div>
+                    <div class="field-group">
+                      <label>StableBuffer Metrics Guardrails</label>
+                      <span class="field-hint guardrail-hint">Define thresholds for buffer metrics validation</span>
+                      <div class="guardrail-row">
+                        <div class="guardrail-field">
+                          <label for="sr-buffer-mg-totalTransactions-max">Total Transactions (Max)</label>
+                          <input type="number" id="sr-buffer-mg-totalTransactions-max" placeholder="e.g. 1000" class="builder-input-sm" disabled>
+                        </div>
+                        <div class="guardrail-field">
+                          <label for="sr-buffer-mg-avgQueueWait-max">Avg Queue Wait (Max) (ms)</label>
+                          <input type="number" id="sr-buffer-mg-avgQueueWait-max" placeholder="e.g. 100" class="builder-input-sm" disabled>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Metrics Guardrails -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  Metrics Guardrails
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="guardrail-info-note">
+                    <strong>Note:</strong> This form shows only the most commonly used <code>min</code> or <code>max</code> constraint for each metric. Each guardrail property actually accepts a full <code>MetricGuardrail</code> object.
+                    <div class="guardrail-other-options">
+                      <span>All available options:</span> <code>min</code>, <code>max</code>, <code>expected</code>, <code>tolerance</code>
+                    </div>
+                  </div>
+                  <div class="field-group">
+                    <label>Request Metrics</label>
+                    <span class="field-hint guardrail-hint">Define thresholds for request execution metrics</span>
+                    <div class="guardrail-row">
+                      <div class="guardrail-field">
+                        <label for="sr-mg-totalAttempts-max">Total Attempts (Max)</label>
+                        <input type="number" id="sr-mg-totalAttempts-max" placeholder="e.g. 10" class="builder-input-sm">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sr-mg-successfulAttempts-min">Successful Attempts (Min)</label>
+                        <input type="number" id="sr-mg-successfulAttempts-min" placeholder="e.g. 1" class="builder-input-sm">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sr-mg-failedAttempts-max">Failed Attempts (Max)</label>
+                        <input type="number" id="sr-mg-failedAttempts-max" placeholder="e.g. 3" class="builder-input-sm">
+                      </div>
+                    </div>
+                    <div class="guardrail-row">
+                      <div class="guardrail-field">
+                        <label for="sr-mg-totalExecutionTime-max">Total Exec Time (Max) (ms)</label>
+                        <input type="number" id="sr-mg-totalExecutionTime-max" placeholder="e.g. 30000" class="builder-input-sm">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sr-mg-averageAttemptTime-max">Avg Attempt Time (Max) (ms)</label>
+                        <input type="number" id="sr-mg-averageAttemptTime-max" placeholder="e.g. 5000" class="builder-input-sm">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="field-group">
+                    <label>Circuit Breaker Metrics</label>
+                    <span class="field-hint guardrail-hint">Define thresholds for circuit breaker behavior</span>
+                    <div class="guardrail-row">
+                      <div class="guardrail-field">
+                        <label for="sr-mg-cb-failureRate-max">Failure Rate (Max)</label>
+                        <input type="number" id="sr-mg-cb-failureRate-max" placeholder="e.g. 0.5" class="builder-input-sm" step="0.01">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sr-mg-cb-totalRequests-max">Total Requests (Max)</label>
+                        <input type="number" id="sr-mg-cb-totalRequests-max" placeholder="e.g. 1000" class="builder-input-sm">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sr-mg-cb-failedRequests-max">Failed Requests (Max)</label>
+                        <input type="number" id="sr-mg-cb-failedRequests-max" placeholder="e.g. 50" class="builder-input-sm">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="field-group">
+                    <label>Cache Metrics</label>
+                    <span class="field-hint guardrail-hint">Define thresholds for cache performance</span>
+                    <div class="guardrail-row">
+                      <div class="guardrail-field">
+                        <label for="sr-mg-cache-hitRate-min">Hit Rate (Min)</label>
+                        <input type="number" id="sr-mg-cache-hitRate-min" placeholder="e.g. 0.5" class="builder-input-sm" step="0.01">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sr-mg-cache-missRate-max">Miss Rate (Max)</label>
+                        <input type="number" id="sr-mg-cache-missRate-max" placeholder="e.g. 0.5" class="builder-input-sm" step="0.01">
+                      </div>
+                    </div>
+                    <div class="guardrail-row">
+                      <div class="guardrail-field">
+                        <label for="sr-mg-cache-utilizationPercentage-max">Utilization % (Max)</label>
+                        <input type="number" id="sr-mg-cache-utilizationPercentage-max" placeholder="e.g. 90" class="builder-input-sm">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sr-mg-cache-evictionRate-max">Eviction Rate (Max)</label>
+                        <input type="number" id="sr-mg-cache-evictionRate-max" placeholder="e.g. 0.1" class="builder-input-sm" step="0.01">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Trial Mode -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6v5l4 9a2 2 0 01-2 3H7a2 2 0 01-2-3l4-9V3z"/><path d="M9 3h6"/><path d="M10 8h4"/></svg>
+                  Trial Mode
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-row">
+                    <div class="field-group checkbox-group">
+                      <label class="checkbox-label">
+                        <input type="checkbox" id="sr-trialMode-enabled" onchange="toggleTrialModeFields()">
+                        <span class="checkbox-custom"></span>
+                        Enable Trial Mode <span class="required-feature">*</span>
+                      </label>
+                      <span class="field-hint">Dry run without actual HTTP requests</span>
+                    </div>
+                  </div>
+                  <div id="trialModeConfigFields" class="conditional-fields disabled">
+                    <div class="field-row">
+                      <div class="field-group">
+                        <label for="sr-trialMode-reqFailureProbability">Request Failure Probability</label>
+                        <input type="number" id="sr-trialMode-reqFailureProbability" value="0" class="builder-input" min="0" max="1" step="0.1" disabled>
+                        <span class="field-hint">Probability (0-1) that request fails in trial mode</span>
+                      </div>
+                      <div class="field-group">
+                        <label for="sr-trialMode-retryFailureProbability">Retry Failure Probability</label>
+                        <input type="number" id="sr-trialMode-retryFailureProbability" value="0" class="builder-input" min="0" max="1" step="0.1" disabled>
+                        <span class="field-hint">Probability (0-1) that retry is not allowed</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Execution Context -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                  Execution Context
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <span class="field-hint" style="display: block; margin-bottom: 0.75rem;">Optional identifiers for workflow execution tracking</span>
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sr-ec-workflowId">Workflow ID</label>
+                      <input type="text" id="sr-ec-workflowId" placeholder="e.g. wf-001" class="builder-input">
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-ec-phaseId">Phase ID</label>
+                      <input type="text" id="sr-ec-phaseId" placeholder="e.g. phase-001" class="builder-input">
+                    </div>
+                  </div>
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sr-ec-branchId">Branch ID</label>
+                      <input type="text" id="sr-ec-branchId" placeholder="e.g. branch-001" class="builder-input">
+                    </div>
+                    <div class="field-group">
+                      <label for="sr-ec-requestId">Request ID</label>
+                      <input type="text" id="sr-ec-requestId" placeholder="e.g. req-001" class="builder-input">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Output Panel -->
+            <div class="builder-output-panel">
+              <div class="output-header code-config">
+                <h4>Generated Configuration</h4>
+                <div class="output-actions">
+                  <button class="btn-icon" onclick="copyGeneratedCode()" title="Copy to clipboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                  </button>
+                  <button class="btn-icon" onclick="resetConfigBuilder()" title="Reset form">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="code-box output-code-box">
+                <div class="code-box-header">
+                  <div class="code-box-dots">
+                    <span></span><span></span><span></span>
+                  </div>
+                  <span class="code-box-lang">TypeScript</span>
+                </div>
+                <pre id="config-output"><code id="config-output-code">import { stableRequest } from '@emmvish/stable-request';
+
+const result = await stableRequest({
+  reqData: {
+    hostname: 'api.example.com',
+    // Add more options...
+  }
+});</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- stableFunction Config Builder -->
+        <div class="builder-content" id="builder-stableFunction">
+          <div class="builder-layout">
+            <!-- Form Panel -->
+            <div class="builder-form-panel">
+              <!-- Legend for required fields -->
+              <div class="builder-legend">
+                <span class="legend-item"><span class="required-critical">**</span> Required for config to work</span>
+                <span class="legend-item"><span class="required-feature">*</span> Required for this feature only</span>
+              </div>
+              
+              <!-- TypeScript Generics -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+                  TypeScript Generics
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <p class="section-description">Define TypeScript types for strong typing. Leave empty for <code>any</code>.</p>
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sf-generic-args">Arguments Type (TArgs)</label>
+                      <input type="text" id="sf-generic-args" placeholder="[string, number]" class="builder-input code-input">
+                      <span class="field-hint">Type for function arguments array</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sf-generic-return">Return Type (TReturn)</label>
+                      <input type="text" id="sf-generic-return" placeholder="{ id: number; name: string }" class="builder-input code-input">
+                      <span class="field-hint">Type for function return value</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Function Configuration -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                  Function Configuration <span class="required-badge">Required</span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-group">
+                    <label for="sf-fn">Function <span class="required-critical">**</span> <span class="func-badge">Function</span></label>
+                    <textarea id="sf-fn" placeholder="async (arg1, arg2) => { return result; }" class="builder-textarea code-textarea" rows="4"></textarea>
+                    <span class="field-hint">The function to execute (sync or async)</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sf-args">Arguments <span class="required-critical">**</span> <span class="json-badge">Array</span></label>
+                    <textarea id="sf-args" placeholder='["arg1", 42, { "key": "value" }]' class="builder-textarea" rows="2">[]</textarea>
+                    <span class="field-hint">Array of arguments to pass to the function</span>
+                  </div>
+                  <div class="field-row">
+                    <div class="field-group checkbox-group">
+                      <label class="checkbox-label">
+                        <input type="checkbox" id="sf-returnResult">
+                        <span class="checkbox-custom"></span>
+                        Return Result (returnResult)
+                      </label>
+                      <span class="field-hint">Return actual result in data instead of boolean</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Retry Configuration -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                  Retry Configuration
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sf-attempts">Attempts</label>
+                      <input type="number" id="sf-attempts" value="1" class="builder-input" min="1" max="20">
+                      <span class="field-hint">Total number of attempts</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sf-retryStrategy">Retry Strategy</label>
+                      <select id="sf-retryStrategy" class="builder-select">
+                        <option value="fixed" selected>Fixed</option>
+                        <option value="linear">Linear</option>
+                        <option value="exponential">Exponential</option>
+                      </select>
+                      <span class="field-hint">Delay growth pattern</span>
+                    </div>
+                  </div>
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sf-wait">Base Wait (ms)</label>
+                      <input type="number" id="sf-wait" value="1000" class="builder-input" min="0">
+                      <span class="field-hint">Initial delay between retries</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sf-maxAllowedWait">Max Wait (ms)</label>
+                      <input type="number" id="sf-maxAllowedWait" value="60000" class="builder-input" min="0">
+                      <span class="field-hint">Maximum delay cap</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sf-jitter">Jitter (ms)</label>
+                      <input type="number" id="sf-jitter" value="0" class="builder-input" min="0">
+                      <span class="field-hint">Random delay variation</span>
+                    </div>
+                  </div>
+                  <div class="field-row">
+                    <div class="field-group checkbox-group">
+                      <label class="checkbox-label">
+                        <input type="checkbox" id="sf-performAllAttempts">
+                        <span class="checkbox-custom"></span>
+                        Perform All Attempts
+                      </label>
+                      <span class="field-hint">Continue all attempts even on success</span>
+                    </div>
+                    <div class="field-group checkbox-group">
+                      <label class="checkbox-label">
+                        <input type="checkbox" id="sf-throwOnFailedErrorAnalysis">
+                        <span class="checkbox-custom"></span>
+                        Throw on Failed Error Analysis
+                      </label>
+                      <span class="field-hint">Throw error if finalErrorAnalyzer returns false</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Timeout Configuration -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  Timeout & Concurrency
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sf-executionTimeout">Execution Timeout (ms)</label>
+                      <input type="number" id="sf-executionTimeout" placeholder="e.g. 30000" class="builder-input" min="0">
+                      <span class="field-hint">Max time for entire execution (all attempts)</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sf-maxConcurrentRequests">Maximum Concurrent Executions</label>
+                      <input type="number" id="sf-maxConcurrentRequests" placeholder="e.g. 5" class="builder-input" min="1">
+                      <span class="field-hint">Semaphore-based concurrency limit</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pre-Execution Hook -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+                  Pre-Execution Hook
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-group">
+                    <label for="sf-preExecution-hook">Pre-Execution Hook <span class="required-feature">*</span> <span class="func-badge">Function</span></label>
+                    <textarea id="sf-preExecution-hook" placeholder="({ inputParams, commonBuffer, stableFunctionOptions }) => {}" class="builder-textarea code-textarea" rows="4" oninput="toggleSfPreExecutionFields()"></textarea>
+                    <span class="field-hint">Runs before main execution</span>
+                  </div>
+                  <div id="sfPreExecutionDependentFields" class="conditional-fields disabled">
+                    <div class="field-group">
+                      <label for="sf-preExecution-params">Pre-Execution Params <span class="json-badge">JSON</span></label>
+                      <textarea id="sf-preExecution-params" placeholder="{}" class="builder-textarea" rows="2" disabled></textarea>
+                      <span class="field-hint">Custom parameters for the hook</span>
+                    </div>
+                    <div class="field-row">
+                      <div class="field-group checkbox-group">
+                        <label class="checkbox-label">
+                          <input type="checkbox" id="sf-preExecution-applyOverride" disabled>
+                          <span class="checkbox-custom"></span>
+                          Apply Config Override
+                        </label>
+                        <span class="field-hint">Apply hook's return config</span>
+                      </div>
+                      <div class="field-group checkbox-group">
+                        <label class="checkbox-label">
+                          <input type="checkbox" id="sf-preExecution-continueOnFailure" disabled>
+                          <span class="checkbox-custom"></span>
+                          Continue on Failure
+                        </label>
+                        <span class="field-hint">Continue if hook fails</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Analysis Hooks -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                  Analysis Hooks
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-group">
+                    <label for="sf-responseAnalyzer">Response Analyzer <span class="func-badge">Function</span></label>
+                    <textarea id="sf-responseAnalyzer" placeholder="({ data, fn, args, trialMode }) => true" class="builder-textarea code-textarea" rows="4"></textarea>
+                    <span class="field-hint">Validate result and determine retry (return false to retry)</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sf-finalErrorAnalyzer">Final Error Analyzer <span class="func-badge">Function</span></label>
+                    <textarea id="sf-finalErrorAnalyzer" placeholder="({ error, fn, args, trialMode }) => false" class="builder-textarea code-textarea" rows="4"></textarea>
+                    <span class="field-hint">Analyze final error after all attempts (return true to suppress throw)</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Observability Hooks -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  Observability Hooks
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-group checkbox-group">
+                    <label class="checkbox-label">
+                      <input type="checkbox" id="sf-logAllErrors" onchange="toggleSfObservabilityHook('errors')">
+                      <span class="checkbox-custom"></span>
+                      Log All Errors
+                    </label>
+                    <span class="field-hint">Collect all error logs</span>
+                  </div>
+                  <div class="field-group checkbox-group">
+                    <label class="checkbox-label">
+                      <input type="checkbox" id="sf-logAllSuccessfulAttempts" onchange="toggleSfObservabilityHook('success')">
+                      <span class="checkbox-custom"></span>
+                      Log All Successful Attempts
+                    </label>
+                    <span class="field-hint">Collect successful attempt data</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sf-handleErrors">Handle Errors Hook <span class="func-badge">Function</span></label>
+                    <textarea id="sf-handleErrors" placeholder="({ errorLog, fn, args, maxSerializableChars }) => console.error(errorLog)" class="builder-textarea code-textarea" rows="3" disabled></textarea>
+                    <span class="field-hint">Called on each error (requires Log All Errors)</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sf-handleSuccessfulAttemptData">Handle Success Hook <span class="func-badge">Function</span></label>
+                    <textarea id="sf-handleSuccessfulAttemptData" placeholder="({ successfulAttemptData, fn, args, maxSerializableChars }) => console.info(successfulAttemptData)" class="builder-textarea code-textarea" rows="3" disabled></textarea>
+                    <span class="field-hint">Called on each successful attempt (requires Log All Successful Attempts)</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sf-maxSerializableChars">Maximum Serializable Chars</label>
+                    <input type="number" id="sf-maxSerializableChars" value="1000" class="builder-input" min="0">
+                    <span class="field-hint">Limit for serialized data in hooks</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Hook Parameters -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                  Hook Parameters
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-group">
+                    <label for="sf-hookParams-responseAnalyzer">Response Analyzer Parameters <span class="json-badge">JSON</span></label>
+                    <textarea id="sf-hookParams-responseAnalyzer" placeholder="{}" class="builder-textarea" rows="2"></textarea>
+                    <span class="field-hint">Params passed to responseAnalyzer hook</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sf-hookParams-handleSuccessfulAttemptData">Handle Successful Attempt Data Parameters <span class="json-badge">JSON</span></label>
+                    <textarea id="sf-hookParams-handleSuccessfulAttemptData" placeholder="{}" class="builder-textarea" rows="2"></textarea>
+                    <span class="field-hint">Params passed to handleSuccessfulAttemptData hook</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sf-hookParams-handleErrors">Handle Errors Parameters <span class="json-badge">JSON</span></label>
+                    <textarea id="sf-hookParams-handleErrors" placeholder="{}" class="builder-textarea" rows="2"></textarea>
+                    <span class="field-hint">Params passed to handleErrors hook</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sf-hookParams-finalErrorAnalyzer">Final Error Analyzer Parameters <span class="json-badge">JSON</span></label>
+                    <textarea id="sf-hookParams-finalErrorAnalyzer" placeholder="{}" class="builder-textarea" rows="2"></textarea>
+                    <span class="field-hint">Params passed to finalErrorAnalyzer hook</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Caching -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                  Caching
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-row">
+                    <div class="field-group checkbox-group">
+                      <label class="checkbox-label">
+                        <input type="checkbox" id="sf-cache-enabled" onchange="toggleSfCacheFields()">
+                        <span class="checkbox-custom"></span>
+                        Enable Cache <span class="required-feature">*</span>
+                      </label>
+                      <span class="field-hint">Cache successful function results</span>
+                    </div>
+                  </div>
+                  <div id="sfCacheConfigFields" class="conditional-fields disabled">
+                    <div class="field-row">
+                      <div class="field-group">
+                        <label for="sf-cache-ttl">TTL (ms)</label>
+                        <input type="number" id="sf-cache-ttl" value="300000" class="builder-input" min="0" disabled>
+                        <span class="field-hint">Cache entry time-to-live</span>
+                      </div>
+                      <div class="field-group">
+                        <label for="sf-cache-maxSize">Max Size</label>
+                        <input type="number" id="sf-cache-maxSize" value="100" class="builder-input" min="1" disabled>
+                        <span class="field-hint">Maximum cached entries</span>
+                      </div>
+                    </div>
+                    <div class="field-group">
+                      <label for="sf-cache-keyGenerator">Key Generator <span class="func-badge">Function</span></label>
+                      <textarea id="sf-cache-keyGenerator" placeholder="(args) => JSON.stringify(args)" class="builder-textarea code-textarea" rows="3" disabled></textarea>
+                      <span class="field-hint">Custom cache key generation from args</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Circuit Breaker -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  Circuit Breaker
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sf-cb-failureThresholdPercentage">Failure Threshold (%) <span class="required-feature">*</span></label>
+                      <input type="number" id="sf-cb-failureThresholdPercentage" placeholder="e.g., 50" class="builder-input" min="1" max="100">
+                      <span class="field-hint">Percentage to trip breaker</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sf-cb-minimumRequests">Minimum Requests <span class="required-feature">*</span></label>
+                      <input type="number" id="sf-cb-minimumRequests" placeholder="e.g., 5" class="builder-input" min="1">
+                      <span class="field-hint">Min requests before evaluation</span>
+                    </div>
+                  </div>
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sf-cb-recoveryTimeoutMs">Recovery Timeout (ms) <span class="required-feature">*</span></label>
+                      <input type="number" id="sf-cb-recoveryTimeoutMs" placeholder="e.g., 30000" class="builder-input" min="100">
+                      <span class="field-hint">Time before half-open state</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sf-cb-halfOpenMaxRequests">Half-Open (Max) Requests</label>
+                      <input type="number" id="sf-cb-halfOpenMaxRequests" value="5" class="builder-input" min="1">
+                      <span class="field-hint">Test requests in half-open</span>
+                    </div>
+                  </div>
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sf-cb-successThresholdPercentage">Success Threshold (%)</label>
+                      <input type="number" id="sf-cb-successThresholdPercentage" value="50" class="builder-input" min="1" max="100">
+                      <span class="field-hint">Success rate to close breaker</span>
+                    </div>
+                    <div class="field-group checkbox-group">
+                      <label class="checkbox-label">
+                        <input type="checkbox" id="sf-cb-trackIndividualAttempts">
+                        <span class="checkbox-custom"></span>
+                        Track Individual Attempts
+                      </label>
+                      <span class="field-hint">Track each attempt as request</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Rate Limiting -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                  Rate Limiting
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sf-rateLimit-maxRequests">Max Requests <span class="required-feature">*</span></label>
+                      <input type="number" id="sf-rateLimit-maxRequests" placeholder="e.g., 100" class="builder-input" min="1">
+                      <span class="field-hint">Maximum requests in window</span>
+                    </div>
+                    <div class="field-group">
+                      <label for="sf-rateLimit-windowMs">Window (ms) <span class="required-feature">*</span></label>
+                      <input type="number" id="sf-rateLimit-windowMs" placeholder="e.g., 60000" class="builder-input" min="1">
+                      <span class="field-hint">Sliding window duration</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Common Buffer -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>
+                  Common Buffer
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-group">
+                    <label for="sf-buffer-initialState">Initial State <span class="json-badge">JSON</span> <span class="required-feature">*</span></label>
+                    <textarea id="sf-buffer-initialState" placeholder='{"count": 0, "results": []}' class="builder-textarea" rows="3" oninput="toggleSfCommonBufferFields()"></textarea>
+                    <span class="field-hint">Initial buffer state object (required to enable buffer options)</span>
+                  </div>
+                  <div id="sfCommonBufferDependentFields" class="conditional-fields disabled">
+                    <div class="field-group checkbox-group" style="margin-top: 1rem;">
+                      <label class="checkbox-label">
+                        <input type="checkbox" id="sf-useStableBuffer" onchange="toggleSfStableBufferFields()" disabled>
+                        <span class="checkbox-custom"></span>
+                        Use StableBuffer
+                      </label>
+                      <span class="field-hint">Wrap in a StableBuffer instance for transactional state management</span>
+                    </div>
+                    <div id="sfStableBufferFields" class="conditional-fields disabled">
+                      <div class="field-group">
+                        <label for="sf-buffer-transactionTimeoutMs">Transaction Timeout (ms)</label>
+                        <input type="number" id="sf-buffer-transactionTimeoutMs" value="0" class="builder-input" min="0" disabled>
+                        <span class="field-hint">Timeout for buffer transactions (0 = no timeout)</span>
+                      </div>
+                      <div class="field-group">
+                        <label for="sf-buffer-clone">Clone Function <span class="func-badge">Function</span></label>
+                        <textarea id="sf-buffer-clone" placeholder="(state) => structuredClone(state)" class="builder-textarea code-textarea" rows="2" disabled></textarea>
+                        <span class="field-hint">Custom clone function for read(). Defaults to structuredClone or JSON cloning.</span>
+                      </div>
+                      <div class="field-group">
+                        <label for="sf-buffer-logTransactionFn">Transaction Logger <span class="func-badge">Function</span></label>
+                        <textarea id="sf-buffer-logTransactionFn" placeholder="(log) => console.log(log)" class="builder-textarea code-textarea" rows="2" disabled></textarea>
+                        <span class="field-hint">Optional function to log buffer transactions (receives StableBufferTransactionLog)</span>
+                      </div>
+                      <div class="field-group">
+                        <label>StableBuffer Metrics Guardrails</label>
+                        <span class="field-hint guardrail-hint">Define thresholds for buffer metrics validation</span>
+                        <div class="guardrail-row">
+                          <div class="guardrail-field">
+                            <label for="sf-buffer-mg-totalTransactions-max">Total Transactions (Max)</label>
+                            <input type="number" id="sf-buffer-mg-totalTransactions-max" placeholder="e.g. 1000" class="builder-input-sm" disabled>
+                          </div>
+                          <div class="guardrail-field">
+                            <label for="sf-buffer-mg-avgQueueWait-max">Avg Queue Wait (Max) (ms)</label>
+                            <input type="number" id="sf-buffer-mg-avgQueueWait-max" placeholder="e.g. 100" class="builder-input-sm" disabled>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Metrics Guardrails -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  Metrics Guardrails
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="guardrail-info-note">
+                    <strong>Note:</strong> This form shows only the most commonly used <code>min</code> or <code>max</code> constraint for each metric. Each guardrail property actually accepts a full <code>MetricGuardrail</code> object.
+                    <div class="guardrail-other-options">
+                      <span>All available options:</span> <code>min</code>, <code>max</code>, <code>expected</code>, <code>tolerance</code>
+                    </div>
+                  </div>
+                  <div class="field-group">
+                    <label>Function Execution Metrics</label>
+                    <span class="field-hint guardrail-hint">Define thresholds for function execution metrics</span>
+                    <div class="guardrail-row">
+                      <div class="guardrail-field">
+                        <label for="sf-mg-totalAttempts-max">Total Attempts (Max)</label>
+                        <input type="number" id="sf-mg-totalAttempts-max" placeholder="e.g. 10" class="builder-input-sm">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sf-mg-successfulAttempts-min">Successful Attempts (Min)</label>
+                        <input type="number" id="sf-mg-successfulAttempts-min" placeholder="e.g. 1" class="builder-input-sm">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sf-mg-failedAttempts-max">Failed Attempts (Max)</label>
+                        <input type="number" id="sf-mg-failedAttempts-max" placeholder="e.g. 3" class="builder-input-sm">
+                      </div>
+                    </div>
+                    <div class="guardrail-row">
+                      <div class="guardrail-field">
+                        <label for="sf-mg-totalExecutionTime-max">Total Exec Time (Max) (ms)</label>
+                        <input type="number" id="sf-mg-totalExecutionTime-max" placeholder="e.g. 30000" class="builder-input-sm">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sf-mg-averageAttemptTime-max">Avg Attempt Time (Max) (ms)</label>
+                        <input type="number" id="sf-mg-averageAttemptTime-max" placeholder="e.g. 5000" class="builder-input-sm">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="field-group">
+                    <label>Circuit Breaker Metrics</label>
+                    <span class="field-hint guardrail-hint">Define thresholds for circuit breaker behavior</span>
+                    <div class="guardrail-row">
+                      <div class="guardrail-field">
+                        <label for="sf-mg-cb-failureRate-max">Failure Rate (Max)</label>
+                        <input type="number" id="sf-mg-cb-failureRate-max" placeholder="e.g. 0.5" class="builder-input-sm" step="0.01">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sf-mg-cb-totalRequests-max">Total Requests (Max)</label>
+                        <input type="number" id="sf-mg-cb-totalRequests-max" placeholder="e.g. 1000" class="builder-input-sm">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sf-mg-cb-failedRequests-max">Failed Requests (Max)</label>
+                        <input type="number" id="sf-mg-cb-failedRequests-max" placeholder="e.g. 50" class="builder-input-sm">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="field-group">
+                    <label>Cache Metrics</label>
+                    <span class="field-hint guardrail-hint">Define thresholds for cache performance</span>
+                    <div class="guardrail-row">
+                      <div class="guardrail-field">
+                        <label for="sf-mg-cache-hitRate-min">Hit Rate (Min)</label>
+                        <input type="number" id="sf-mg-cache-hitRate-min" placeholder="e.g. 0.5" class="builder-input-sm" step="0.01">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sf-mg-cache-missRate-max">Miss Rate (Max)</label>
+                        <input type="number" id="sf-mg-cache-missRate-max" placeholder="e.g. 0.5" class="builder-input-sm" step="0.01">
+                      </div>
+                    </div>
+                    <div class="guardrail-row">
+                      <div class="guardrail-field">
+                        <label for="sf-mg-cache-utilizationPercentage-max">Utilization % (Max)</label>
+                        <input type="number" id="sf-mg-cache-utilizationPercentage-max" placeholder="e.g. 90" class="builder-input-sm">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sf-mg-cache-evictionRate-max">Eviction Rate (Max)</label>
+                        <input type="number" id="sf-mg-cache-evictionRate-max" placeholder="e.g. 0.1" class="builder-input-sm" step="0.01">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="field-group">
+                    <label>Rate Limiter Metrics</label>
+                    <span class="field-hint guardrail-hint">Define thresholds for rate limiter behavior</span>
+                    <div class="guardrail-row">
+                      <div class="guardrail-field">
+                        <label for="sf-mg-rl-throttleRate-max">Throttle Rate (Max)</label>
+                        <input type="number" id="sf-mg-rl-throttleRate-max" placeholder="e.g. 0.1" class="builder-input-sm" step="0.01">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sf-mg-rl-queueLength-max">Queue Length (Max)</label>
+                        <input type="number" id="sf-mg-rl-queueLength-max" placeholder="e.g. 100" class="builder-input-sm">
+                      </div>
+                    </div>
+                    <div class="guardrail-row">
+                      <div class="guardrail-field">
+                        <label for="sf-mg-rl-utilizationPercentage-max">Utilization % (Max)</label>
+                        <input type="number" id="sf-mg-rl-utilizationPercentage-max" placeholder="e.g. 90" class="builder-input-sm">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sf-mg-rl-averageQueueWaitTime-max">Avg Queue Wait (Max) (ms)</label>
+                        <input type="number" id="sf-mg-rl-averageQueueWaitTime-max" placeholder="e.g. 1000" class="builder-input-sm">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="field-group">
+                    <label>Concurrency Limiter Metrics</label>
+                    <span class="field-hint guardrail-hint">Define thresholds for concurrency limiter behavior</span>
+                    <div class="guardrail-row">
+                      <div class="guardrail-field">
+                        <label for="sf-mg-cl-utilizationPercentage-max">Utilization % (Max)</label>
+                        <input type="number" id="sf-mg-cl-utilizationPercentage-max" placeholder="e.g. 90" class="builder-input-sm">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sf-mg-cl-queueLength-max">Queue Length (Max)</label>
+                        <input type="number" id="sf-mg-cl-queueLength-max" placeholder="e.g. 50" class="builder-input-sm">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sf-mg-cl-averageQueueWaitTime-max">Avg Queue Wait (Max) (ms)</label>
+                        <input type="number" id="sf-mg-cl-averageQueueWaitTime-max" placeholder="e.g. 500" class="builder-input-sm">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Trial Mode -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6v5l4 9a2 2 0 01-2 3H7a2 2 0 01-2-3l4-9V3z"/><path d="M9 3h6"/><path d="M10 8h4"/></svg>
+                  Trial Mode
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-row">
+                    <div class="field-group checkbox-group">
+                      <label class="checkbox-label">
+                        <input type="checkbox" id="sf-trialMode-enabled" onchange="toggleSfTrialModeFields()">
+                        <span class="checkbox-custom"></span>
+                        Enable Trial Mode <span class="required-feature">*</span>
+                      </label>
+                      <span class="field-hint">Dry run without actual function execution</span>
+                    </div>
+                  </div>
+                  <div id="sfTrialModeConfigFields" class="conditional-fields disabled">
+                    <div class="field-row">
+                      <div class="field-group">
+                        <label for="sf-trialMode-execFailureProbability">Exec Failure Probability</label>
+                        <input type="number" id="sf-trialMode-execFailureProbability" value="0" class="builder-input" min="0" max="1" step="0.1" disabled>
+                        <span class="field-hint">Probability (0-1) that execution fails in trial mode</span>
+                      </div>
+                      <div class="field-group">
+                        <label for="sf-trialMode-retryFailureProbability">Retry Failure Probability</label>
+                        <input type="number" id="sf-trialMode-retryFailureProbability" value="0" class="builder-input" min="0" max="1" step="0.1" disabled>
+                        <span class="field-hint">Probability (0-1) that retry is not allowed</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Execution Context -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                  Execution Context
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <span class="field-hint" style="display: block; margin-bottom: 0.75rem;">Optional identifiers for workflow execution tracking</span>
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sf-ec-workflowId">Workflow ID</label>
+                      <input type="text" id="sf-ec-workflowId" placeholder="e.g. wf-001" class="builder-input">
+                    </div>
+                    <div class="field-group">
+                      <label for="sf-ec-phaseId">Phase ID</label>
+                      <input type="text" id="sf-ec-phaseId" placeholder="e.g. phase-001" class="builder-input">
+                    </div>
+                  </div>
+                  <div class="field-row">
+                    <div class="field-group">
+                      <label for="sf-ec-branchId">Branch ID</label>
+                      <input type="text" id="sf-ec-branchId" placeholder="e.g. branch-001" class="builder-input">
+                    </div>
+                    <div class="field-group">
+                      <label for="sf-ec-requestId">Request ID</label>
+                      <input type="text" id="sf-ec-requestId" placeholder="e.g. req-001" class="builder-input">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Output Panel -->
+            <div class="builder-output-panel">
+              <div class="output-header code-config" id="sfCodeConfig">
+                <h4>Generated Configuration</h4>
+                <div class="output-actions">
+                  <button class="btn-icon" onclick="copySfGeneratedCode()" title="Copy to clipboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                  </button>
+                  <button class="btn-icon" onclick="resetSfConfigBuilder()" title="Reset form">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="code-box output-code-box">
+                <div class="code-box-header">
+                  <div class="code-box-dots">
+                    <span></span><span></span><span></span>
+                  </div>
+                  <span class="code-box-lang">TypeScript</span>
+                </div>
+                <pre id="sf-config-output"><code id="sf-config-output-code">import { stableFunction } from '@emmvish/stable-request';
+
+const result = await stableFunction({
+  fn: async () => { /* your function */ },
+  args: []
+});</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- StableBuffer Config Builder -->
+        <div class="builder-content" id="builder-StableBuffer">
+          <div class="builder-layout">
+            <!-- Form Panel -->
+            <div class="builder-form-panel">
+              <!-- Legend for required fields -->
+              <div class="builder-legend">
+                <span class="legend-item"><span class="required-critical">**</span> Required for config to work</span>
+                <span class="legend-item"><span class="required-feature">*</span> Required for this feature only</span>
+              </div>
+              
+              <!-- Initial State -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>
+                  Initial State
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-group">
+                    <label for="sb-initialState">Initial State <span class="json-badge">JSON</span></label>
+                    <textarea id="sb-initialState" placeholder='{"count": 0, "items": [], "status": "idle"}' class="builder-textarea" rows="4"></textarea>
+                    <span class="field-hint">Starting state for the buffer. Defaults to empty object if not provided.</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Transaction Configuration -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  Transaction Configuration
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-group">
+                    <label for="sb-transactionTimeoutMs">Transaction Timeout (ms)</label>
+                    <input type="number" id="sb-transactionTimeoutMs" value="0" placeholder="e.g. 5000" class="builder-input" min="0">
+                    <span class="field-hint">Timeout for each transaction. 0 or empty disables timeouts.</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sb-logTransaction">Transaction Logger <span class="func-badge">Function</span></label>
+                    <textarea id="sb-logTransaction" placeholder="(log) => { console.log(log); }" class="builder-textarea code-textarea" rows="4"></textarea>
+                    <span class="field-hint">Optional function to log transaction details (receives StableBufferTransactionLog)</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Clone Function -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                  Clone Function
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-group">
+                    <label for="sb-clone">Custom Clone Function <span class="func-badge">Function</span></label>
+                    <textarea id="sb-clone" placeholder="(state) => structuredClone(state)" class="builder-textarea code-textarea" rows="3"></textarea>
+                    <span class="field-hint">Custom clone function for read(). Defaults to structuredClone or JSON cloning.</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Metrics Guardrails -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  Metrics Guardrails
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="guardrail-info-note">
+                    <strong>Note:</strong> This form shows only the most commonly used <code>min</code> or <code>max</code> constraint for each metric. Each guardrail property actually accepts a full <code>MetricGuardrail</code> object.
+                    <div class="guardrail-other-options">
+                      <span>All available options:</span> <code>min</code>, <code>max</code>, <code>expected</code>, <code>tolerance</code>
+                    </div>
+                  </div>
+                  <div class="field-group">
+                    <label>Buffer Metrics</label>
+                    <span class="field-hint guardrail-hint">Define thresholds for buffer performance validation</span>
+                    <div class="guardrail-row">
+                      <div class="guardrail-field">
+                        <label for="sb-mg-totalTransactions-max">Total Transactions (Max)</label>
+                        <input type="number" id="sb-mg-totalTransactions-max" placeholder="e.g. 1000" class="builder-input-sm">
+                      </div>
+                      <div class="guardrail-field">
+                        <label for="sb-mg-avgQueueWait-max">Avg Queue Wait (Max) (ms)</label>
+                        <input type="number" id="sb-mg-avgQueueWait-max" placeholder="e.g. 100" class="builder-input-sm">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Usage Examples -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                  Usage Examples
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <p class="section-description">StableBuffer provides transactional state management. Key methods:</p>
+                  <div class="usage-examples">
+                    <div class="usage-example">
+                      <code>buffer.read()</code>
+                      <span class="field-hint">Returns a cloned snapshot of current state</span>
+                    </div>
+                    <div class="usage-example">
+                      <code>buffer.getState()</code>
+                      <span class="field-hint">Returns live reference (bypasses queue)</span>
+                    </div>
+                    <div class="usage-example">
+                      <code>buffer.setState(newState)</code>
+                      <span class="field-hint">Replaces internal state reference</span>
+                    </div>
+                    <div class="usage-example">
+                      <code>buffer.transaction(fn)</code>
+                      <span class="field-hint">Queued executor for safe mutations</span>
+                    </div>
+                    <div class="usage-example">
+                      <code>buffer.update(mutator)</code>
+                      <span class="field-hint">Convenience wrapper for void mutations</span>
+                    </div>
+                    <div class="usage-example">
+                      <code>buffer.getMetrics()</code>
+                      <span class="field-hint">Returns StableBufferMetrics with validation</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Output Panel -->
+            <div class="builder-output-panel">
+              <div class="output-header code-config" id="sbCodeConfig">
+                <h4>Generated Configuration</h4>
+                <div class="output-actions">
+                  <button class="btn-icon" onclick="copySbGeneratedCode()" title="Copy to clipboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                  </button>
+                  <button class="btn-icon" onclick="resetSbConfigBuilder()" title="Reset form">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="code-box output-code-box">
+                <div class="code-box-header">
+                  <div class="code-box-dots">
+                    <span></span><span></span><span></span>
+                  </div>
+                  <span class="code-box-lang">TypeScript</span>
+                </div>
+                <pre id="sb-config-output"><code id="sb-config-output-code">import { StableBuffer } from '@emmvish/stable-request';
+
+const buffer = new StableBuffer();
+
+// Basic usage
+await buffer.transaction((state) => {
+  state.count = (state.count ?? 0) + 1;
+});
+
+console.log(buffer.read());</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Placeholder for Coming Soon modules -->
+        <div class="builder-content" id="builder-placeholder">
+          <div class="builder-placeholder-content">
+            <div class="placeholder-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="80" height="80">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 6v6l4 2"/>
+              </svg>
+            </div>
+            <h3>Coming Soon</h3>
+            <p>The config builder for this module is currently under development.</p>
+            <p class="placeholder-hint">In the meantime, check the <a href="https://github.com/Emmvish/stable-request/tree/main/docs/api-references" target="_blank">API References documentation</a> for configuration options.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-content">
+        <div class="footer-grid">
+          <div class="footer-section">
+            <h5>Framework</h5>
+            <a href="index.html#core-apis">Core APIs</a>
+            <a href="index.html#resilience-stack">Resilience Stack</a>
+            <a href="index.html#workflows">Workflow Patterns</a>
+            <a href="https://github.com/Emmvish/stable-request/tree/main/docs/api-references" target="_blank">API References</a>
+          </div>
+          <div class="footer-section">
+            <h5>Resources</h5>
+            <a href="https://www.npmjs.com/package/@emmvish/stable-request" target="_blank">NPM Package</a>
+            <a href="https://github.com/emmvish/stable-request" target="_blank">GitHub Repository</a>
+            <a href="https://github.com/emmvish/stable-request/issues" target="_blank">Issues</a>
+            <a href="https://github.com/emmvish/stable-request/blob/main/LICENSE" target="_blank">License (MIT)</a>
+          </div>
+          <div class="footer-section">
+            <h5>Author</h5>
+            <a href="https://emmvish.github.io" target="_blank">Manish Varma</a>
+            <a href="https://github.com/emmvish" target="_blank">GitHub Profile</a>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <p>© 2026 <a href="https://www.npmjs.com/package/@emmvish/stable-request" target="_blank">@emmvish/stable-request</a>. Built with a resilient stability-first mindset.</p>
+        </div>
+      </div>
+    </footer>
+  </main>
+
+  <script src="js/config-builder.js"></script>
+</body>
+</html>
