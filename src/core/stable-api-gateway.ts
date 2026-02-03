@@ -10,7 +10,8 @@ import {
     RateLimiterDashboardMetrics,
     CircuitBreakerDashboardMetrics,
     CONCURRENT_REQUEST_EXECUTION_OPTIONS,
-    SEQUENTIAL_REQUEST_EXECUTION_OPTIONS
+    SEQUENTIAL_REQUEST_EXECUTION_OPTIONS,
+    StableBufferTransactionLog
 } from '../types/index.js';
 import { 
     executeConcurrently,
@@ -77,6 +78,15 @@ async function executeGateway<RequestDataType = any, ResponseDataType = any, Fun
     finalOptions: API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
     startTime: number
 ): Promise<API_GATEWAY_RESULT<ResponseDataType | FunctionReturnType>> {
+    let transactionLogs: StableBufferTransactionLog[] | undefined = finalOptions.transactionLogs;
+    if (finalOptions.loadTransactionLogs) {
+        try {
+            transactionLogs = await finalOptions.loadTransactionLogs(finalOptions.executionContext || {});
+        } catch (e: any) {
+            console.error(`stable-request: Failed to load transaction logs: ${e.message}`);
+        }
+    }
+
     const {
         concurrentExecution = true,
         stopOnFirstError = false,
@@ -129,7 +139,8 @@ async function executeGateway<RequestDataType = any, ResponseDataType = any, Fun
         ...(circuitBreaker !== undefined && { circuitBreaker }),
         ...(enableRacing !== undefined && { enableRacing }),
         ...extractCommonOptions<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>(finalOptions),
-        executionContext: finalOptions.executionContext
+        executionContext: finalOptions.executionContext,
+        transactionLogs
     }
 
     let responses: API_GATEWAY_RESPONSE<ResponseDataType | FunctionReturnType>[];

@@ -10,7 +10,8 @@ import type {
   SchedulerJobHandler,
   ScheduledJob,
   InternalSchedulerConfig,
-  SchedulerSharedInfrastructure
+  SchedulerSharedInfrastructure,
+  StableBufferTransactionLog
 } from '../types/index.js';
 import { 
   isStableBuffer, 
@@ -57,7 +58,8 @@ export class StableScheduler<
       executionTimeoutMs: config.executionTimeoutMs,
       metricsGuardrails: config.metricsGuardrails,
       sharedBuffer: config.sharedBuffer,
-      sharedInfrastructure: config.sharedInfrastructure
+      sharedInfrastructure: config.sharedInfrastructure,
+      loadTransactionLogs: config.loadTransactionLogs
     };
     this.handler = handler;
   }
@@ -432,14 +434,18 @@ export class StableScheduler<
     this.totalQueueDelayMs += queueDelay;
     
     const sharedInfra = this.config.sharedInfrastructure;
-    const baseContext: SchedulerRunContext = {
+    
+    let transactionLogs: StableBufferTransactionLog[] | undefined;
+    
+    const createBaseContext = (): SchedulerRunContext => ({
       runId: this.createId('run'),
       jobId: job.id,
       scheduledAt: new Date(job.nextRunAt ?? startedAt).toISOString(),
       startedAt: new Date(startedAt).toISOString(),
       schedule: job.schedule,
-      ...(sharedInfra ? { sharedInfrastructure: sharedInfra } : {})
-    };
+      ...(sharedInfra ? { sharedInfrastructure: sharedInfra } : {}),
+      ...(transactionLogs ? { transactionLogs } : {})
+    });
 
     const retryConfig = this.getRetryConfig(job);
     if (retryConfig) {
@@ -449,6 +455,16 @@ export class StableScheduler<
     let jobError: unknown = null;
 
     const executeHandler = async (): Promise<unknown> => {
+      if (this.config.loadTransactionLogs) {
+        try {
+          transactionLogs = await this.config.loadTransactionLogs({});
+        } catch (e: any) {
+          console.error(`stable-request: Failed to load transaction logs: ${e.message}`);
+        }
+      }
+      
+      const baseContext = createBaseContext();
+      
       if (sharedInfra?.circuitBreaker) {
         const canExecute = await sharedInfra.circuitBreaker.canExecute();
         if (!canExecute) {
@@ -482,14 +498,16 @@ export class StableScheduler<
     };
 
     let handlerPromise: Promise<unknown>;
-    if (sharedInfra?.circuitBreaker || sharedInfra?.rateLimiter || sharedInfra?.concurrencyLimiter) {
+    if (sharedInfra?.circuitBreaker || sharedInfra?.rateLimiter || sharedInfra?.concurrencyLimiter || this.config.loadTransactionLogs) {
       handlerPromise = executeHandler();
     } else if (isStableBuffer(this.config.sharedBuffer)) {
+      const baseContext = createBaseContext();
       handlerPromise = this.config.sharedBuffer.run((bufferState) =>
         this.handler(job.job, { ...baseContext, sharedBuffer: bufferState })
       );
     } else {
       try {
+        const baseContext = createBaseContext();
         const result = this.handler(job.job, {
           ...baseContext,
           ...(this.config.sharedBuffer !== undefined

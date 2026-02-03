@@ -4,7 +4,7 @@ import { formatLogContext } from './format-log-context.js';
 import { MetricsAggregator } from './metrics-aggregator.js';
 import { MetricsValidator } from './metrics-validator.js';
 import { RequestOrFunction } from '../enums/index.js';
-import { BufferLike, STABLE_WORKFLOW_PHASE, STABLE_WORKFLOW_PHASE_RESULT, PrePhaseExecutionHookOptions } from '../types/index.js';
+import { BufferLike, STABLE_WORKFLOW_PHASE, STABLE_WORKFLOW_PHASE_RESULT, PrePhaseExecutionHookOptions, StableBufferTransactionLog } from '../types/index.js';
 
 export async function executePhase<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
     phase: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
@@ -81,6 +81,8 @@ async function executePhaseInternal<RequestDataType = any, ResponseDataType = an
     const phaseId = phase.id || `phase-${phaseIndex + 1}`;
     
     let modifiedPhase = phase;
+    const transactionLogs: StableBufferTransactionLog[] | undefined = commonGatewayOptions?.transactionLogs;
+    
     if (prePhaseExecutionHook) {
         try {
             const hookOptions: PrePhaseExecutionHookOptions<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> = {
@@ -90,7 +92,8 @@ async function executePhaseInternal<RequestDataType = any, ResponseDataType = an
                 phaseIndex,
                 phase: { ...phase },
                 sharedBuffer,
-                params: workflowHookParams?.prePhaseExecutionHookParams
+                params: workflowHookParams?.prePhaseExecutionHookParams,
+                transactionLogs
             };
             
             const result = await executeWithPersistence<STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>(
@@ -214,7 +217,8 @@ async function executePhaseInternal<RequestDataType = any, ResponseDataType = an
                     phaseResult,
                     maxSerializableChars,
                     params: workflowHookParams?.handlePhaseCompletionParams,
-                    sharedBuffer
+                    sharedBuffer,
+                    transactionLogs
                 },
                 modifiedPhase.statePersistence,
                 { workflowId, branchId, phaseId },

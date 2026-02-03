@@ -273,6 +273,8 @@ export interface StableBufferReplayResult {
   errors: Array<{ log: StableBufferTransactionLog; error: unknown }>;
 }
 
+export type TransactionLogsLoader = (context: ExecutionContext) => StableBufferTransactionLog[] | Promise<StableBufferTransactionLog[]>;
+
 export interface ExecutionContext {
   workflowId?: string;
   branchId?: string;
@@ -338,6 +340,8 @@ export interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = a
   metricsGuardrails?: MetricsGuardrails;
   enableRacing?: boolean;
   maxTimeout?: number;
+  loadTransactionLogs?: TransactionLogsLoader;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 export interface RequestGroup<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
@@ -424,6 +428,7 @@ export type ApiRequestOptionsMapping = {
 
 export type CONCURRENT_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> = Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>, "concurrentExecution"> & {
   executionContext?: Partial<ExecutionContext>;
+  transactionLogs?: StableBufferTransactionLog[];
 };
 
 export interface ERROR_LOG {
@@ -483,6 +488,7 @@ export type RETRY_STRATEGY_TYPES = RETRY_STRATEGIES.FIXED | RETRY_STRATEGIES.LIN
 
 export type SEQUENTIAL_REQUEST_EXECUTION_OPTIONS<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> = Omit<API_GATEWAY_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>, "concurrentExecution"> & {
   executionContext?: Partial<ExecutionContext>;
+  transactionLogs?: StableBufferTransactionLog[];
 };
 
 interface ObservabilityHooksOptions<RequestDataType = any> {
@@ -492,6 +498,7 @@ interface ObservabilityHooksOptions<RequestDataType = any> {
   preExecutionResult?: any;
   commonBuffer?: Record<string, any>;
   executionContext?: ExecutionContext;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 interface AnalysisHookOptions<RequestDataType = any> extends Omit<ObservabilityHooksOptions<RequestDataType>, "maxSerializableChars"> {
@@ -500,6 +507,7 @@ interface AnalysisHookOptions<RequestDataType = any> extends Omit<ObservabilityH
   preExecutionResult?: any;
   executionContext?: ExecutionContext;
   commonBuffer?: Record<string, any>;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 export interface ResponseAnalysisHookOptions<RequestDataType = any, ResponseDataType = any> extends AnalysisHookOptions<RequestDataType> {
@@ -540,6 +548,7 @@ interface FunctionObservabilityHooksOptions<FunctionArgsType extends any[] = any
   preExecutionResult?: any;
   commonBuffer?: Record<string, any>;
   executionContext?: ExecutionContext;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 interface FunctionAnalysisHookOptions<FunctionArgsType extends any[] = any[]> extends Omit<FunctionObservabilityHooksOptions<FunctionArgsType>, "maxSerializableChars"> {
@@ -548,6 +557,7 @@ interface FunctionAnalysisHookOptions<FunctionArgsType extends any[] = any[]> ex
   preExecutionResult?: any;
   executionContext?: ExecutionContext;
   commonBuffer?: Record<string, any>;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 export interface FunctionResponseAnalysisHookOptions<FunctionArgsType extends any[] = any[], FunctionReturnType = any> extends FunctionAnalysisHookOptions<FunctionArgsType> {
@@ -570,12 +580,14 @@ export interface PreExecutionHookOptions<RequestDataType = any, ResponseDataType
   inputParams?: any;
   commonBuffer?: Record<string, any>;
   stableRequestOptions: STABLE_REQUEST<RequestDataType, ResponseDataType>;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 export interface FunctionPreExecutionHookOptions<FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
   inputParams?: any;
   commonBuffer?: Record<string, any>;
   stableFunctionOptions: STABLE_FUNCTION<FunctionArgsType, FunctionReturnType>;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 interface WorkflowPreExecutionHookOptions {
@@ -583,6 +595,7 @@ interface WorkflowPreExecutionHookOptions {
   sharedBuffer?: Record<string, any>;
   workflowId: string;
   branchId?: string;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 export interface PrePhaseExecutionHookOptions<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> extends WorkflowPreExecutionHookOptions {
@@ -655,6 +668,8 @@ export interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
   statePersistence?: StatePersistenceConfig;
   metricsGuardrails?: MetricsGuardrails;
   throwOnFailedErrorAnalysis?: boolean;
+  loadTransactionLogs?: TransactionLogsLoader;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 export interface STABLE_FUNCTION<FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
@@ -691,6 +706,8 @@ export interface STABLE_FUNCTION<FunctionArgsType extends any[] = any[], Functio
   metricsGuardrails?: MetricsGuardrails;
   throwOnFailedErrorAnalysis?: boolean;
   executionTimeout?: number;
+  loadTransactionLogs?: TransactionLogsLoader;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 export interface StableRequestInfrastructureMetrics {
@@ -831,7 +848,8 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   handleBranchDecision?: (
     decision: BranchExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
     branchResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>,
-    maxSerializableChars?: number
+    maxSerializableChars?: number,
+    transactionLogs?: StableBufferTransactionLog[]
   ) => any | Promise<any>;
   prePhaseExecutionHook?: (
     options: PrePhaseExecutionHookOptions<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
@@ -841,6 +859,8 @@ export interface STABLE_WORKFLOW_OPTIONS<RequestDataType = any, ResponseDataType
   ) => STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType> | Promise<STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>;
   maxSerializableChars?: number;
   workflowHookParams?: WorkflowHookParams;
+  loadTransactionLogs?: TransactionLogsLoader;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 export interface WorkflowInfrastructureMetrics {
@@ -911,6 +931,7 @@ export interface HandlePhaseCompletionHookOptions<ResponseDataType = any, Functi
   maxSerializableChars?: number;
   params?: any;
   sharedBuffer?: Record<string, any>;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 export interface HandlePhaseErrorHookOptions<ResponseDataType = any, FunctionReturnType = any> extends HandlePhaseCompletionHookOptions<ResponseDataType, FunctionReturnType> {
@@ -921,6 +942,7 @@ export interface HandlePhaseDecisionHookOptions<RequestDataType = any, ResponseD
   decision: PhaseExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>;
   phaseResult: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>;
   maxSerializableChars?: number;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 export type InfrastructurePersistenceOperationType = 'load' | 'store';
@@ -1092,6 +1114,7 @@ export interface PhaseDecisionHookOptions<RequestDataType = any, ResponseDataTyp
   sharedBuffer?: Record<string, any>;
   params?: any;
   concurrentPhaseResults?: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType>[];
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 export interface PhaseExecutionRecord<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
@@ -1129,6 +1152,7 @@ export interface NonLinearWorkflowContext<RequestDataType, ResponseDataType, Fun
   sharedBuffer?: Record<string, any>;
   stopOnFirstPhaseError: boolean;
   maxWorkflowIterations: number;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 export interface EXECUTE_NON_LINEAR_WORKFLOW_RESPONSE<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
@@ -1169,6 +1193,7 @@ export interface BranchDecisionHookOptions<RequestDataType = any, ResponseDataTy
   sharedBuffer?: Record<string, any>;
   params?: any;
   concurrentBranchResults?: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[];
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 export interface BranchExecutionDecision<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
@@ -1211,6 +1236,7 @@ export interface HandleBranchCompletionHookOptions<ResponseDataType = any, Funct
   branchResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, any, any[]>[];
   success: boolean;
   maxSerializableChars?: number;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 export interface BranchWorkflowContext<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
@@ -1231,7 +1257,8 @@ export interface BranchWorkflowContext<RequestDataType = any, ResponseDataType =
   handleBranchDecision?: (
     decision: BranchExecutionDecision<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>,
     branchResult: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>,
-    maxSerializableChars?: number
+    maxSerializableChars?: number,
+    transactionLogs?: StableBufferTransactionLog[]
   ) => any | Promise<any>;
   preBranchExecutionHook?: (
     options: PreBranchExecutionHookOptions<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
@@ -1245,6 +1272,7 @@ export interface BranchWorkflowContext<RequestDataType = any, ResponseDataType =
   stopOnFirstPhaseError: boolean;
   enableBranchRacing?: boolean;
   maxWorkflowIterations: number;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 export interface EXECUTE_BRANCH_WORKFLOW_RESPONSE<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any> {
@@ -1565,6 +1593,7 @@ export interface SchedulerConfig<TJob = unknown> {
   metricsGuardrails?: MetricsGuardrails;
   sharedBuffer?: BufferLike;
   sharedInfrastructure?: SchedulerSharedInfrastructure;
+  loadTransactionLogs?: TransactionLogsLoader;
 }
 
 export interface SchedulerRunContext {
@@ -1575,6 +1604,7 @@ export interface SchedulerRunContext {
   schedule?: SchedulerSchedule;
   sharedBuffer?: Record<string, any>;
   sharedInfrastructure?: SchedulerSharedInfrastructure;
+  transactionLogs?: StableBufferTransactionLog[];
 }
 
 export interface SchedulerJobState<TJob> {
@@ -1631,6 +1661,7 @@ export interface InternalSchedulerConfig<TJob = any> {
   metricsGuardrails?: SchedulerConfig<TJob>['metricsGuardrails'];
   sharedBuffer?: BufferLike;
   sharedInfrastructure?: SchedulerSharedInfrastructure;
+  loadTransactionLogs?: TransactionLogsLoader;
 }
 
 export interface RunnerRequestJob<RequestDataType = any, ResponseDataType = any> {

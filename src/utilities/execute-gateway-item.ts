@@ -7,7 +7,7 @@ import {
     API_GATEWAY_RESPONSE,
     API_GATEWAY_OPTIONS,
     STABLE_REQUEST_RESULT,
-    STABLE_FUNCTION_RESULT
+    STABLE_FUNCTION_RESULT,
 } from '../types/index.js';
 import { prepareApiRequestData } from "./prepare-api-request-data.js";
 import { prepareApiRequestOptions } from "./prepare-api-request-options.js";
@@ -46,6 +46,7 @@ export async function executeGatewayRequest<RequestDataType = any, ResponseDataT
         ...prepareApiRequestOptions(req, gatewayOptions),
         commonBuffer: gatewayOptions.sharedBuffer ?? req.requestOptions.commonBuffer,
         ...(circuitBreaker ? { circuitBreaker } : {}),
+        ...(gatewayOptions.transactionLogs ? { transactionLogs: gatewayOptions.transactionLogs } : {}),
         executionContext: {
             ...gatewayOptions.executionContext,
             requestId: req.id
@@ -118,6 +119,7 @@ export async function executeGatewayFunction<TArgs extends any[] = any[], TRetur
         ...prepareApiFunctionOptions(func, gatewayOptions),
         commonBuffer: gatewayOptions.sharedBuffer ?? func.functionOptions.commonBuffer,
         ...(circuitBreaker ? { circuitBreaker } : {}),
+        ...(gatewayOptions.transactionLogs ? { transactionLogs: gatewayOptions.transactionLogs } : {}),
         executionContext: {
             ...gatewayOptions.executionContext,
             requestId: func.id

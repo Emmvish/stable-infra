@@ -6,6 +6,7 @@ import {
   STABLE_WORKFLOW_PHASE_RESULT,
   WorkflowNode,
   PhaseExecutionRecord,
+  StableBufferTransactionLog
 } from '../types/index.js';
 import { 
   validateWorkflowGraph,
@@ -49,6 +50,16 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
   workflowId: string
 ): Promise<STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>> {
   const startTime = Date.now();
+
+  let transactionLogs: StableBufferTransactionLog[] | undefined = options.transactionLogs;
+  if (!transactionLogs && options.loadTransactionLogs) {
+    try {
+      transactionLogs = await options.loadTransactionLogs({ workflowId });
+      (options as any).transactionLogs = transactionLogs;
+    } catch (e: any) {
+      console.error(`stable-request: Failed to load transaction logs: ${e.message}`);
+    }
+  }
 
   const removeNodes = (nodeIds: string[]) => {
     if (nodeIds.length === 0) {

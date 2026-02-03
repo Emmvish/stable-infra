@@ -8,7 +8,7 @@ import {
   STABLE_WORKFLOW_PHASE, 
   PhaseExecutionDecision,
   PhaseExecutionRecord,
-  STABLE_WORKFLOW_PHASE_RESULT
+  STABLE_WORKFLOW_PHASE_RESULT,
 } from '../types/index.js';
 
 export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
@@ -30,7 +30,8 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
     workflowHookParams,
     sharedBuffer,
     stopOnFirstPhaseError,
-    maxWorkflowIterations
+    maxWorkflowIterations,
+    transactionLogs
   } = context;
 
   const phaseResults: STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[] = [];
@@ -200,7 +201,8 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
               executionHistory,
               sharedBuffer,
               params: workflowHookParams?.handlePhaseDecisionParams,
-              concurrentPhaseResults: concurrentResults
+              concurrentPhaseResults: concurrentResults,
+              transactionLogs
             },
             lastConcurrentPhase.phase.statePersistence,
             { workflowId, branchId, phaseId: lastConcurrentPhase.id },
@@ -222,7 +224,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
             try {
               await executeWithPersistence<void>(
                 handlePhaseDecision,
-                { decision, phaseResult: lastResult, maxSerializableChars },
+                { decision, phaseResult: lastResult, maxSerializableChars, transactionLogs },
                 workflowHookParams?.statePersistence,
                 { workflowId, ...(branchId && { branchId }) },
                 sharedBuffer
@@ -435,7 +437,8 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
               phaseIndex,
               executionHistory,
               sharedBuffer,
-              params: workflowHookParams?.handlePhaseDecisionParams
+              params: workflowHookParams?.handlePhaseDecisionParams,
+              transactionLogs
             },
             phase.statePersistence,
             { workflowId, branchId, phaseId },
@@ -460,7 +463,7 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
             try {
               await executeWithPersistence<void>(
                 handlePhaseDecision,
-                { decision, phaseResult, maxSerializableChars },
+                { decision, phaseResult, maxSerializableChars, transactionLogs },
                 workflowHookParams?.statePersistence,
                 { workflowId, ...(branchId && { branchId }), phaseId },
                 sharedBuffer
@@ -643,7 +646,8 @@ export async function executeNonLinearWorkflow<RequestDataType = any, ResponseDa
             error: phaseError,
             maxSerializableChars,
             params: workflowHookParams?.handlePhaseErrorParams,
-            sharedBuffer
+            sharedBuffer,
+            transactionLogs
           },
           workflowHookParams?.statePersistence,
           { workflowId, ...(branchId && { branchId }), phaseId },

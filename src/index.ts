@@ -183,7 +183,8 @@ export type {
     StableBufferTransactionOptions,
     StableBufferReplayHandler,
     StableBufferReplayOptions,
-    StableBufferReplayResult
+    StableBufferReplayResult,
+    TransactionLogsLoader
 } from './types/index.js';
 
 export {

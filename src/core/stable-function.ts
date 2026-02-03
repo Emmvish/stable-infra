@@ -10,6 +10,7 @@ import {
   STABLE_FUNCTION,
   STABLE_FUNCTION_RESULT,
   SUCCESSFUL_FUNCTION_ATTEMPT_DATA,
+  StableBufferTransactionLog,
 } from '../types/index.js';
 
 import {
@@ -52,8 +53,19 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
     },
     commonBuffer = {},
     executionContext,
-    throwOnFailedErrorAnalysis = false
+    throwOnFailedErrorAnalysis = false,
+    loadTransactionLogs,
+    transactionLogs: preloadedTransactionLogs
   } = options;
+
+  let transactionLogs: StableBufferTransactionLog[] | undefined = preloadedTransactionLogs;
+  if (loadTransactionLogs) {
+    try {
+      transactionLogs = await loadTransactionLogs(executionContext || {});
+    } catch (e: any) {
+      console.error(`stable-request: Failed to load transaction logs: ${e.message}`);
+    }
+  }
   
   let preExecutionResult: Partial<STABLE_FUNCTION<TArgs, TReturn>> | unknown;
   try {
@@ -62,7 +74,8 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
       {
         inputParams: preExecution?.preExecutionHookParams,
         commonBuffer,
-        stableFunctionOptions: options
+        stableFunctionOptions: options,
+        transactionLogs
       },
       options.statePersistence,
       executionContext || {},
@@ -284,7 +297,8 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
               params: hookParams?.responseAnalyzerParams,
               preExecutionResult,
               commonBuffer,
-              executionContext
+              executionContext,
+              transactionLogs
             },
             statePersistence,
             executionContext || {},
@@ -346,7 +360,8 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
               params: hookParams?.handleErrorsParams,
               preExecutionResult,
               commonBuffer,
-              executionContext
+              executionContext,
+              transactionLogs
             },
             statePersistence,
             executionContext || {},
@@ -387,7 +402,8 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
                 params: hookParams?.handleSuccessfulAttemptDataParams,
                 preExecutionResult,
                 commonBuffer,
-                executionContext
+                executionContext,
+                transactionLogs
               },
               statePersistence,
               executionContext || {},
@@ -462,7 +478,8 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
             params: hookParams?.finalErrorAnalyzerParams,
             preExecutionResult,
             commonBuffer,
-            executionContext
+            executionContext,
+            transactionLogs
           },
           statePersistence,
           executionContext || {},
@@ -499,7 +516,8 @@ export async function stableFunction<TArgs extends any[] = any[], TReturn = any>
           params: hookParams?.finalErrorAnalyzerParams,
           preExecutionResult,
           commonBuffer,
-          executionContext
+          executionContext,
+          transactionLogs
         },
         statePersistence,
         executionContext || {},

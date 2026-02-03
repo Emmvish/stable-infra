@@ -1,7 +1,8 @@
 import {
     STABLE_WORKFLOW_OPTIONS,
     STABLE_WORKFLOW_PHASE,
-    STABLE_WORKFLOW_RESULT
+    STABLE_WORKFLOW_RESULT,
+    StableBufferTransactionLog
 } from '../types/index.js';
 import { 
     executeBranchWorkflow,
@@ -40,6 +41,18 @@ async function executeWorkflowInternal<RequestDataType = any, ResponseDataType =
     phases: STABLE_WORKFLOW_PHASE<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>[],
     options: STABLE_WORKFLOW_OPTIONS<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>
 ): Promise<STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>> {
+    const workflowId = options.workflowId || `workflow-${Date.now()}`;
+
+    // Use pre-loaded transaction logs or load via hook if provided
+    let transactionLogs: StableBufferTransactionLog[] | undefined = options.transactionLogs;
+    if (!transactionLogs && options.loadTransactionLogs) {
+        try {
+            transactionLogs = await options.loadTransactionLogs({ workflowId });
+        } catch (e: any) {
+            console.error(`stable-request: Failed to load transaction logs: ${e.message}`);
+        }
+    }
+
     const {
         stopOnFirstPhaseError = false,
         logPhaseResults = false,
@@ -79,7 +92,6 @@ async function executeWorkflowInternal<RequestDataType = any, ResponseDataType =
     } = options;
 
     const workflowStartTime = Date.now();
-    const workflowId = options.workflowId || `workflow-${Date.now()}`;
     const phaseResults: STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>['phases'] = [];
     let totalRequests = 0;
     let successfulRequests = 0;
@@ -92,8 +104,8 @@ async function executeWorkflowInternal<RequestDataType = any, ResponseDataType =
         : null;
     
     const commonGatewayOptionsWithBreaker = workflowCircuitBreaker
-        ? { ...commonGatewayOptions, circuitBreaker: workflowCircuitBreaker }
-        : commonGatewayOptions;
+        ? { ...commonGatewayOptions, circuitBreaker: workflowCircuitBreaker, transactionLogs }
+        : { ...commonGatewayOptions, transactionLogs };
 
     const resolveStartPhaseIndex = () => {
         if (startPhaseIndex === undefined) {
@@ -139,7 +151,8 @@ async function executeWorkflowInternal<RequestDataType = any, ResponseDataType =
                 sharedBuffer: options.sharedBuffer,
                 stopOnFirstPhaseError,
                 maxWorkflowIterations,
-                enableBranchRacing
+                enableBranchRacing,
+                transactionLogs
             });
 
             phaseResults.push(...branchResult.allPhaseResults);
@@ -207,7 +220,8 @@ async function executeWorkflowInternal<RequestDataType = any, ResponseDataType =
                 workflowHookParams,
                 sharedBuffer: options.sharedBuffer,
                 stopOnFirstPhaseError,
-                maxWorkflowIterations
+                maxWorkflowIterations,
+                transactionLogs
             });
 
             phaseResults.push(...nonLinearResult.phaseResults);

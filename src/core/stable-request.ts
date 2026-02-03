@@ -13,6 +13,7 @@ import {
   STABLE_REQUEST,
   STABLE_REQUEST_RESULT,
   SUCCESSFUL_ATTEMPT_DATA,
+  StableBufferTransactionLog,
 } from '../types/index.js';
 
 import {
@@ -43,8 +44,20 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
     },
     commonBuffer = {},
     executionContext,
-    throwOnFailedErrorAnalysis = false
+    throwOnFailedErrorAnalysis = false,
+    loadTransactionLogs,
+    transactionLogs: preloadedTransactionLogs
   } = options;
+
+  let transactionLogs: StableBufferTransactionLog[] | undefined = preloadedTransactionLogs;
+  if (loadTransactionLogs) {
+    try {
+      transactionLogs = await loadTransactionLogs(executionContext || {});
+    } catch (e: any) {
+      console.error(`stable-request: Failed to load transaction logs: ${e.message}`);
+    }
+  }
+
   let preExecutionResult: Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>> | unknown;
   try {
     preExecutionResult = await executeWithPersistence<Partial<STABLE_REQUEST<RequestDataType, ResponseDataType>> | unknown>(
@@ -52,7 +65,8 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
       {
         inputParams: preExecution?.preExecutionHookParams,
         commonBuffer,
-        stableRequestOptions: options
+        stableRequestOptions: options,
+        transactionLogs
       },
       options.statePersistence,
       executionContext || {},
@@ -233,7 +247,8 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
               params: hookParams?.responseAnalyzerParams,
               preExecutionResult,
               commonBuffer,
-              executionContext
+              executionContext,
+              transactionLogs
             },
             statePersistence,
             executionContext || {},
@@ -297,7 +312,8 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
               params: hookParams?.handleErrorsParams,
               preExecutionResult,
               commonBuffer,
-              executionContext
+              executionContext,
+              transactionLogs
             },
             statePersistence,
             executionContext || {},
@@ -335,7 +351,8 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
                 params: hookParams?.handleSuccessfulAttemptDataParams,
                 preExecutionResult,
                 commonBuffer,
-                executionContext
+                executionContext,
+                transactionLogs
               },
               statePersistence,
               executionContext || {},
@@ -406,7 +423,8 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
             params: hookParams?.finalErrorAnalyzerParams,
             preExecutionResult,
             commonBuffer,
-            executionContext
+            executionContext,
+            transactionLogs
           },
           statePersistence,
           executionContext || {},
@@ -441,7 +459,8 @@ export async function stableRequest<RequestDataType = any, ResponseDataType = an
           params: hookParams?.finalErrorAnalyzerParams,
           preExecutionResult,
           commonBuffer,
-          executionContext
+          executionContext,
+          transactionLogs
         },
         statePersistence,
         executionContext || {},

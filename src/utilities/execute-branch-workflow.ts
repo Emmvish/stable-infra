@@ -13,7 +13,7 @@ import {
   BranchWorkflowContext,
   PhaseExecutionRecord,
   BranchExecutionRecord,
-  PreBranchExecutionHookOptions
+  PreBranchExecutionHookOptions,
 } from '../types/index.js';
 
 export async function executeBranchWorkflow<RequestDataType = any, ResponseDataType = any, FunctionArgsType extends any[] = any[], FunctionReturnType = any>(
@@ -36,7 +36,8 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     sharedBuffer,
     stopOnFirstPhaseError,
     maxWorkflowIterations,
-    enableBranchRacing = false
+    enableBranchRacing = false,
+    transactionLogs
   } = context;
 
   const branchResults: BranchExecutionResult<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>[] = [];
@@ -123,7 +124,8 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
           branchIndex,
           branch: { ...branch },
           sharedBuffer,
-          params: workflowHookParams?.preBranchExecutionHookParams
+          params: workflowHookParams?.preBranchExecutionHookParams,
+          transactionLogs
         };
         
         const result = await executeWithPersistence<STABLE_WORKFLOW_BRANCH<RequestDataType, ResponseDataType, FunctionArgsType, FunctionReturnType>>(
@@ -286,7 +288,8 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
                 branchId: result.branchResult.branchId,
                 branchResults: result.branchResult.phaseResults,
                 success: result.branchResult.success,
-                maxSerializableChars
+                maxSerializableChars,
+                transactionLogs
               },
               branches[winner.index].statePersistence,
               { workflowId, branchId: result.branchResult.branchId },
@@ -514,7 +517,8 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
                 branchId: result.branchResult.branchId,
                 branchResults: result.branchResult.phaseResults,
                 success: result.branchResult.success,
-                maxSerializableChars
+                maxSerializableChars,
+                transactionLogs
               },
               branch.statePersistence,
               { workflowId, branchId: result.branchResult.branchId },
@@ -543,7 +547,8 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
                 branchExecutionHistory,
                 sharedBuffer,
                 params: workflowHookParams?.handleBranchDecisionParams,
-                concurrentBranchResults: concurrentBranchResults
+                concurrentBranchResults: concurrentBranchResults,
+                transactionLogs
               },
               branch.statePersistence,
               { workflowId, branchId: branch.id },
@@ -564,12 +569,13 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
                 const wrappedHook = (options: any) => handleBranchDecision(
                   options.decision,
                   options.branchResult,
-                  options.maxSerializableChars
+                  options.maxSerializableChars,
+                  options.transactionLogs
                 );
                 
                 await executeWithPersistence<void>(
                   wrappedHook,
-                  { decision, branchResult: result.branchResult, maxSerializableChars },
+                  { decision, branchResult: result.branchResult, maxSerializableChars, transactionLogs },
                   workflowHookParams?.statePersistence,
                   { workflowId, branchId: branch.id },
                   sharedBuffer
@@ -740,7 +746,8 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
               branchId: result.branchResult.branchId,
               branchResults: result.branchResult.phaseResults,
               success: result.branchResult.success,
-              maxSerializableChars
+              maxSerializableChars,
+              transactionLogs
             },
             currentBranch.statePersistence,
             { workflowId, branchId: currentBranchId },
@@ -771,7 +778,8 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
               executionHistory: result.executionHistory,
               branchExecutionHistory,
               sharedBuffer,
-              params: workflowHookParams?.handleBranchDecisionParams
+              params: workflowHookParams?.handleBranchDecisionParams,
+              transactionLogs
             },
             currentBranch.statePersistence,
             { workflowId, branchId: currentBranchId },
@@ -799,12 +807,13 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
               const wrappedHook = (options: any) => handleBranchDecision(
                 options.decision,
                 options.branchResult,
-                options.maxSerializableChars
+                options.maxSerializableChars,
+                options.transactionLogs
               );
               
               await executeWithPersistence<void>(
                 wrappedHook,
-                { decision, branchResult: result.branchResult, maxSerializableChars },
+                { decision, branchResult: result.branchResult, maxSerializableChars, transactionLogs },
                 workflowHookParams?.statePersistence,
                 { workflowId, branchId: currentBranchId },
                 sharedBuffer
