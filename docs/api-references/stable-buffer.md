@@ -105,6 +105,8 @@ type StableBufferTransactionLog = StableBufferTransactionOptions & {
 };
 ```
 
+**Consuming Logs in Other APIs:** Transaction logs can be passed to `stableRequest`, `stableFunction`, `stableApiGateway`, `stableWorkflow`, and `stableWorkflowGraph` via `loadTransactionLogs` or `transactionLogs` options. When provided, logs are available in all hooks.
+
 Example:
 
 ```ts

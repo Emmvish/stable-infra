@@ -169,6 +169,8 @@ interface STABLE_WORKFLOW_OPTIONS<
 | `maxSerializableChars` | `number?` | `1000` | Maximum characters for serializing objects in logs. |
 | `workflowHookParams` | `WorkflowHookParams?` | `{}` | Parameters passed to workflow hooks. |
 | `metricsGuardrails` | `MetricsGuardrails?` | `undefined` | Metrics validation guardrails for workflow execution (see `MetricsGuardrailsWorkflow`, `MetricsGuardrailsInfrastructure`, `MetricsGuardrailsCommon`). |
+| `loadTransactionLogs` | `Function?` | `undefined` | Hook to load `StableBuffer` transaction logs. Logs are passed to all phase/branch hooks. |
+| `transactionLogs` | `StableBufferTransactionLog[]?` | `undefined` | Pre-loaded transaction logs. If `loadTransactionLogs` is also provided, it takes priority. |
 
 **Inherited from API_GATEWAY_OPTIONS:**
 - All `common*` configuration fields (commonAttempts, commonWait, commonRetryStrategy, etc.)

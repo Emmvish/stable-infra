@@ -107,6 +107,8 @@ interface STABLE_REQUEST<RequestDataType = any, ResponseDataType = any> {
 | `statePersistence` | `StatePersistenceConfig` | No | `undefined` | State persistence configuration for external storage. `persistenceFunction` receives `persistenceStage` (`PersistenceStage.BEFORE_HOOK` \| `PersistenceStage.AFTER_HOOK`). |
 | `metricsGuardrails` | `MetricsGuardrails` | No | `undefined` | Metrics validation guardrails with min/max thresholds for request metrics (see `MetricsGuardrailsRequest`, `MetricsGuardrailsInfrastructure`, `MetricsGuardrailsCommon`). |
 | `throwOnFailedErrorAnalysis` | `boolean` | No | `false` | If `true`, throws when `finalErrorAnalyzer` returns `false`. Otherwise returns a failed result with metrics. |
+| `loadTransactionLogs` | `Function` | No | `undefined` | Hook to load `StableBuffer` transaction logs. Called once before execution; logs are passed to all hooks. |
+| `transactionLogs` | `StableBufferTransactionLog[]` | No | `undefined` | Pre-loaded transaction logs. If `loadTransactionLogs` is also provided, it takes priority. |
 
 ### REQUEST_DATA Interface
 

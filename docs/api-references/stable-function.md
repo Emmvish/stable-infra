@@ -112,6 +112,8 @@ interface STABLE_FUNCTION<TArgs extends any[] = any[], TReturn = any> {
 | `executionTimeout` | `number` | No | `undefined` | Maximum execution time in milliseconds. Throws TimeoutError if exceeded. Covers entire execution including all retry attempts. |
 | `metricsGuardrails` | `MetricsGuardrails` | No | `undefined` | Metrics validation guardrails with min/max thresholds for function metrics (see `MetricsGuardrailsInfrastructure`, `MetricsGuardrailsCommon`). |
 | `throwOnFailedErrorAnalysis` | `boolean` | No | `false` | If `true`, throws when `finalErrorAnalyzer` returns `false`. Otherwise returns a failed result with metrics. |
+| `loadTransactionLogs` | `Function` | No | `undefined` | Hook to load `StableBuffer` transaction logs. Called once before execution; logs are passed to all hooks. |
+| `transactionLogs` | `StableBufferTransactionLog[]` | No | `undefined` | Pre-loaded transaction logs. If `loadTransactionLogs` is also provided, it takes priority. |
 
 ---
 

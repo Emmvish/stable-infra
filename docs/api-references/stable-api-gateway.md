@@ -165,6 +165,8 @@ interface API_GATEWAY_OPTIONS<RequestDataType = any, ResponseDataType = any, Fun
 | `executionContext` | `Partial<ExecutionContext>` | `undefined` | Context metadata for tracing. |
 | `metricsGuardrails` | `MetricsGuardrails` | `undefined` | Metrics validation guardrails for API Gateway execution (see `MetricsGuardrailsApiGateway`, `MetricsGuardrailsInfrastructure`, `MetricsGuardrailsCommon`). |
 | `maxTimeout` | `number` | `undefined` | Gateway-level timeout (ms) for the entire batch. |
+| `loadTransactionLogs` | `Function` | `undefined` | Hook to load `StableBuffer` transaction logs. Logs are passed to all underlying requests/functions. |
+| `transactionLogs` | `StableBufferTransactionLog[]` | `undefined` | Pre-loaded transaction logs. If `loadTransactionLogs` is also provided, it takes priority. |
 
 ### RequestGroup Interface
 
