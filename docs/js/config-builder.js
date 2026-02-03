@@ -669,6 +669,13 @@ function generateStableRequestConfig() {
         if (stableRequestFields.ecBranchId?.value) config.executionContext.branchId = stableRequestFields.ecBranchId.value;
         if (stableRequestFields.ecRequestId?.value) config.executionContext.requestId = stableRequestFields.ecRequestId.value;
     }
+
+    // Transaction Logs
+    const loadTransactionLogs = validateFunction(stableRequestFields.loadTransactionLogs?.value, stableRequestFields.loadTransactionLogs);
+    if (loadTransactionLogs) config.loadTransactionLogs = loadTransactionLogs;
+
+    const transactionLogs = parseJson(stableRequestFields.transactionLogs?.value, stableRequestFields.transactionLogs);
+    if (transactionLogs !== null) config.transactionLogs = transactionLogs;
     
     // Hook Params - Build from individual fields
     const hookParams = {};
@@ -1012,6 +1019,10 @@ function initConfigBuilder() {
         trialModeEnabled: document.getElementById('sr-trialMode-enabled'),
         trialModeReqFailureProbability: document.getElementById('sr-trialMode-reqFailureProbability'),
         trialModeRetryFailureProbability: document.getElementById('sr-trialMode-retryFailureProbability'),
+
+        // Transaction Logs
+        loadTransactionLogs: document.getElementById('sr-loadTransactionLogs'),
+        transactionLogs: document.getElementById('sr-transactionLogs'),
         
         // Execution Context
         ecWorkflowId: document.getElementById('sr-ec-workflowId'),
@@ -1510,6 +1521,12 @@ function generateStableFunctionConfig() {
         if (stableFunctionFields.ecRequestId?.value) config.executionContext.requestId = stableFunctionFields.ecRequestId.value;
     }
     
+    // Transaction Logs
+    const loadTransactionLogs = validateFunction(stableFunctionFields.loadTransactionLogs?.value, stableFunctionFields.loadTransactionLogs);
+    if (loadTransactionLogs) config.loadTransactionLogs = loadTransactionLogs;
+
+    const transactionLogs = parseJson(stableFunctionFields.transactionLogs?.value, stableFunctionFields.transactionLogs);
+    if (transactionLogs !== null) config.transactionLogs = transactionLogs;
     // Metrics Guardrails
     const hasGuardrails = stableFunctionFields.mgTotalAttemptsMax?.value ||
                           stableFunctionFields.mgSuccessfulAttemptsMin?.value ||
@@ -1882,6 +1899,8 @@ function initStableFunctionBuilder() {
         trialModeEnabled: document.getElementById('sf-trialMode-enabled'),
         trialModeExecFailureProbability: document.getElementById('sf-trialMode-execFailureProbability'),
         trialModeRetryFailureProbability: document.getElementById('sf-trialMode-retryFailureProbability'),
+        loadTransactionLogs: document.getElementById('sf-loadTransactionLogs'),
+        transactionLogs: document.getElementById('sf-transactionLogs'),
         
         // Execution Context
         ecWorkflowId: document.getElementById('sf-ec-workflowId'),
@@ -2089,15 +2108,1414 @@ function initStableBufferBuilder() {
     updateSbConfigOutput();
 }
 
+/*
+// ============================================
+// stableApiGateway Config Builder
+// ============================================
+
+let gwFields = {};
+let gwRequestCounter = 0;
+let gwFunctionCounter = 0;
+let gwGroupCounter = 0;
+
+// Toggle conditional fields
+function toggleGwCacheFields() {
+    const enabled = gwFields.commonCacheEnabled?.checked;
+    const container = document.getElementById('gwCacheConfigFields');
+    if (container) {
+        container.classList.toggle('disabled', !enabled);
+    }
+    updateGwConfigOutput();
+}
+
+function toggleGwTrialModeFields() {
+    const enabled = gwFields.commonTrialModeEnabled?.checked;
+    const container = document.getElementById('gwTrialModeConfigFields');
+    if (container) {
+        container.classList.toggle('disabled', !enabled);
+    }
+    updateGwConfigOutput();
+}
+
+function toggleGwFunctionCacheFields() {
+    const enabled = document.getElementById('gw-commonFunctionCache-enabled')?.checked;
+    const container = document.getElementById('gwFunctionCacheConfigFields');
+    if (container) {
+        container.classList.toggle('disabled', !enabled);
+    }
+    updateGwConfigOutput();
+}
+
+// Request item with full configuration options
+function addGwRequest() {
+    gwRequestCounter++;
+    const container = document.getElementById('gw-requests-container');
+    const item = document.createElement('div');
+    item.className = 'array-item';
+    item.id = `gw-req-${gwRequestCounter}`;
+    item.innerHTML = `
+        <div class="array-item-header">
+            <span class="array-item-title">Request #${gwRequestCounter}</span>
+            <button type="button" class="btn-remove-item" onclick="removeGwRequest('gw-req-${gwRequestCounter}')" title="Remove request">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="array-item-fields">
+            <!-- Core request settings -->
+            <div class="field-row">
+                <div class="field-group">
+                    <label>Request ID <span class="required-critical">**</span></label>
+                    <input type="text" class="builder-input gw-req-id" placeholder="e.g. getUser" onchange="updateGwConfigOutput()">
+                </div>
+                <div class="field-group">
+                    <label>Group ID</label>
+                    <input type="text" class="builder-input gw-req-groupId" placeholder="e.g. userRequests" onchange="updateGwConfigOutput()">
+                    <span class="field-hint">Assign to a request group</span>
+                </div>
+            </div>
+            <div class="field-row">
+                <div class="field-group">
+                    <label>Path <span class="required-critical">**</span></label>
+                    <input type="text" class="builder-input gw-req-path" placeholder="e.g. /api/users/123" onchange="updateGwConfigOutput()">
+                </div>
+                <div class="field-group">
+                    <label>Method</label>
+                    <select class="builder-select gw-req-method" onchange="updateGwConfigOutput()">
+                        <option value="GET" selected>GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="PATCH">PATCH</option>
+                        <option value="DELETE">DELETE</option>
+                    </select>
+                </div>
+            </div>
+            <div class="field-row">
+                <div class="field-group">
+                    <label>Hostname (override)</label>
+                    <input type="text" class="builder-input gw-req-hostname" placeholder="Override common hostname" onchange="updateGwConfigOutput()">
+                </div>
+                <div class="field-group">
+                    <label>Timeout (ms)</label>
+                    <input type="number" class="builder-input gw-req-timeout" placeholder="e.g. 30000" min="0" onchange="updateGwConfigOutput()">
+                </div>
+            </div>
+            <div class="field-group">
+                <label>Data/Body <span class="json-badge">JSON</span></label>
+                <textarea class="builder-textarea gw-req-data" rows="2" placeholder='{"key": "value"}' onchange="updateGwConfigOutput()"></textarea>
+            </div>
+            <div class="field-group">
+                <label>Headers (override) <span class="json-badge">JSON</span></label>
+                <textarea class="builder-textarea gw-req-headers" rows="2" placeholder='{"X-Custom-Header": "value"}' onchange="updateGwConfigOutput()"></textarea>
+            </div>
+            
+            <!-- Retry settings -->
+            <div class="array-item-subsection">
+                <span class="subsection-title">Retry Configuration (Override)</span>
+                <div class="field-row">
+                    <div class="field-group">
+                        <label>Attempts</label>
+                        <input type="number" class="builder-input gw-req-attempts" placeholder="Override" min="1" onchange="updateGwConfigOutput()">
+                    </div>
+                    <div class="field-group">
+                        <label>Wait (ms)</label>
+                        <input type="number" class="builder-input gw-req-wait" placeholder="Override" min="0" onchange="updateGwConfigOutput()">
+                    </div>
+                    <div class="field-group">
+                        <label>Retry Strategy</label>
+                        <select class="builder-select gw-req-retryStrategy" onchange="updateGwConfigOutput()">
+                            <option value="" selected>Use common</option>
+                            <option value="fixed">Fixed</option>
+                            <option value="linear">Linear</option>
+                            <option value="exponential">Exponential</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Analysis hooks -->
+            <div class="array-item-subsection collapsible-subsection">
+                <span class="subsection-title clickable" onclick="toggleSubsection(this)">
+                    Analysis Hooks (Optional)
+                    <svg class="chevron-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </span>
+                <div class="subsection-content collapsed">
+                    <div class="field-group">
+                        <label>Response Analyzer <span class="func-badge">Function</span></label>
+                        <textarea class="builder-textarea code-textarea gw-req-responseAnalyzer" rows="2" placeholder="({ data, reqData }) => data.success !== false" onchange="updateGwConfigOutput()"></textarea>
+                    </div>
+                    <div class="field-group">
+                        <label>Final Error Analyzer <span class="func-badge">Function</span></label>
+                        <textarea class="builder-textarea code-textarea gw-req-finalErrorAnalyzer" rows="2" placeholder="({ error, reqData }) => false" onchange="updateGwConfigOutput()"></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pre-execution hook -->
+            <div class="array-item-subsection collapsible-subsection">
+                <span class="subsection-title clickable" onclick="toggleSubsection(this)">
+                    Pre-Execution (Optional)
+                    <svg class="chevron-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </span>
+                <div class="subsection-content collapsed">
+                    <div class="field-group">
+                        <label>Pre-Execution Hook <span class="func-badge">Function</span></label>
+                        <textarea class="builder-textarea code-textarea gw-req-preExecution" rows="3" placeholder="({ inputParams, commonBuffer }) => { inputParams.data.token = commonBuffer.authToken; }" onchange="updateGwConfigOutput()"></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Cache settings -->
+            <div class="array-item-subsection collapsible-subsection">
+                <span class="subsection-title clickable" onclick="toggleSubsection(this)">
+                    Caching (Optional)
+                    <svg class="chevron-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </span>
+                <div class="subsection-content collapsed">
+                    <div class="field-row">
+                        <div class="field-group">
+                            <label>Cache TTL (ms)</label>
+                            <input type="number" class="builder-input gw-req-cacheTtl" placeholder="e.g. 60000" min="0" onchange="updateGwConfigOutput()">
+                        </div>
+                        <div class="field-group">
+                            <label>Cache Key Generator <span class="func-badge">Function</span></label>
+                            <input type="text" class="builder-input code-input gw-req-cacheKeyGen" placeholder="(reqData) => reqData.path" onchange="updateGwConfigOutput()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    container.appendChild(item);
+    updateGwConfigOutput();
+}
+
+function removeGwRequest(id) {
+    const item = document.getElementById(id);
+    if (item) {
+        item.remove();
+        updateGwConfigOutput();
+    }
+}
+
+// Function item with full configuration options
+function addGwFunction() {
+    gwFunctionCounter++;
+    const container = document.getElementById('gw-functions-container');
+    const item = document.createElement('div');
+    item.className = 'array-item';
+    item.id = `gw-fn-${gwFunctionCounter}`;
+    item.innerHTML = `
+        <div class="array-item-header">
+            <span class="array-item-title">Function #${gwFunctionCounter}</span>
+            <button type="button" class="btn-remove-item" onclick="removeGwFunction('gw-fn-${gwFunctionCounter}')" title="Remove function">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="array-item-fields">
+            <!-- Core function settings -->
+            <div class="field-row">
+                <div class="field-group">
+                    <label>Function ID <span class="required-critical">**</span></label>
+                    <input type="text" class="builder-input gw-fn-id" placeholder="e.g. processData" onchange="updateGwConfigOutput()">
+                </div>
+                <div class="field-group">
+                    <label>Group ID</label>
+                    <input type="text" class="builder-input gw-fn-groupId" placeholder="e.g. dataTasks" onchange="updateGwConfigOutput()">
+                    <span class="field-hint">Assign to a request group</span>
+                </div>
+            </div>
+            <div class="field-row">
+                <div class="field-group">
+                    <label>Function Reference <span class="required-critical">**</span></label>
+                    <input type="text" class="builder-input gw-fn-ref code-input" placeholder="e.g. myFunction" onchange="updateGwConfigOutput()">
+                    <span class="field-hint">Name of function variable</span>
+                </div>
+                <div class="field-group">
+                    <label>Execution Timeout (ms)</label>
+                    <input type="number" class="builder-input gw-fn-timeout" placeholder="e.g. 30000" min="0" onchange="updateGwConfigOutput()">
+                </div>
+            </div>
+            <div class="field-group">
+                <label>Function Args <span class="json-badge">JSON Array</span></label>
+                <textarea class="builder-textarea gw-fn-args" rows="2" placeholder='["arg1", 42, true]' onchange="updateGwConfigOutput()"></textarea>
+                <span class="field-hint">Arguments to pass to the function</span>
+            </div>
+            <div class="field-row">
+                <div class="field-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="gw-fn-returnResult" onchange="updateGwConfigOutput()">
+                        <span class="checkbox-custom"></span>
+                        Return Result
+                    </label>
+                    <span class="field-hint">Include return value in response</span>
+                </div>
+            </div>
+            
+            <!-- Retry settings -->
+            <div class="array-item-subsection">
+                <span class="subsection-title">Retry Configuration (Override)</span>
+                <div class="field-row">
+                    <div class="field-group">
+                        <label>Attempts</label>
+                        <input type="number" class="builder-input gw-fn-attempts" placeholder="Override" min="1" onchange="updateGwConfigOutput()">
+                    </div>
+                    <div class="field-group">
+                        <label>Wait (ms)</label>
+                        <input type="number" class="builder-input gw-fn-wait" placeholder="Override" min="0" onchange="updateGwConfigOutput()">
+                    </div>
+                    <div class="field-group">
+                        <label>Retry Strategy</label>
+                        <select class="builder-select gw-fn-retryStrategy" onchange="updateGwConfigOutput()">
+                            <option value="" selected>Use common</option>
+                            <option value="fixed">Fixed</option>
+                            <option value="linear">Linear</option>
+                            <option value="exponential">Exponential</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Analysis hooks -->
+            <div class="array-item-subsection collapsible-subsection">
+                <span class="subsection-title clickable" onclick="toggleSubsection(this)">
+                    Analysis Hooks (Optional)
+                    <svg class="chevron-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </span>
+                <div class="subsection-content collapsed">
+                    <div class="field-group">
+                        <label>Response Analyzer <span class="func-badge">Function</span></label>
+                        <textarea class="builder-textarea code-textarea gw-fn-responseAnalyzer" rows="2" placeholder="({ data, fn, args }) => data !== null" onchange="updateGwConfigOutput()"></textarea>
+                    </div>
+                    <div class="field-group">
+                        <label>Final Error Analyzer <span class="func-badge">Function</span></label>
+                        <textarea class="builder-textarea code-textarea gw-fn-finalErrorAnalyzer" rows="2" placeholder="({ error, fn, args }) => false" onchange="updateGwConfigOutput()"></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pre-execution hook -->
+            <div class="array-item-subsection collapsible-subsection">
+                <span class="subsection-title clickable" onclick="toggleSubsection(this)">
+                    Pre-Execution (Optional)
+                    <svg class="chevron-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </span>
+                <div class="subsection-content collapsed">
+                    <div class="field-group">
+                        <label>Pre-Execution Hook <span class="func-badge">Function</span></label>
+                        <textarea class="builder-textarea code-textarea gw-fn-preExecution" rows="3" placeholder="({ inputParams, commonBuffer }) => { inputParams.args[0] = commonBuffer.userId; }" onchange="updateGwConfigOutput()"></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Cache settings -->
+            <div class="array-item-subsection collapsible-subsection">
+                <span class="subsection-title clickable" onclick="toggleSubsection(this)">
+                    Caching (Optional)
+                    <svg class="chevron-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </span>
+                <div class="subsection-content collapsed">
+                    <div class="field-row">
+                        <div class="field-group">
+                            <label>Cache TTL (ms)</label>
+                            <input type="number" class="builder-input gw-fn-cacheTtl" placeholder="e.g. 60000" min="0" onchange="updateGwConfigOutput()">
+                        </div>
+                        <div class="field-group">
+                            <label>Cache Key Generator <span class="func-badge">Function</span></label>
+                            <input type="text" class="builder-input code-input gw-fn-cacheKeyGen" placeholder="(args) => args.join(':')" onchange="updateGwConfigOutput()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    container.appendChild(item);
+    updateGwConfigOutput();
+}
+
+function removeGwFunction(id) {
+    const item = document.getElementById(id);
+    if (item) {
+        item.remove();
+        updateGwConfigOutput();
+    }
+}
+
+// Request Group management
+function addGwGroup() {
+    gwGroupCounter++;
+    const container = document.getElementById('gw-groups-container');
+    const item = document.createElement('div');
+    item.className = 'array-item';
+    item.id = `gw-group-${gwGroupCounter}`;
+    item.innerHTML = `
+        <div class="array-item-header">
+            <span class="array-item-title">Group #${gwGroupCounter}</span>
+            <button type="button" class="btn-remove-item" onclick="removeGwGroup('gw-group-${gwGroupCounter}')" title="Remove group">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="array-item-fields">
+            <div class="field-row">
+                <div class="field-group">
+                    <label>Group ID <span class="required-critical">**</span></label>
+                    <input type="text" class="builder-input gw-group-id" placeholder="e.g. userRequests" onchange="updateGwConfigOutput()">
+                    <span class="field-hint">Match this ID in request/function groupId field</span>
+                </div>
+            </div>
+            
+            <!-- Group-level overrides -->
+            <div class="array-item-subsection">
+                <span class="subsection-title">Group Configuration (Overrides Global)</span>
+                <div class="field-row">
+                    <div class="field-group">
+                        <label>Hostname</label>
+                        <input type="text" class="builder-input gw-group-hostname" placeholder="e.g. api.users.example.com" onchange="updateGwConfigOutput()">
+                    </div>
+                    <div class="field-group">
+                        <label>Timeout (ms)</label>
+                        <input type="number" class="builder-input gw-group-timeout" placeholder="e.g. 30000" min="0" onchange="updateGwConfigOutput()">
+                    </div>
+                </div>
+                <div class="field-row">
+                    <div class="field-group">
+                        <label>Attempts</label>
+                        <input type="number" class="builder-input gw-group-attempts" placeholder="Override" min="1" onchange="updateGwConfigOutput()">
+                    </div>
+                    <div class="field-group">
+                        <label>Wait (ms)</label>
+                        <input type="number" class="builder-input gw-group-wait" placeholder="Override" min="0" onchange="updateGwConfigOutput()">
+                    </div>
+                    <div class="field-group">
+                        <label>Retry Strategy</label>
+                        <select class="builder-select gw-group-retryStrategy" onchange="updateGwConfigOutput()">
+                            <option value="" selected>Use common</option>
+                            <option value="fixed">Fixed</option>
+                            <option value="linear">Linear</option>
+                            <option value="exponential">Exponential</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="field-group">
+                <label>Headers (override) <span class="json-badge">JSON</span></label>
+                <textarea class="builder-textarea gw-group-headers" rows="2" placeholder='{"X-Group-Header": "value"}' onchange="updateGwConfigOutput()"></textarea>
+            </div>
+        </div>
+    `;
+    container.appendChild(item);
+    updateGwConfigOutput();
+}
+
+function removeGwGroup(id) {
+    const item = document.getElementById(id);
+    if (item) {
+        item.remove();
+        updateGwConfigOutput();
+    }
+}
+
+// Toggle collapsible subsections in array items
+function toggleSubsection(element) {
+    const content = element.nextElementSibling;
+    if (content) {
+        content.classList.toggle('collapsed');
+        element.classList.toggle('expanded');
+    }
+}
+
+// Get all requests from the form
+function getGwRequests() {
+    const container = document.getElementById('gw-requests-container');
+    const items = container.querySelectorAll('.array-item');
+    const requests = [];
+    
+    items.forEach(item => {
+        const id = item.querySelector('.gw-req-id')?.value?.trim();
+        const path = item.querySelector('.gw-req-path')?.value?.trim();
+        
+        if (id && path) {
+            const req = { id };
+            const requestOptions = { path };
+            
+            const groupId = item.querySelector('.gw-req-groupId')?.value?.trim();
+            if (groupId) req.groupId = groupId;
+            
+            const method = item.querySelector('.gw-req-method')?.value;
+            if (method && method !== 'GET') requestOptions.method = method;
+            
+            const hostname = item.querySelector('.gw-req-hostname')?.value?.trim();
+            if (hostname) requestOptions.hostname = hostname;
+            
+            const timeout = item.querySelector('.gw-req-timeout')?.value;
+            if (timeout) requestOptions.timeout = parseInt(timeout);
+            
+            const data = item.querySelector('.gw-req-data')?.value?.trim();
+            if (data) {
+                try {
+                    requestOptions.data = JSON.parse(data);
+                } catch (e) {}
+            }
+            
+            const headers = item.querySelector('.gw-req-headers')?.value?.trim();
+            if (headers) {
+                try {
+                    requestOptions.headers = JSON.parse(headers);
+                } catch (e) {}
+            }
+            
+            // Retry settings
+            const attempts = item.querySelector('.gw-req-attempts')?.value;
+            if (attempts) requestOptions.attempts = parseInt(attempts);
+            
+            const wait = item.querySelector('.gw-req-wait')?.value;
+            if (wait) requestOptions.wait = parseInt(wait);
+            
+            const retryStrategy = item.querySelector('.gw-req-retryStrategy')?.value;
+            if (retryStrategy) requestOptions.retryStrategy = retryStrategy;
+            
+            // Analysis hooks
+            const responseAnalyzer = item.querySelector('.gw-req-responseAnalyzer')?.value?.trim();
+            if (responseAnalyzer) requestOptions.responseAnalyzer = responseAnalyzer;
+            
+            const finalErrorAnalyzer = item.querySelector('.gw-req-finalErrorAnalyzer')?.value?.trim();
+            if (finalErrorAnalyzer) requestOptions.finalErrorAnalyzer = finalErrorAnalyzer;
+            
+            // Pre-execution
+            const preExecution = item.querySelector('.gw-req-preExecution')?.value?.trim();
+            if (preExecution) requestOptions.preExecution = { hook: preExecution };
+            
+            // Cache
+            const cacheTtl = item.querySelector('.gw-req-cacheTtl')?.value;
+            const cacheKeyGen = item.querySelector('.gw-req-cacheKeyGen')?.value?.trim();
+            if (cacheTtl || cacheKeyGen) {
+                requestOptions.cache = {};
+                if (cacheTtl) requestOptions.cache.ttlMs = parseInt(cacheTtl);
+                if (cacheKeyGen) requestOptions.cache.keyGenerator = cacheKeyGen;
+            }
+            
+            req.requestOptions = requestOptions;
+            requests.push(req);
+        }
+    });
+    
+    return requests;
+}
+
+// Get all functions from the form
+function getGwFunctions() {
+    const container = document.getElementById('gw-functions-container');
+    const items = container.querySelectorAll('.array-item');
+    const functions = [];
+    
+    items.forEach(item => {
+        const id = item.querySelector('.gw-fn-id')?.value?.trim();
+        const fnRef = item.querySelector('.gw-fn-ref')?.value?.trim();
+        
+        if (id && fnRef) {
+            const fn = { id };
+            const functionOptions = { fn: fnRef };
+            
+            const groupId = item.querySelector('.gw-fn-groupId')?.value?.trim();
+            if (groupId) fn.groupId = groupId;
+            
+            const timeout = item.querySelector('.gw-fn-timeout')?.value;
+            if (timeout) functionOptions.executionTimeout = parseInt(timeout);
+            
+            const args = item.querySelector('.gw-fn-args')?.value?.trim();
+            if (args) {
+                try {
+                    functionOptions.args = JSON.parse(args);
+                } catch (e) {}
+            }
+            
+            const returnResult = item.querySelector('.gw-fn-returnResult')?.checked;
+            if (returnResult) functionOptions.returnResult = true;
+            
+            // Retry settings
+            const attempts = item.querySelector('.gw-fn-attempts')?.value;
+            if (attempts) functionOptions.attempts = parseInt(attempts);
+            
+            const wait = item.querySelector('.gw-fn-wait')?.value;
+            if (wait) functionOptions.wait = parseInt(wait);
+            
+            const retryStrategy = item.querySelector('.gw-fn-retryStrategy')?.value;
+            if (retryStrategy) functionOptions.retryStrategy = retryStrategy;
+            
+            // Analysis hooks
+            const responseAnalyzer = item.querySelector('.gw-fn-responseAnalyzer')?.value?.trim();
+            if (responseAnalyzer) functionOptions.responseAnalyzer = responseAnalyzer;
+            
+            const finalErrorAnalyzer = item.querySelector('.gw-fn-finalErrorAnalyzer')?.value?.trim();
+            if (finalErrorAnalyzer) functionOptions.finalErrorAnalyzer = finalErrorAnalyzer;
+            
+            // Pre-execution
+            const preExecution = item.querySelector('.gw-fn-preExecution')?.value?.trim();
+            if (preExecution) functionOptions.preExecution = { hook: preExecution };
+            
+            // Cache
+            const cacheTtl = item.querySelector('.gw-fn-cacheTtl')?.value;
+            const cacheKeyGen = item.querySelector('.gw-fn-cacheKeyGen')?.value?.trim();
+            if (cacheTtl || cacheKeyGen) {
+                functionOptions.cache = {};
+                if (cacheTtl) functionOptions.cache.ttlMs = parseInt(cacheTtl);
+                if (cacheKeyGen) functionOptions.cache.keyGenerator = cacheKeyGen;
+            }
+            
+            fn.functionOptions = functionOptions;
+            functions.push(fn);
+        }
+    });
+    
+    return functions;
+}
+
+// Get all request groups from the form
+function getGwGroups() {
+    const container = document.getElementById('gw-groups-container');
+    const items = container.querySelectorAll('.array-item');
+    const groups = [];
+    
+    items.forEach(item => {
+        const id = item.querySelector('.gw-group-id')?.value?.trim();
+        
+        if (id) {
+            const group = { id };
+            
+            const hostname = item.querySelector('.gw-group-hostname')?.value?.trim();
+            if (hostname) group.hostname = hostname;
+            
+            const timeout = item.querySelector('.gw-group-timeout')?.value;
+            if (timeout) group.timeout = parseInt(timeout);
+            
+            const attempts = item.querySelector('.gw-group-attempts')?.value;
+            if (attempts) group.attempts = parseInt(attempts);
+            
+            const wait = item.querySelector('.gw-group-wait')?.value;
+            if (wait) group.wait = parseInt(wait);
+            
+            const retryStrategy = item.querySelector('.gw-group-retryStrategy')?.value;
+            if (retryStrategy) group.retryStrategy = retryStrategy;
+            
+            const headers = item.querySelector('.gw-group-headers')?.value?.trim();
+            if (headers) {
+                try {
+                    group.headers = JSON.parse(headers);
+                } catch (e) {}
+            }
+            
+            groups.push(group);
+        }
+    });
+    
+    return groups;
+}
+
+// Generate the complete gateway configuration
+function generateGwConfig() {
+    const imports = ['stableApiGateway'];
+    let needsEnums = false;
+    const config = {};
+    const functionDefs = [];
+    
+    // Generics
+    const genericRequest = gwFields.genericRequest?.value?.trim();
+    const genericResponse = gwFields.genericResponse?.value?.trim();
+    const genericFnArgs = gwFields.genericFnArgs?.value?.trim();
+    const genericFnReturn = gwFields.genericFnReturn?.value?.trim();
+    
+    const genericsInfo = {
+        request: genericRequest,
+        response: genericResponse,
+        fnArgs: genericFnArgs,
+        fnReturn: genericFnReturn
+    };
+    
+    // Execution mode
+    const concurrentExecution = gwFields.concurrentExecution?.checked;
+    if (!concurrentExecution) config.concurrentExecution = false;
+    
+    const stopOnFirstError = gwFields.stopOnFirstError?.checked;
+    if (stopOnFirstError) config.stopOnFirstError = true;
+    
+    const enableRacing = gwFields.enableRacing?.checked;
+    if (enableRacing) config.enableRacing = true;
+    
+    const maxTimeout = gwFields.maxTimeout?.value;
+    if (maxTimeout) config.maxTimeout = parseInt(maxTimeout);
+    
+    // Common request data
+    const commonRequestData = {};
+    const hostname = gwFields.commonRequestDataHostname?.value?.trim();
+    if (hostname) commonRequestData.hostname = hostname;
+    
+    const protocol = gwFields.commonRequestDataProtocol?.value;
+    if (protocol && protocol !== 'https') commonRequestData.protocol = protocol;
+    
+    const port = gwFields.commonRequestDataPort?.value;
+    if (port) commonRequestData.port = parseInt(port);
+    
+    const commonTimeout = gwFields.commonRequestDataTimeout?.value;
+    if (commonTimeout) commonRequestData.timeout = parseInt(commonTimeout);
+    
+    const headers = gwFields.commonRequestDataHeaders?.value?.trim();
+    if (headers) {
+        try {
+            commonRequestData.headers = JSON.parse(headers);
+        } catch (e) {}
+    }
+    
+    const query = gwFields.commonRequestDataQuery?.value?.trim();
+    if (query) {
+        try {
+            commonRequestData.query = JSON.parse(query);
+        } catch (e) {}
+    }
+    
+    const body = gwFields.commonRequestDataBody?.value?.trim();
+    if (body) {
+        try {
+            commonRequestData.body = JSON.parse(body);
+        } catch (e) {}
+    }
+    
+    const method = gwFields.commonRequestDataMethod?.value;
+    if (method && method !== 'GET') commonRequestData.method = method;
+    
+    if (Object.keys(commonRequestData).length > 0) {
+        config.commonRequestData = commonRequestData;
+    }
+    
+    const commonResReq = gwFields.commonResReq?.checked;
+    if (commonResReq) config.commonResReq = true;
+    
+    // Common retry config
+    const commonAttempts = gwFields.commonAttempts?.value;
+    if (commonAttempts && parseInt(commonAttempts) !== 1) {
+        config.commonAttempts = parseInt(commonAttempts);
+    }
+    
+    const commonRetryStrategy = gwFields.commonRetryStrategy?.value;
+    if (commonRetryStrategy && commonRetryStrategy !== 'fixed') {
+        config.commonRetryStrategy = `RETRY_STRATEGY.${commonRetryStrategy.toUpperCase()}`;
+        needsEnums = true;
+    }
+    
+    const commonWait = gwFields.commonWait?.value;
+    if (commonWait && parseInt(commonWait) !== 1000) {
+        config.commonWait = parseInt(commonWait);
+    }
+    
+    const commonMaxAllowedWait = gwFields.commonMaxAllowedWait?.value;
+    if (commonMaxAllowedWait && parseInt(commonMaxAllowedWait) !== 60000) {
+        config.commonMaxAllowedWait = parseInt(commonMaxAllowedWait);
+    }
+    
+    const commonJitter = gwFields.commonJitter?.value;
+    if (commonJitter && parseInt(commonJitter) > 0) {
+        config.commonJitter = parseInt(commonJitter);
+    }
+    
+    const commonPerformAllAttempts = gwFields.commonPerformAllAttempts?.checked;
+    if (commonPerformAllAttempts) config.commonPerformAllAttempts = true;
+    
+    // Common function config
+    const commonExecutionTimeout = gwFields.commonExecutionTimeout?.value;
+    if (commonExecutionTimeout) config.commonExecutionTimeout = parseInt(commonExecutionTimeout);
+    
+    const commonReturnResult = gwFields.commonReturnResult?.checked;
+    if (commonReturnResult) config.commonReturnResult = true;
+    
+    // Common analysis hooks
+    const commonResponseAnalyzer = gwFields.commonResponseAnalyzer?.value?.trim();
+    if (commonResponseAnalyzer) {
+        config.commonResponseAnalyzer = commonResponseAnalyzer;
+        functionDefs.push({ name: 'commonResponseAnalyzer', value: commonResponseAnalyzer });
+    }
+    
+    const commonFinalErrorAnalyzer = gwFields.commonFinalErrorAnalyzer?.value?.trim();
+    if (commonFinalErrorAnalyzer) {
+        config.commonFinalErrorAnalyzer = commonFinalErrorAnalyzer;
+        functionDefs.push({ name: 'commonFinalErrorAnalyzer', value: commonFinalErrorAnalyzer });
+    }
+    
+    const commonFunctionResponseAnalyzer = gwFields.commonFunctionResponseAnalyzer?.value?.trim();
+    if (commonFunctionResponseAnalyzer) {
+        config.commonFunctionResponseAnalyzer = commonFunctionResponseAnalyzer;
+        functionDefs.push({ name: 'commonFunctionResponseAnalyzer', value: commonFunctionResponseAnalyzer });
+    }
+    
+    const commonFinalFunctionErrorAnalyzer = gwFields.commonFinalFunctionErrorAnalyzer?.value?.trim();
+    if (commonFinalFunctionErrorAnalyzer) {
+        config.commonFinalFunctionErrorAnalyzer = commonFinalFunctionErrorAnalyzer;
+        functionDefs.push({ name: 'commonFinalFunctionErrorAnalyzer', value: commonFinalFunctionErrorAnalyzer });
+    }
+    
+    // Common pre-execution hooks
+    const commonPreExecutionHook = gwFields.commonPreExecutionHook?.value?.trim();
+    const commonPreExecutionInputParams = gwFields.commonPreExecutionInputParams?.value?.trim();
+    if (commonPreExecutionHook) {
+        config.commonPreExecution = { preExecutionHook: commonPreExecutionHook };
+        functionDefs.push({ name: 'commonPreExecutionHook', value: commonPreExecutionHook });
+        if (commonPreExecutionInputParams) {
+            try {
+                config.commonPreExecution.preExecutionHookParams = JSON.parse(commonPreExecutionInputParams);
+            } catch (e) {}
+        }
+    }
+    
+    const commonFunctionPreExecutionHook = gwFields.commonFunctionPreExecutionHook?.value?.trim();
+    const commonFunctionPreExecutionInputParams = gwFields.commonFunctionPreExecutionInputParams?.value?.trim();
+    if (commonFunctionPreExecutionHook) {
+        config.commonFunctionPreExecution = { preExecutionHook: commonFunctionPreExecutionHook };
+        functionDefs.push({ name: 'commonFunctionPreExecutionHook', value: commonFunctionPreExecutionHook });
+        if (commonFunctionPreExecutionInputParams) {
+            try {
+                config.commonFunctionPreExecution.preExecutionHookParams = JSON.parse(commonFunctionPreExecutionInputParams);
+            } catch (e) {}
+        }
+    }
+    
+    // Common observability
+    const logAllErrors = gwFields.commonLogAllErrors?.checked;
+    if (logAllErrors) config.commonLogAllErrors = true;
+    
+    const logAllSuccessful = gwFields.commonLogAllSuccessfulAttempts?.checked;
+    if (logAllSuccessful) config.commonLogAllSuccessfulAttempts = true;
+    
+    const commonHandleErrors = gwFields.commonHandleErrors?.value?.trim();
+    if (commonHandleErrors) {
+        config.commonHandleErrors = commonHandleErrors;
+        functionDefs.push({ name: 'commonHandleErrors', value: commonHandleErrors });
+    }
+    
+    const commonHandleSuccessfulAttemptData = gwFields.commonHandleSuccessfulAttemptData?.value?.trim();
+    if (commonHandleSuccessfulAttemptData) {
+        config.commonHandleSuccessfulAttemptData = commonHandleSuccessfulAttemptData;
+        functionDefs.push({ name: 'commonHandleSuccessfulAttemptData', value: commonHandleSuccessfulAttemptData });
+    }
+    
+    const commonHandleFunctionErrors = gwFields.commonHandleFunctionErrors?.value?.trim();
+    if (commonHandleFunctionErrors) {
+        config.commonHandleFunctionErrors = commonHandleFunctionErrors;
+        functionDefs.push({ name: 'commonHandleFunctionErrors', value: commonHandleFunctionErrors });
+    }
+    
+    const commonHandleSuccessfulFunctionAttemptData = gwFields.commonHandleSuccessfulFunctionAttemptData?.value?.trim();
+    if (commonHandleSuccessfulFunctionAttemptData) {
+        config.commonHandleSuccessfulFunctionAttemptData = commonHandleSuccessfulFunctionAttemptData;
+        functionDefs.push({ name: 'commonHandleSuccessfulFunctionAttemptData', value: commonHandleSuccessfulFunctionAttemptData });
+    }
+    
+    const maxSerializableChars = gwFields.commonMaxSerializableChars?.value;
+    if (maxSerializableChars && parseInt(maxSerializableChars) !== 1000) {
+        config.commonMaxSerializableChars = parseInt(maxSerializableChars);
+    }
+    
+    // Common hook params
+    const commonHookParams = {};
+    const hpResponseAnalyzer = gwFields.commonHookParamsResponseAnalyzer?.value?.trim();
+    if (hpResponseAnalyzer) { try { commonHookParams.responseAnalyzerParams = JSON.parse(hpResponseAnalyzer); } catch (e) {} }
+    const hpHandleSuccessful = gwFields.commonHookParamsHandleSuccessful?.value?.trim();
+    if (hpHandleSuccessful) { try { commonHookParams.handleSuccessfulAttemptDataParams = JSON.parse(hpHandleSuccessful); } catch (e) {} }
+    const hpHandleErrors = gwFields.commonHookParamsHandleErrors?.value?.trim();
+    if (hpHandleErrors) { try { commonHookParams.handleErrorsParams = JSON.parse(hpHandleErrors); } catch (e) {} }
+    const hpFinalError = gwFields.commonHookParamsFinalError?.value?.trim();
+    if (hpFinalError) { try { commonHookParams.finalErrorAnalyzerParams = JSON.parse(hpFinalError); } catch (e) {} }
+    if (Object.keys(commonHookParams).length > 0) config.commonHookParams = commonHookParams;
+    
+    // Common function hook params
+    const commonFunctionHookParams = {};
+    const fhpResponseAnalyzer = gwFields.commonFunctionHookParamsResponseAnalyzer?.value?.trim();
+    if (fhpResponseAnalyzer) { try { commonFunctionHookParams.responseAnalyzerParams = JSON.parse(fhpResponseAnalyzer); } catch (e) {} }
+    const fhpHandleSuccessful = gwFields.commonFunctionHookParamsHandleSuccessful?.value?.trim();
+    if (fhpHandleSuccessful) { try { commonFunctionHookParams.handleSuccessfulAttemptDataParams = JSON.parse(fhpHandleSuccessful); } catch (e) {} }
+    const fhpHandleErrors = gwFields.commonFunctionHookParamsHandleErrors?.value?.trim();
+    if (fhpHandleErrors) { try { commonFunctionHookParams.handleErrorsParams = JSON.parse(fhpHandleErrors); } catch (e) {} }
+    const fhpFinalError = gwFields.commonFunctionHookParamsFinalError?.value?.trim();
+    if (fhpFinalError) { try { commonFunctionHookParams.finalErrorAnalyzerParams = JSON.parse(fhpFinalError); } catch (e) {} }
+    if (Object.keys(commonFunctionHookParams).length > 0) config.commonFunctionHookParams = commonFunctionHookParams;
+    
+    // Common request caching
+    const cacheEnabled = gwFields.commonCacheEnabled?.checked;
+    if (cacheEnabled) {
+        const cacheTtl = gwFields.commonCacheTtl?.value;
+        const cacheMaxSize = gwFields.commonCacheMaxSize?.value;
+        const cacheKeyGenerator = gwFields.commonCacheKeyGenerator?.value?.trim();
+        const staleWhileRevalidate = gwFields.commonCacheStaleWhileRevalidate?.checked;
+        const staleIfError = gwFields.commonCacheStaleIfError?.checked;
+        
+        if (cacheTtl) {
+            config.commonCache = { ttlMs: parseInt(cacheTtl) };
+            if (cacheMaxSize) config.commonCache.maxSize = parseInt(cacheMaxSize);
+            if (cacheKeyGenerator) {
+                config.commonCache.keyGenerator = cacheKeyGenerator;
+                functionDefs.push({ name: 'cacheKeyGenerator', value: cacheKeyGenerator });
+            }
+            if (staleWhileRevalidate) config.commonCache.staleWhileRevalidate = true;
+            if (staleIfError) config.commonCache.staleIfError = true;
+        }
+    }
+    
+    // Common function caching
+    const functionCacheEnabled = gwFields.commonFunctionCacheEnabled?.checked;
+    if (functionCacheEnabled) {
+        const fnCacheTtl = gwFields.commonFunctionCacheTtl?.value;
+        const fnCacheMaxSize = gwFields.commonFunctionCacheMaxSize?.value;
+        const fnCacheKeyGenerator = gwFields.commonFunctionCacheKeyGenerator?.value?.trim();
+        
+        if (fnCacheTtl) {
+            config.commonFunctionCache = { ttlMs: parseInt(fnCacheTtl) };
+            if (fnCacheMaxSize) config.commonFunctionCache.maxSize = parseInt(fnCacheMaxSize);
+            if (fnCacheKeyGenerator) {
+                config.commonFunctionCache.keyGenerator = fnCacheKeyGenerator;
+                functionDefs.push({ name: 'functionCacheKeyGenerator', value: fnCacheKeyGenerator });
+            }
+        }
+    }
+    
+    // Common state persistence
+    const statePersistenceOnStateChange = gwFields.commonStatePersistenceOnStateChange?.value?.trim();
+    const statePersistenceOnCompletion = gwFields.commonStatePersistenceOnCompletion?.value?.trim();
+    if (statePersistenceOnStateChange || statePersistenceOnCompletion) {
+        config.commonStatePersistence = {};
+        if (statePersistenceOnStateChange) {
+            config.commonStatePersistence.persistenceFunction = statePersistenceOnStateChange;
+            functionDefs.push({ name: 'persistenceFunction', value: statePersistenceOnStateChange });
+        }
+    }
+    
+    // Common trial mode
+    const trialModeEnabled = gwFields.commonTrialModeEnabled?.checked;
+    if (trialModeEnabled) {
+        const mockData = gwFields.commonTrialModeMockData?.value?.trim();
+        const mockLatency = gwFields.commonTrialModeMockLatencyMs?.value;
+        
+        config.commonTrialMode = { enabled: true };
+        if (mockData) {
+            try {
+                config.commonTrialMode.mockData = JSON.parse(mockData);
+            } catch (e) {}
+        }
+        if (mockLatency) config.commonTrialMode.mockLatencyMs = parseInt(mockLatency);
+    }
+    
+    // Rate limiting & Concurrency
+    const maxConcurrentRequests = gwFields.maxConcurrentRequests?.value;
+    if (maxConcurrentRequests) {
+        config.maxConcurrentRequests = parseInt(maxConcurrentRequests);
+    }
+    
+    const rlMaxRequests = gwFields.rateLimitMaxRequests?.value;
+    const rlWindowMs = gwFields.rateLimitWindowMs?.value;
+    if (rlMaxRequests && rlWindowMs) {
+        config.rateLimit = {
+            maxRequests: parseInt(rlMaxRequests),
+            windowMs: parseInt(rlWindowMs)
+        };
+    }
+    
+    // Circuit breaker
+    const cbFailure = gwFields.cbFailureThresholdPercentage?.value;
+    const cbMinRequests = gwFields.cbMinimumRequests?.value;
+    const cbRecovery = gwFields.cbRecoveryTimeoutMs?.value;
+    
+    if (cbFailure && cbMinRequests && cbRecovery) {
+        config.circuitBreaker = {
+            failureThresholdPercentage: parseInt(cbFailure),
+            minimumRequests: parseInt(cbMinRequests),
+            recoveryTimeoutMs: parseInt(cbRecovery)
+        };
+        
+        const cbHalfOpen = gwFields.cbHalfOpenMaxRequests?.value;
+        if (cbHalfOpen && parseInt(cbHalfOpen) !== 5) {
+            config.circuitBreaker.halfOpenMaxRequests = parseInt(cbHalfOpen);
+        }
+        
+        const cbSuccess = gwFields.cbSuccessThresholdPercentage?.value;
+        if (cbSuccess && parseInt(cbSuccess) !== 50) {
+            config.circuitBreaker.successThresholdPercentage = parseInt(cbSuccess);
+        }
+        
+        const cbTrackSlow = gwFields.cbTrackSlowCalls?.checked;
+        if (cbTrackSlow) {
+            config.circuitBreaker.trackSlowCalls = true;
+            const cbSlowDuration = gwFields.cbSlowCallDurationMs?.value;
+            if (cbSlowDuration) config.circuitBreaker.slowCallDurationMs = parseInt(cbSlowDuration);
+            const cbSlowThreshold = gwFields.cbSlowCallThresholdPercentage?.value;
+            if (cbSlowThreshold) config.circuitBreaker.slowCallThresholdPercentage = parseInt(cbSlowThreshold);
+        }
+    }
+    
+    // Shared buffer
+    const sharedBuffer = gwFields.sharedBuffer?.value?.trim();
+    if (sharedBuffer) {
+        try {
+            config.sharedBuffer = JSON.parse(sharedBuffer);
+        } catch (e) {}
+    }
+    
+    // Execution context
+    const executionContext = {};
+    const ecWorkflowId = gwFields.ecWorkflowId?.value?.trim();
+    if (ecWorkflowId) executionContext.workflowId = ecWorkflowId;
+    
+    const ecPhaseId = gwFields.ecPhaseId?.value?.trim();
+    if (ecPhaseId) executionContext.phaseId = ecPhaseId;
+    
+    const ecBranchId = gwFields.ecBranchId?.value?.trim();
+    if (ecBranchId) executionContext.branchId = ecBranchId;
+    
+    const ecRequestId = gwFields.ecRequestId?.value?.trim();
+    if (ecRequestId) executionContext.requestId = ecRequestId;
+    
+    if (Object.keys(executionContext).length > 0) {
+        config.executionContext = executionContext;
+    }
+    
+    // Metrics guardrails
+    const metricsGuardrails = {};
+    const mgSuccessRateMin = gwFields.mgSuccessRateMin?.value;
+    if (mgSuccessRateMin) metricsGuardrails.successRate = { min: parseFloat(mgSuccessRateMin) };
+    
+    const mgExecutionTimeMax = gwFields.mgExecutionTimeMax?.value;
+    if (mgExecutionTimeMax) metricsGuardrails.executionTime = { max: parseInt(mgExecutionTimeMax) };
+    
+    const mgThroughputMin = gwFields.mgThroughputMin?.value;
+    if (mgThroughputMin) metricsGuardrails.throughput = { min: parseFloat(mgThroughputMin) };
+    
+    const mgTotalRequestsMin = gwFields.mgTotalRequestsMin?.value;
+    if (mgTotalRequestsMin) metricsGuardrails.totalRequests = { min: parseInt(mgTotalRequestsMin) };
+    
+    const mgFailedRequestsMax = gwFields.mgFailedRequestsMax?.value;
+    if (mgFailedRequestsMax) metricsGuardrails.failedRequests = { max: parseInt(mgFailedRequestsMax) };
+    
+    const mgAvgRequestDurationMax = gwFields.mgAvgRequestDurationMax?.value;
+    if (mgAvgRequestDurationMax) metricsGuardrails.averageRequestDuration = { max: parseInt(mgAvgRequestDurationMax) };
+    
+    if (Object.keys(metricsGuardrails).length > 0) {
+        config.metricsGuardrails = { apiGateway: metricsGuardrails };
+    }
+    
+    return { config, imports, needsEnums, genericsInfo, functionDefs };
+}
+
+// Generate formatted code output
+function updateGwConfigOutput() {
+    const { config, imports, needsEnums, genericsInfo, functionDefs } = generateGwConfig();
+    const requests = getGwRequests();
+    const functions = getGwFunctions();
+    const groups = getGwGroups();
+    
+    let code = '';
+    
+    // Imports
+    if (needsEnums) {
+        imports.push('RETRY_STRATEGY');
+    }
+    code += `import { ${imports.join(', ')} } from '@emmvish/stable-request';\n`;
+    
+    // Build generics string
+    let genericsStr = '';
+    if (genericsInfo.request || genericsInfo.response || genericsInfo.fnArgs || genericsInfo.fnReturn) {
+        const parts = [
+            genericsInfo.request || 'any',
+            genericsInfo.response || 'any',
+            genericsInfo.fnArgs || 'any[]',
+            genericsInfo.fnReturn || 'any'
+        ];
+        genericsStr = `<${parts.join(', ')}>`;
+    }
+    
+    // Add request groups to config
+    if (groups.length > 0) {
+        config.requestGroups = groups.map(g => {
+            const group = { id: g.id };
+            if (g.hostname) group.hostname = g.hostname;
+            if (g.timeout) group.timeout = g.timeout;
+            if (g.attempts) group.attempts = g.attempts;
+            if (g.wait) group.wait = g.wait;
+            if (g.retryStrategy) group.retryStrategy = `RETRY_STRATEGY.${g.retryStrategy.toUpperCase()}`;
+            if (g.headers) group.headers = g.headers;
+            return group;
+        });
+    }
+    
+    // Generate items array
+    if (requests.length > 0 || functions.length > 0) {
+        code += '\n';
+        
+        // Generate requests
+        if (requests.length > 0) {
+            code += 'const requests = [\n';
+            requests.forEach((req, i) => {
+                code += '  {\n';
+                code += `    id: '${req.id}'`;
+                if (req.groupId) code += `,\n    groupId: '${req.groupId}'`;
+                code += `,\n    requestOptions: {\n`;
+                
+                const opts = req.requestOptions;
+                const optLines = [];
+                
+                optLines.push(`      path: '${opts.path}'`);
+                if (opts.method) optLines.push(`      method: '${opts.method}'`);
+                if (opts.hostname) optLines.push(`      hostname: '${opts.hostname}'`);
+                if (opts.timeout) optLines.push(`      timeout: ${opts.timeout}`);
+                if (opts.data) optLines.push(`      data: ${JSON.stringify(opts.data, null, 2).split('\n').map((l, j) => j > 0 ? '      ' + l : l).join('\n')}`);
+                if (opts.headers) optLines.push(`      headers: ${JSON.stringify(opts.headers, null, 2).split('\n').map((l, j) => j > 0 ? '      ' + l : l).join('\n')}`);
+                if (opts.attempts) optLines.push(`      attempts: ${opts.attempts}`);
+                if (opts.wait) optLines.push(`      wait: ${opts.wait}`);
+                if (opts.retryStrategy) optLines.push(`      retryStrategy: RETRY_STRATEGY.${opts.retryStrategy.toUpperCase()}`);
+                if (opts.responseAnalyzer) optLines.push(`      responseAnalyzer: ${opts.responseAnalyzer}`);
+                if (opts.finalErrorAnalyzer) optLines.push(`      finalErrorAnalyzer: ${opts.finalErrorAnalyzer}`);
+                if (opts.preExecution) optLines.push(`      preExecution: { hook: ${opts.preExecution.hook} }`);
+                if (opts.cache) {
+                    let cacheStr = '      cache: { ';
+                    const cacheParts = [];
+                    if (opts.cache.ttlMs) cacheParts.push(`ttlMs: ${opts.cache.ttlMs}`);
+                    if (opts.cache.keyGenerator) cacheParts.push(`keyGenerator: ${opts.cache.keyGenerator}`);
+                    cacheStr += cacheParts.join(', ') + ' }';
+                    optLines.push(cacheStr);
+                }
+                
+                code += optLines.join(',\n');
+                code += '\n    }\n  }';
+                if (i < requests.length - 1) code += ',';
+                code += '\n';
+            });
+            code += '];\n';
+        }
+        
+        // Generate functions
+        if (functions.length > 0) {
+            code += '\nconst functions = [\n';
+            functions.forEach((fn, i) => {
+                code += '  {\n';
+                code += `    id: '${fn.id}'`;
+                if (fn.groupId) code += `,\n    groupId: '${fn.groupId}'`;
+                code += `,\n    functionOptions: {\n`;
+                
+                const opts = fn.functionOptions;
+                const optLines = [];
+                
+                optLines.push(`      fn: ${opts.fn}`);
+                if (opts.args) optLines.push(`      args: ${JSON.stringify(opts.args)}`);
+                if (opts.executionTimeout) optLines.push(`      executionTimeout: ${opts.executionTimeout}`);
+                if (opts.returnResult) optLines.push(`      returnResult: true`);
+                if (opts.attempts) optLines.push(`      attempts: ${opts.attempts}`);
+                if (opts.wait) optLines.push(`      wait: ${opts.wait}`);
+                if (opts.retryStrategy) optLines.push(`      retryStrategy: RETRY_STRATEGY.${opts.retryStrategy.toUpperCase()}`);
+                if (opts.responseAnalyzer) optLines.push(`      responseAnalyzer: ${opts.responseAnalyzer}`);
+                if (opts.finalErrorAnalyzer) optLines.push(`      finalErrorAnalyzer: ${opts.finalErrorAnalyzer}`);
+                if (opts.preExecution) optLines.push(`      preExecution: { hook: ${opts.preExecution.hook} }`);
+                if (opts.cache) {
+                    let cacheStr = '      cache: { ';
+                    const cacheParts = [];
+                    if (opts.cache.ttlMs) cacheParts.push(`ttlMs: ${opts.cache.ttlMs}`);
+                    if (opts.cache.keyGenerator) cacheParts.push(`keyGenerator: ${opts.cache.keyGenerator}`);
+                    cacheStr += cacheParts.join(', ') + ' }';
+                    optLines.push(cacheStr);
+                }
+                
+                code += optLines.join(',\n');
+                code += '\n    }\n  }';
+                if (i < functions.length - 1) code += ',';
+                code += '\n';
+            });
+            code += '];\n';
+        }
+    }
+    
+    // Generate options
+    const hasConfig = Object.keys(config).length > 0;
+    const hasRequests = requests.length > 0;
+    const hasFunctions = functions.length > 0;
+    
+    code += '\n';
+    
+    if (hasConfig) {
+        code += `const options = ${formatGwConfigValue(config, 2)};\n\n`;
+    }
+    
+    // Generate call
+    if (hasRequests || hasFunctions) {
+        const itemsArg = hasRequests && hasFunctions 
+            ? '[...requests, ...functions]' 
+            : (hasRequests ? 'requests' : 'functions');
+        
+        if (hasConfig) {
+            code += `const result = await stableApiGateway${genericsStr}(${itemsArg}, options);`;
+        } else {
+            code += `const result = await stableApiGateway${genericsStr}(${itemsArg});`;
+        }
+    } else {
+        // No items yet
+        code += '// Add requests using the "Add Request" button above\n\n';
+        if (hasConfig) {
+            code += `const result = await stableApiGateway${genericsStr}(requests, options);`;
+        } else {
+            code += `const result = await stableApiGateway${genericsStr}(requests, {\n  concurrentExecution: true\n});`;
+        }
+    }
+    
+    const codeElement = document.getElementById('gw-config-output-code');
+    if (codeElement) {
+        codeElement.textContent = code;
+        if (window.Prism) {
+            Prism.highlightElement(codeElement);
+        }
+    }
+}
+
+// Format config value for gateway (handles function references)
+function formatGwConfigValue(value, baseIndent = 0, currentIndent = 0) {
+    const indent = '  '.repeat(currentIndent);
+    const nextIndent = '  '.repeat(currentIndent + 1);
+    
+    if (value === null) return 'null';
+    if (value === undefined) return 'undefined';
+    
+    if (typeof value === 'string') {
+        // Check if it's a function reference or enum
+        if (value.startsWith('RETRY_STRATEGY.') || 
+            value.includes('=>') ||
+            value.startsWith('(') ||
+            /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(value)) {
+            return value;
+        }
+        return `'${value.replace(/'/g, "\\'")}'`;
+    }
+    
+    if (typeof value === 'number' || typeof value === 'boolean') {
+        return String(value);
+    }
+    
+    if (Array.isArray(value)) {
+        if (value.length === 0) return '[]';
+        const items = value.map(item => formatGwConfigValue(item, baseIndent, currentIndent + 1));
+        return `[\n${nextIndent}${items.join(`,\n${nextIndent}`)}\n${indent}]`;
+    }
+    
+    if (typeof value === 'object') {
+        const entries = Object.entries(value);
+        if (entries.length === 0) return '{}';
+        
+        const lines = entries.map(([key, val]) => {
+            const formattedVal = formatGwConfigValue(val, baseIndent, currentIndent + 1);
+            return `${nextIndent}${key}: ${formattedVal}`;
+        });
+        
+        return `{\n${lines.join(',\n')}\n${indent}}`;
+    }
+    
+    return String(value);
+}
+
+function copyGwGeneratedCode() {
+    const code = document.getElementById('gw-config-output-code')?.textContent;
+    if (code) {
+        navigator.clipboard.writeText(code).then(() => {
+            showCopyFeedback('Code copied!');
+        });
+    }
+}
+
+function resetGwConfigBuilder() {
+    // Reset all fields
+    Object.values(gwFields).forEach(field => {
+        if (!field) return;
+        if (field.type === 'checkbox') {
+            // Reset checkboxes based on their defaults
+            if (field.id === 'gw-concurrentExecution') {
+                field.checked = true;
+            } else {
+                field.checked = false;
+            }
+        } else if (field.tagName === 'SELECT') {
+            field.selectedIndex = 0;
+        } else {
+            field.value = '';
+        }
+    });
+    
+    // Reset defaults for specific fields
+    if (gwFields.commonAttempts) gwFields.commonAttempts.value = '1';
+    if (gwFields.commonWait) gwFields.commonWait.value = '1000';
+    if (gwFields.commonMaxAllowedWait) gwFields.commonMaxAllowedWait.value = '60000';
+    if (gwFields.commonJitter) gwFields.commonJitter.value = '0';
+    if (gwFields.commonMaxSerializableChars) gwFields.commonMaxSerializableChars.value = '1000';
+    if (gwFields.cbHalfOpenMaxRequests) gwFields.cbHalfOpenMaxRequests.value = '5';
+    if (gwFields.cbSuccessThresholdPercentage) gwFields.cbSuccessThresholdPercentage.value = '50';
+    
+    // Clear dynamic items
+    const requestsContainer = document.getElementById('gw-requests-container');
+    const functionsContainer = document.getElementById('gw-functions-container');
+    const groupsContainer = document.getElementById('gw-groups-container');
+    if (requestsContainer) requestsContainer.innerHTML = '';
+    if (functionsContainer) functionsContainer.innerHTML = '';
+    if (groupsContainer) groupsContainer.innerHTML = '';
+    
+    // Reset conditional fields
+    const cacheFields = document.getElementById('gwCacheConfigFields');
+    const trialModeFields = document.getElementById('gwTrialModeConfigFields');
+    const functionCacheFields = document.getElementById('gwFunctionCacheConfigFields');
+    if (cacheFields) cacheFields.classList.add('disabled');
+    if (trialModeFields) trialModeFields.classList.add('disabled');
+    if (functionCacheFields) functionCacheFields.classList.add('disabled');
+    
+    gwRequestCounter = 0;
+    gwFunctionCounter = 0;
+    gwGroupCounter = 0;
+    
+    updateGwConfigOutput();
+}
+
+function initStableApiGatewayBuilder() {
+    gwFields = {
+        // Generics
+        genericRequest: document.getElementById('gw-generic-request'),
+        genericResponse: document.getElementById('gw-generic-response'),
+        genericFnArgs: document.getElementById('gw-generic-fnArgs'),
+        genericFnReturn: document.getElementById('gw-generic-fnReturn'),
+        
+        // Execution mode
+        concurrentExecution: document.getElementById('gw-concurrentExecution'),
+        stopOnFirstError: document.getElementById('gw-stopOnFirstError'),
+        enableRacing: document.getElementById('gw-enableRacing'),
+        maxTimeout: document.getElementById('gw-maxTimeout'),
+        
+        // Common request data
+        commonRequestDataHostname: document.getElementById('gw-commonRequestData-hostname'),
+        commonRequestDataProtocol: document.getElementById('gw-commonRequestData-protocol'),
+        commonRequestDataPort: document.getElementById('gw-commonRequestData-port'),
+        commonRequestDataMethod: document.getElementById('gw-commonRequestData-method'),
+        commonRequestDataTimeout: document.getElementById('gw-commonRequestData-timeout'),
+        commonRequestDataHeaders: document.getElementById('gw-commonRequestData-headers'),
+        commonRequestDataQuery: document.getElementById('gw-commonRequestData-query'),
+        commonRequestDataBody: document.getElementById('gw-commonRequestData-body'),
+        commonResReq: document.getElementById('gw-commonResReq'),
+        
+        // Common retry config
+        commonAttempts: document.getElementById('gw-commonAttempts'),
+        commonRetryStrategy: document.getElementById('gw-commonRetryStrategy'),
+        commonWait: document.getElementById('gw-commonWait'),
+        commonMaxAllowedWait: document.getElementById('gw-commonMaxAllowedWait'),
+        commonJitter: document.getElementById('gw-commonJitter'),
+        commonPerformAllAttempts: document.getElementById('gw-commonPerformAllAttempts'),
+        
+        // Common function config
+        commonExecutionTimeout: document.getElementById('gw-commonExecutionTimeout'),
+        commonReturnResult: document.getElementById('gw-commonReturnResult'),
+        
+        // Common analysis hooks
+        commonResponseAnalyzer: document.getElementById('gw-commonResponseAnalyzer'),
+        commonFinalErrorAnalyzer: document.getElementById('gw-commonFinalErrorAnalyzer'),
+        commonFunctionResponseAnalyzer: document.getElementById('gw-commonFunctionResponseAnalyzer'),
+        commonFinalFunctionErrorAnalyzer: document.getElementById('gw-commonFinalFunctionErrorAnalyzer'),
+        
+        // Common pre-execution
+        commonPreExecutionHook: document.getElementById('gw-commonPreExecution-hook'),
+        commonPreExecutionInputParams: document.getElementById('gw-commonPreExecution-inputParams'),
+        commonFunctionPreExecutionHook: document.getElementById('gw-commonFunctionPreExecution-hook'),
+        commonFunctionPreExecutionInputParams: document.getElementById('gw-commonFunctionPreExecution-inputParams'),
+        
+        // Common observability
+        commonLogAllErrors: document.getElementById('gw-commonLogAllErrors'),
+        commonLogAllSuccessfulAttempts: document.getElementById('gw-commonLogAllSuccessfulAttempts'),
+        commonHandleErrors: document.getElementById('gw-commonHandleErrors'),
+        commonHandleSuccessfulAttemptData: document.getElementById('gw-commonHandleSuccessfulAttemptData'),
+        commonHandleFunctionErrors: document.getElementById('gw-commonHandleFunctionErrors'),
+        commonHandleSuccessfulFunctionAttemptData: document.getElementById('gw-commonHandleSuccessfulFunctionAttemptData'),
+        commonMaxSerializableChars: document.getElementById('gw-commonMaxSerializableChars'),
+        
+        // Common hook params
+        commonHookParamsResponseAnalyzer: document.getElementById('gw-commonHookParams-responseAnalyzer'),
+        commonHookParamsHandleSuccessful: document.getElementById('gw-commonHookParams-handleSuccessful'),
+        commonHookParamsHandleErrors: document.getElementById('gw-commonHookParams-handleErrors'),
+        commonHookParamsFinalError: document.getElementById('gw-commonHookParams-finalError'),
+        commonFunctionHookParamsResponseAnalyzer: document.getElementById('gw-commonFunctionHookParams-responseAnalyzer'),
+        commonFunctionHookParamsHandleSuccessful: document.getElementById('gw-commonFunctionHookParams-handleSuccessful'),
+        commonFunctionHookParamsHandleErrors: document.getElementById('gw-commonFunctionHookParams-handleErrors'),
+        commonFunctionHookParamsFinalError: document.getElementById('gw-commonFunctionHookParams-finalError'),
+        
+        // Common request caching
+        commonCacheEnabled: document.getElementById('gw-commonCache-enabled'),
+        commonCacheTtl: document.getElementById('gw-commonCache-ttlMs'),
+        commonCacheMaxSize: document.getElementById('gw-commonCache-maxSize'),
+        commonCacheKeyGenerator: document.getElementById('gw-commonCache-keyGenerator'),
+        commonCacheStaleWhileRevalidate: document.getElementById('gw-commonCache-staleWhileRevalidate'),
+        commonCacheStaleIfError: document.getElementById('gw-commonCache-staleIfError'),
+        
+        // Common function caching
+        commonFunctionCacheEnabled: document.getElementById('gw-commonFunctionCache-enabled'),
+        commonFunctionCacheTtl: document.getElementById('gw-commonFunctionCache-ttlMs'),
+        commonFunctionCacheMaxSize: document.getElementById('gw-commonFunctionCache-maxSize'),
+        commonFunctionCacheKeyGenerator: document.getElementById('gw-commonFunctionCache-keyGenerator'),
+        
+        // Common state persistence
+        commonStatePersistenceOnStateChange: document.getElementById('gw-commonStatePersistence-onStateChange'),
+        commonStatePersistenceOnCompletion: document.getElementById('gw-commonStatePersistence-onCompletion'),
+        
+        // Common trial mode
+        commonTrialModeEnabled: document.getElementById('gw-commonTrialMode-enabled'),
+        commonTrialModeMockData: document.getElementById('gw-commonTrialMode-mockData'),
+        commonTrialModeMockLatencyMs: document.getElementById('gw-commonTrialMode-mockLatencyMs'),
+        
+        // Rate limiting & concurrency
+        maxConcurrentRequests: document.getElementById('gw-maxConcurrentRequests'),
+        rateLimitMaxRequests: document.getElementById('gw-rateLimit-maxRequests'),
+        rateLimitWindowMs: document.getElementById('gw-rateLimit-windowMs'),
+        
+        // Circuit breaker
+        cbFailureThresholdPercentage: document.getElementById('gw-cb-failureThresholdPercentage'),
+        cbMinimumRequests: document.getElementById('gw-cb-minimumRequests'),
+        cbRecoveryTimeoutMs: document.getElementById('gw-cb-recoveryTimeoutMs'),
+        cbHalfOpenMaxRequests: document.getElementById('gw-cb-halfOpenMaxRequests'),
+        cbSuccessThresholdPercentage: document.getElementById('gw-cb-successThresholdPercentage'),
+        cbTrackSlowCalls: document.getElementById('gw-cb-trackSlowCalls'),
+        cbSlowCallDurationMs: document.getElementById('gw-cb-slowCallDurationMs'),
+        cbSlowCallThresholdPercentage: document.getElementById('gw-cb-slowCallThresholdPercentage'),
+        
+        // Shared buffer
+        sharedBuffer: document.getElementById('gw-sharedBuffer'),
+        
+        // Execution context
+        ecWorkflowId: document.getElementById('gw-ec-workflowId'),
+        ecPhaseId: document.getElementById('gw-ec-phaseId'),
+        ecBranchId: document.getElementById('gw-ec-branchId'),
+        ecRequestId: document.getElementById('gw-ec-requestId'),
+        
+        // Metrics guardrails
+        mgSuccessRateMin: document.getElementById('gw-mg-successRate-min'),
+        mgExecutionTimeMax: document.getElementById('gw-mg-executionTime-max'),
+        mgThroughputMin: document.getElementById('gw-mg-throughput-min'),
+        mgTotalRequestsMin: document.getElementById('gw-mg-totalRequests-min'),
+        mgFailedRequestsMax: document.getElementById('gw-mg-failedRequests-max'),
+        mgAvgRequestDurationMax: document.getElementById('gw-mg-avgRequestDuration-max')
+    };
+    
+    // Add event listeners to all fields
+    Object.entries(gwFields).forEach(([name, field]) => {
+        if (!field) return;
+        field.addEventListener('input', updateGwConfigOutput);
+        field.addEventListener('change', updateGwConfigOutput);
+    });
+    
+    updateGwConfigOutput();
+}
+*/
+
 // Run initialization
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         initConfigBuilder();
         initStableFunctionBuilder();
         initStableBufferBuilder();
+        // stableApiGateway builder disabled (coming soon)
     });
 } else {
     initConfigBuilder();
     initStableFunctionBuilder();
     initStableBufferBuilder();
+    // stableApiGateway builder disabled (coming soon)
 }

@@ -724,6 +724,27 @@
                 </div>
               </div>
 
+              <!-- Transaction Logs -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v6H3z"/><path d="M3 9h18v12H3z"/><path d="M7 6h4"/><path d="M7 13h10"/><path d="M7 17h10"/></svg>
+                  Transaction Logs
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-group">
+                    <label for="sr-loadTransactionLogs">Load Transaction Logs <span class="func-badge">Function</span></label>
+                    <textarea id="sr-loadTransactionLogs" placeholder="(executionContext) => []" class="builder-textarea code-textarea" rows="3"></textarea>
+                    <span class="field-hint">Called once before execution; logs are passed to all hooks</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sr-transactionLogs">Transaction Logs <span class="json-badge">JSON</span></label>
+                    <textarea id="sr-transactionLogs" placeholder='[{"transactionId":"tx-001"}]' class="builder-textarea" rows="3"></textarea>
+                    <span class="field-hint">Pre-loaded logs (overridden by loadTransactionLogs)</span>
+                  </div>
+                </div>
+              </div>
+
               <!-- Execution Context -->
               <div class="builder-section collapsible">
                 <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
@@ -1410,6 +1431,27 @@ const result = await stableRequest({
                 </div>
               </div>
 
+              <!-- Transaction Logs -->
+              <div class="builder-section collapsible">
+                <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v6H3z"/><path d="M3 9h18v12H3z"/><path d="M7 6h4"/><path d="M7 13h10"/><path d="M7 17h10"/></svg>
+                  Transaction Logs
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </h4>
+                <div class="builder-fields collapsed">
+                  <div class="field-group">
+                    <label for="sf-loadTransactionLogs">Load Transaction Logs <span class="func-badge">Function</span></label>
+                    <textarea id="sf-loadTransactionLogs" placeholder="(executionContext) => []" class="builder-textarea code-textarea" rows="3"></textarea>
+                    <span class="field-hint">Called once before execution; logs are passed to all hooks</span>
+                  </div>
+                  <div class="field-group">
+                    <label for="sf-transactionLogs">Transaction Logs <span class="json-badge">JSON</span></label>
+                    <textarea id="sf-transactionLogs" placeholder='[{"transactionId":"tx-001"}]' class="builder-textarea" rows="3"></textarea>
+                    <span class="field-hint">Pre-loaded logs (overridden by loadTransactionLogs)</span>
+                  </div>
+                </div>
+              </div>
+
               <!-- Execution Context -->
               <div class="builder-section collapsible">
                 <h4 class="builder-section-title" onclick="toggleBuilderSection(this)">
@@ -1642,6 +1684,7 @@ console.log(buffer.read());</code></pre>
             </div>
           </div>
         </div>
+        <!-- stableApiGateway Config Builder (coming soon) -->
 
         <!-- Placeholder for Coming Soon modules -->
         <div class="builder-content" id="builder-placeholder">
