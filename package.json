@@ -56,5 +56,8 @@
   "homepage": "https://emmvish.github.io/stable-infra",
   "bugs": {
     "url": "https://github.com/Emmvish/stable-infra/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
