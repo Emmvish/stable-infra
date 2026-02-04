@@ -33,7 +33,7 @@ export async function executeWorkflowGraph<RequestDataType = any, ResponseDataTy
     const timeoutPromise = new Promise<STABLE_WORKFLOW_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>>((_, reject) => {
       setTimeout(() => {
         const contextStr = `workflowId=${workflowId}`;
-        reject(new Error(`stable-request: Workflow graph execution exceeded maxTimeout of ${options.maxTimeout}ms [${contextStr}]`));
+        reject(new Error(`stable-infra: Workflow graph execution exceeded maxTimeout of ${options.maxTimeout}ms [${contextStr}]`));
       }, options.maxTimeout);
     });
 
@@ -57,7 +57,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
       transactionLogs = await options.loadTransactionLogs({ workflowId });
       (options as any).transactionLogs = transactionLogs;
     } catch (e: any) {
-      console.error(`stable-request: Failed to load transaction logs: ${e.message}`);
+      console.error(`stable-infra: Failed to load transaction logs: ${e.message}`);
     }
   }
 
@@ -86,7 +86,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
     }
     
     if (validation.warnings.length > 0 && options.logPhaseResults) {
-      console.warn(`${formatLogContext({ workflowId })}stable-request: Workflow graph warnings:\n${validation.errors.join('\n')}`);
+      console.warn(`${formatLogContext({ workflowId })}stable-infra: Workflow graph warnings:\n${validation.errors.join('\n')}`);
     }
   }
 
@@ -97,7 +97,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
 
     if (nodesToRemove.length > 0 && options.logPhaseResults) {
       console.info(
-        `${formatLogContext({ workflowId })}stable-request: Optimizing graph by removing nodes: ${nodesToRemove.join(', ')}`
+        `${formatLogContext({ workflowId })}stable-infra: Optimizing graph by removing nodes: ${nodesToRemove.join(', ')}`
       );
     }
 
@@ -108,7 +108,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
     const depth = calculateGraphDepth(graph);
     if (depth > options.maxGraphDepth) {
       throw new Error(
-        `${formatLogContext({ workflowId })}stable-request: Workflow graph depth ${depth} exceeds maxGraphDepth of ${options.maxGraphDepth}`
+        `${formatLogContext({ workflowId })}stable-infra: Workflow graph depth ${depth} exceeds maxGraphDepth of ${options.maxGraphDepth}`
       );
     }
   }
@@ -146,7 +146,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
       visited.add(nodeId);
       
       if (options.logPhaseResults) {
-        console.info(`${formatLogContext({ workflowId })}stable-request: Merge point '${nodeId}' synchronized (waited for: ${node.waitForNodes.join(', ')})`);
+        console.info(`${formatLogContext({ workflowId })}stable-infra: Merge point '${nodeId}' synchronized (waited for: ${node.waitForNodes.join(', ')})`);
       }
       
       const edges = graph.edges.get(nodeId) || [];
@@ -303,14 +303,14 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
             executionNumber++;
             
             if (options.logPhaseResults) {
-              console.info(`${formatLogContext({ workflowId, phaseId })}stable-request: Phase decision - REPLAY (execution ${executionNumber})`);
+              console.info(`${formatLogContext({ workflowId, phaseId })}stable-infra: Phase decision - REPLAY (execution ${executionNumber})`);
             }
           } else if (decision.action === 'terminate') {
             terminatedEarly = true;
             terminationReason = decision.reason || 'Phase decision hook requested termination';
             
             if (options.logPhaseResults) {
-              console.info(`${formatLogContext({ workflowId, phaseId })}stable-request: Phase decision - TERMINATE: ${terminationReason}`);
+              console.info(`${formatLogContext({ workflowId, phaseId })}stable-infra: Phase decision - TERMINATE: ${terminationReason}`);
             }
           }
         }
@@ -322,8 +322,8 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
             workflowId,
             phaseId
           });
-          console.info(`${logContext}stable-request: Phase completed - Success: ${phaseResult.success}, Requests: ${phaseResult.totalRequests}`);
-          console.info(`${logContext}stable-request: ${safelyStringify(phaseResult, options.maxSerializableChars || 1000)}`);
+          console.info(`${logContext}stable-infra: Phase completed - Success: ${phaseResult.success}, Requests: ${phaseResult.totalRequests}`);
+          console.info(`${logContext}stable-infra: ${safelyStringify(phaseResult, options.maxSerializableChars || 1000)}`);
         }
         
         if (options.handlePhaseCompletion) {
@@ -367,7 +367,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
         phaseResults.push(errorResult);
         
         terminatedEarly = true;
-        terminationReason = error.message || `${formatLogContext({ workflowId })}stable-request: Unknown error during execution`;
+        terminationReason = error.message || `${formatLogContext({ workflowId })}stable-infra: Unknown error during execution`;
         shouldReplay = false;
       }
     } while (shouldReplay && !terminatedEarly);
@@ -445,7 +445,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
     );
     
     if (options.logPhaseResults) {
-      console.info(`${formatLogContext({ workflowId, phaseId: nodeId })}stable-request: Conditional '${nodeId}' evaluated to: ${nextNodeId}`);
+      console.info(`${formatLogContext({ workflowId, phaseId: nodeId })}stable-infra: Conditional '${nodeId}' evaluated to: ${nextNodeId}`);
     }
     
     if (graph.nodes.has(nextNodeId)) {
@@ -467,7 +467,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
     
     if (options.enableBranchRacing && allBranchNodes && node.parallelNodes.length > 1) {
       if (options.logPhaseResults) {
-        console.info(`${formatLogContext({ workflowId })}stable-request: Starting branch racing with ${node.parallelNodes.length} branches`);
+        console.info(`${formatLogContext({ workflowId })}stable-infra: Starting branch racing with ${node.parallelNodes.length} branches`);
       }
       
       const branchPromises = node.parallelNodes.map((parallelNodeId, index) => 
@@ -480,7 +480,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
         const winner = await Promise.race(branchPromises);
         
         if (options.logPhaseResults) {
-          console.info(`${formatLogContext({ workflowId })}stable-request: Branch '${winner.nodeId}' won the race`);
+          console.info(`${formatLogContext({ workflowId })}stable-infra: Branch '${winner.nodeId}' won the race`);
         }
         
         for (let i = 0; i < node.parallelNodes.length; i++) {
@@ -502,7 +502,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
                 failedRequests: 0,
                 responses: [],
                 skipped: true,
-                error: 'stable-request: Cancelled - another branch won the race'
+                error: 'stable-infra: Cancelled - another branch won the race'
               };
               
               results.set(losingNodeId, cancelledBranchResult);
@@ -513,7 +513,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
         
         if (!winner.success) {
           console.error(
-            `${formatLogContext({ workflowId })}stable-request: Winning branch '${winner.nodeId}' failed:`,
+            `${formatLogContext({ workflowId })}stable-infra: Winning branch '${winner.nodeId}' failed:`,
             winner.error
           );
           terminatedEarly = true;
@@ -521,7 +521,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
         }
       } catch (error: any) {
         console.error(
-          `${formatLogContext({ workflowId })}stable-request: Error during branch racing:`,
+          `${formatLogContext({ workflowId })}stable-infra: Error during branch racing:`,
           error
         );
         terminatedEarly = true;
@@ -532,7 +532,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
     }
     
     if (options.logPhaseResults) {
-      console.info(`${formatLogContext({ workflowId })}stable-request: Starting parallel execution of: ${node.parallelNodes.join(', ')}`);
+      console.info(`${formatLogContext({ workflowId })}stable-infra: Starting parallel execution of: ${node.parallelNodes.join(', ')}`);
     }
     
     await Promise.all(
@@ -540,7 +540,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
     );
     
     if (options.logPhaseResults) {
-      console.info(`${formatLogContext({ workflowId })}stable-request: Parallel execution completed for: ${node.parallelNodes.join(', ')}`);
+      console.info(`${formatLogContext({ workflowId })}stable-infra: Parallel execution completed for: ${node.parallelNodes.join(', ')}`);
     }
   };
   
@@ -549,7 +549,7 @@ async function executeWorkflowGraphInternal<RequestDataType = any, ResponseDataT
   } catch (error: any) {
     if (!terminatedEarly) {
       terminatedEarly = true;
-      terminationReason = error.message || `${formatLogContext({ workflowId })}stable-request: Unknown error during execution`;
+      terminationReason = error.message || `${formatLogContext({ workflowId })}stable-infra: Unknown error during execution`;
     }
   }
   

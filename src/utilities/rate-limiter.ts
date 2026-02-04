@@ -48,7 +48,7 @@ export class RateLimiter {
                     this.restoreState(persistedState);
                 }
             } catch (error) {
-                console.warn('stable-request: Unable to load rate limiter state from persistence.');
+                console.warn('stable-infra: Unable to load rate limiter state from persistence.');
             }
         }
         this.initialized = true;
@@ -87,7 +87,7 @@ export class RateLimiter {
             try {
                 await this.persistenceCoordinator.store(this.getPersistedState());
             } catch (error) {
-                console.warn('stable-request: Unable to store rate limiter state to persistence.');
+                console.warn('stable-infra: Unable to store rate limiter state to persistence.');
             }
         }
     }

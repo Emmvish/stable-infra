@@ -1001,7 +1001,7 @@ describe('Multi-Phase Workflows', () => {
       throw new Error('Expected timeout error');
     } catch (error: any) {
       const elapsed = Date.now() - start;
-      expect(error.message).toContain('stable-request:');
+      expect(error.message).toContain('stable-infra:');
       expect(error.message).toContain('Workflow execution exceeded maxTimeout of 200ms');
       expect(error.message).toContain('workflowId=wf-timeout');
       expect(elapsed).toBeLessThan(300);
@@ -1043,7 +1043,7 @@ describe('Multi-Phase Workflows', () => {
     expect(result.success).toBe(false);
     expect(result.completedPhases).toBe(1);
     expect(result.failedRequests).toBe(1);
-    expect(result.phases[0].error).toContain('stable-request:');
+    expect(result.phases[0].error).toContain('stable-infra:');
     expect(result.phases[0].error).toContain('Phase execution exceeded maxTimeout of 150ms');
     expect(result.phases[0].error).toContain('workflowId=wf-phase-timeout');
     expect(result.phases[0].error).toContain('phaseId=phase-1');

@@ -329,7 +329,7 @@ describe('stableApiGateway - Batch Processing', () => {
         fail('Expected timeout error');
       } catch (error: any) {
         const elapsed = Date.now() - start;
-        expect(error.message).toContain('stable-request:');
+        expect(error.message).toContain('stable-infra:');
         expect(error.message).toContain('Gateway execution exceeded maxTimeout of 200ms');
         expect(error.message).toContain('requestId=test-gateway-1');
         expect(elapsed).toBeLessThan(300);
@@ -389,7 +389,7 @@ describe('stableApiGateway - Batch Processing', () => {
         
         fail('Expected timeout error');
       } catch (error: any) {
-        expect(error.message).toContain('stable-request:');
+        expect(error.message).toContain('stable-infra:');
         expect(error.message).toContain('requestId=gw-123');
         expect(error.message).toContain('workflowId=user-456');
       }

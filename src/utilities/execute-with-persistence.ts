@@ -39,7 +39,7 @@ export async function executeWithPersistence<T = any>(
         }
       } catch (error: any) {
         console.error(
-          `${formatLogContext(executionContext)}stable-request: \nState persistence: Failed to load state before hook execution: ${error.message}`
+          `${formatLogContext(executionContext)}stable-infra: \nState persistence: Failed to load state before hook execution: ${error.message}`
         );
       }
     }
@@ -72,7 +72,7 @@ export async function executeWithPersistence<T = any>(
         );
       } catch (error: any) {
         console.error(
-          `${formatLogContext(executionContext)}stable-request: \nState persistence: Failed to store state after hook execution: ${error.message}`
+          `${formatLogContext(executionContext)}stable-infra: \nState persistence: Failed to store state after hook execution: ${error.message}`
         );
       }
     }

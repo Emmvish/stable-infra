@@ -8,7 +8,7 @@ export function isRetryableError(
 ) {
   if (trialMode.enabled) {
     if (Math.random() <= (trialMode?.retryFailureProbability ?? 0)) {
-      console.error('stable-request: Retry failed in trial mode.');
+      console.error('stable-infra: Retry failed in trial mode.');
       return false;
     }
     return true;

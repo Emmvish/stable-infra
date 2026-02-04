@@ -58,7 +58,7 @@ export class CircuitBreaker {
                     this.restoreState(persistedState);
                 }
             } catch (error) {
-                console.warn('stable-request: Unable to load circuit breaker state from persistence.');
+                console.warn('stable-infra: Unable to load circuit breaker state from persistence.');
             }
         }
         this.initialized = true;
@@ -117,7 +117,7 @@ export class CircuitBreaker {
             try {
                 await this.persistenceCoordinator.store(this.getPersistedState());
             } catch (error) {
-                console.warn('stable-request: Unable to store circuit breaker state to persistence.');
+                console.warn('stable-infra: Unable to store circuit breaker state to persistence.');
             }
         }
     }
@@ -380,7 +380,7 @@ export class CircuitBreaker {
         
         if (!canExecute) {
             throw new CircuitBreakerOpenError(
-                `stable-request: Circuit breaker is ${this.state}. Request blocked.`
+                `stable-infra: Circuit breaker is ${this.state}. Request blocked.`
             );
         }
 

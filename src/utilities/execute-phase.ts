@@ -26,7 +26,7 @@ export async function executePhase<RequestDataType = any, ResponseDataType = any
         const timeoutPromise = new Promise<STABLE_WORKFLOW_PHASE_RESULT<ResponseDataType, FunctionReturnType, RequestDataType, FunctionArgsType>>((_, reject) => {
             setTimeout(() => {
                 const contextStr = `workflowId=${workflowId}${branchId ? `, branchId=${branchId}` : ''}, phaseId=${phaseId}`;
-                reject(new Error(`stable-request: Phase execution exceeded maxTimeout of ${phase.maxTimeout}ms [${contextStr}]`));
+                reject(new Error(`stable-infra: Phase execution exceeded maxTimeout of ${phase.maxTimeout}ms [${contextStr}]`));
             }, phase.maxTimeout);
         });
 
@@ -106,12 +106,12 @@ async function executePhaseInternal<RequestDataType = any, ResponseDataType = an
             if (result) {
                 modifiedPhase = result;
                 console.info(
-                    `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Phase configuration modified by prePhaseExecutionHook`
+                    `${formatLogContext({ workflowId, branchId, phaseId })}stable-infra: Phase configuration modified by prePhaseExecutionHook`
                 );
             }
         } catch (error) {
             console.error(
-                `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Error in prePhaseExecutionHook:`,
+                `${formatLogContext({ workflowId, branchId, phaseId })}stable-infra: Error in prePhaseExecutionHook:`,
                 error
             );
         }
@@ -202,7 +202,7 @@ async function executePhaseInternal<RequestDataType = any, ResponseDataType = an
 
     if (logPhaseResults) {
         console.info(
-            `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Phase ${phaseId} completed:`,
+            `${formatLogContext({ workflowId, branchId, phaseId })}stable-infra: Phase ${phaseId} completed:`,
             `${phaseSuccessCount}/${responses.length} successful`,
             `(${phaseExecutionTime}ms)`
         );
@@ -226,7 +226,7 @@ async function executePhaseInternal<RequestDataType = any, ResponseDataType = an
             );
         } catch (hookError) {
             console.error(
-                `${formatLogContext({ workflowId, branchId, phaseId })}stable-request: Error in handlePhaseCompletion hook:`,
+                `${formatLogContext({ workflowId, branchId, phaseId })}stable-infra: Error in handlePhaseCompletion hook:`,
                 hookError
             );
         }

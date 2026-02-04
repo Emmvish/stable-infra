@@ -43,7 +43,7 @@ export class ConcurrencyLimiter {
                     this.restoreState(persistedState);
                 }
             } catch (error) {
-                console.warn('stable-request: Unable to load concurrency limiter state from persistence.');
+                console.warn('stable-infra: Unable to load concurrency limiter state from persistence.');
             }
         }
         this.initialized = true;
@@ -78,7 +78,7 @@ export class ConcurrencyLimiter {
             try {
                 await this.persistenceCoordinator.store(this.getPersistedState());
             } catch (error) {
-                console.warn('stable-request: Unable to store concurrency limiter state to persistence.');
+                console.warn('stable-infra: Unable to store concurrency limiter state to persistence.');
             }
         }
     }

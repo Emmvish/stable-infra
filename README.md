@@ -1,4 +1,4 @@
-# @emmvish/stable-request
+# @emmvish/stable-infra
 
 A stability-first production-grade TypeScript framework for resilient API integrations, batch processing, and orchestrating complex workflows with deterministic error handling, type safety, and comprehensive observability.
 
@@ -50,7 +50,7 @@ A stability-first production-grade TypeScript framework for resilient API integr
 
 ## Overview
 
-**@emmvish/stable-request** evolved from a focused library for resilient API calls to a comprehensive execution framework. Originally addressing **API integration** challenges via `stableRequest`, it expanded to include:
+**@emmvish/stable-infra** evolved from a focused library for resilient API calls to a comprehensive execution framework. Originally addressing **API integration** challenges via `stableRequest`, it expanded to include:
 
 1. **Batch orchestration** via `stableApiGateway` for processing groups of mixed requests/functions
 2. **Phased workflows** via `stableWorkflow` for array-based multi-phase execution with dynamic control flow
@@ -97,7 +97,7 @@ Workflows and gateways support `sharedBuffer` for passing computed state across 
 Single API call with resilience, type-safe request and response types.
 
 ```typescript
-import { stableRequest, REQUEST_METHODS, VALID_REQUEST_PROTOCOLS } from '@emmvish/stable-request';
+import { stableRequest, REQUEST_METHODS, VALID_REQUEST_PROTOCOLS } from '@emmvish/stable-infra';
 
 interface GetUserRequest {
   // Empty for GET requests with no body
@@ -150,7 +150,7 @@ if (result.success) {
 Generic async/sync function execution with identical resilience.
 
 ```typescript
-import { stableFunction, RETRY_STRATEGIES } from '@emmvish/stable-request';
+import { stableFunction, RETRY_STRATEGIES } from '@emmvish/stable-infra';
 
 type ComputeArgs = [number, number];
 type ComputeResult = number;
@@ -190,8 +190,8 @@ import {
   REQUEST_METHODS,
   VALID_REQUEST_PROTOCOLS,
   RequestOrFunction
-} from '@emmvish/stable-request';
-import type { API_GATEWAY_ITEM } from '@emmvish/stable-request';
+} from '@emmvish/stable-infra';
+import type { API_GATEWAY_ITEM } from '@emmvish/stable-infra';
 
 // Define request types
 interface ApiRequestData {
@@ -311,8 +311,8 @@ Phased array-based workflows with sequential/concurrent phases, mixed items, and
 You can start a workflow from a specific phase using `startPhaseIndex` (0-based). When starting inside a concurrent group (`markConcurrentPhase`), execution aligns to the group’s first phase.
 
 ```typescript
-import { stableWorkflow, PHASE_DECISION_ACTIONS, RequestOrFunction, REQUEST_METHODS } from '@emmvish/stable-request';
-import type { STABLE_WORKFLOW_PHASE, API_GATEWAY_ITEM } from '@emmvish/stable-request';
+import { stableWorkflow, PHASE_DECISION_ACTIONS, RequestOrFunction, REQUEST_METHODS } from '@emmvish/stable-infra';
+import type { STABLE_WORKFLOW_PHASE, API_GATEWAY_ITEM } from '@emmvish/stable-infra';
 
 // Define types for requests
 interface FetchRequestData {}
@@ -437,7 +437,7 @@ console.log(`Workflow succeeded: ${result.success}, phases: ${result.totalPhases
 DAG-based execution for higher parallelism and explicit phase dependencies.
 
 ```typescript
-import { stableWorkflowGraph, WorkflowGraphBuilder } from '@emmvish/stable-request';
+import { stableWorkflowGraph, WorkflowGraphBuilder } from '@emmvish/stable-infra';
 
 const graph = new WorkflowGraphBuilder()
   .addPhase('fetch-posts', {
@@ -509,7 +509,7 @@ Key features:
 - Optional transaction logging with `logTransaction`
 
 ```ts
-import { StableBuffer } from '@emmvish/stable-request';
+import { StableBuffer } from '@emmvish/stable-infra';
 
 const buffer = new StableBuffer({
   initialState: { counter: 0 },
@@ -528,7 +528,7 @@ await buffer.run(
 Replay utility (transaction logs → deterministic state replay):
 
 ```ts
-import { replayStableBufferTransactions } from '@emmvish/stable-request';
+import { replayStableBufferTransactions } from '@emmvish/stable-infra';
 
 const replay = await replayStableBufferTransactions({
   logs, // StableBufferTransactionLog[]
@@ -562,7 +562,7 @@ You can also set a **workflow/gateway-level `maxTimeout`** to cap total executio
 Set timeout directly on a function:
 
 ```typescript
-import { stableFunction } from '@emmvish/stable-request';
+import { stableFunction } from '@emmvish/stable-infra';
 
 const result = await stableFunction({
   fn: async () => {
@@ -586,7 +586,7 @@ if (!result.success && result.error?.includes('timeout')) {
 Apply timeout to all functions in a gateway:
 
 ```typescript
-import { stableApiGateway, RequestOrFunction } from '@emmvish/stable-request';
+import { stableApiGateway, RequestOrFunction } from '@emmvish/stable-infra';
 
 const results = await stableApiGateway(
   [
@@ -667,7 +667,7 @@ const results = await stableApiGateway(
 Apply timeout at phase level in workflows:
 
 ```typescript
-import { stableWorkflow } from '@emmvish/stable-request';
+import { stableWorkflow } from '@emmvish/stable-infra';
 
 const result = await stableWorkflow(
   [
@@ -752,7 +752,7 @@ When a request or function fails and is retryable, retry with configurable backo
 Constant wait between retries.
 
 ```typescript
-import { stableRequest, RETRY_STRATEGIES } from '@emmvish/stable-request';
+import { stableRequest, RETRY_STRATEGIES } from '@emmvish/stable-infra';
 
 interface DataRequest {}
 interface DataResponse { data: any; }
@@ -833,7 +833,7 @@ const result = await stableRequest<DataRequest, DataResponse>({
 Prevent cascading failures by failing fast when a dependency becomes unhealthy.
 
 ```typescript
-import { stableApiGateway, CircuitBreaker } from '@emmvish/stable-request';
+import { stableApiGateway, CircuitBreaker } from '@emmvish/stable-infra';
 
 interface FlakyRequest {}
 interface FlakyResponse { status: string; }
@@ -873,7 +873,7 @@ const responses = await stableApiGateway<FlakyRequest, FlakyResponse>(requests, 
 Cache responses to avoid redundant calls.
 
 ```typescript
-import { stableRequest, CacheManager } from '@emmvish/stable-request';
+import { stableRequest, CacheManager } from '@emmvish/stable-infra';
 
 interface UserRequest {}
 interface UserResponse {
@@ -914,7 +914,7 @@ const cache2 = new CacheManager({
 Arguments become cache key; identical args hit cache.
 
 ```typescript
-import { stableFunction } from '@emmvish/stable-request';
+import { stableFunction } from '@emmvish/stable-infra';
 
 const expensive = (x: number) => x * x * x; // Cubic calculation
 
@@ -938,7 +938,7 @@ const result2 = await stableFunction({
 Enforce max requests per time window.
 
 ```typescript
-import { stableApiGateway } from '@emmvish/stable-request';
+import { stableApiGateway } from '@emmvish/stable-infra';
 
 interface ItemRequest {}
 interface ItemResponse {
@@ -969,7 +969,7 @@ const responses = await stableApiGateway<ItemRequest, ItemResponse>(requests, {
 Limit concurrent in-flight requests.
 
 ```typescript
-import { stableApiGateway } from '@emmvish/stable-request';
+import { stableApiGateway } from '@emmvish/stable-infra';
 
 interface ItemRequest {}
 interface ItemResponse {
@@ -1004,8 +1004,8 @@ const responses = await stableApiGateway<ItemRequest, ItemResponse>(requests, {
 Each phase waits for the previous to complete.
 
 ```typescript
-import { stableWorkflow } from '@emmvish/stable-request';
-import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-request';
+import { stableWorkflow } from '@emmvish/stable-infra';
+import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-infra';
 
 const phases: STABLE_WORKFLOW_PHASE[] = [
   {
@@ -1246,8 +1246,8 @@ console.log(result.terminatedEarly); // true if TERMINATE triggered
 Execute multiple independent branches with shared state.
 
 ```typescript
-import { stableWorkflow } from '@emmvish/stable-request';
-import type { STABLE_WORKFLOW_BRANCH } from '@emmvish/stable-request';
+import { stableWorkflow } from '@emmvish/stable-infra';
+import type { STABLE_WORKFLOW_BRANCH } from '@emmvish/stable-infra';
 
 const branches: STABLE_WORKFLOW_BRANCH[] = [
   {
@@ -1338,8 +1338,8 @@ const result = await stableWorkflow([], {
 For complex topologies with explicit dependencies, use DAG execution mixing requests and functions.
 
 ```typescript
-import { stableWorkflowGraph, WorkflowGraphBuilder, RequestOrFunction } from '@emmvish/stable-request';
-import type { API_GATEWAY_ITEM } from '@emmvish/stable-request';
+import { stableWorkflowGraph, WorkflowGraphBuilder, RequestOrFunction } from '@emmvish/stable-infra';
+import type { API_GATEWAY_ITEM } from '@emmvish/stable-infra';
 
 // Request types
 interface PostsRequest {}
@@ -1428,7 +1428,7 @@ console.log(`Graph workflow success: ${result.success}`);
 Execute multiple phases concurrently within a group.
 
 ```typescript
-import { stableWorkflowGraph, WorkflowGraphBuilder } from '@emmvish/stable-request';
+import { stableWorkflowGraph, WorkflowGraphBuilder } from '@emmvish/stable-infra';
 
 const graph = new WorkflowGraphBuilder()
   .addPhase('fetch-users', {
@@ -1502,7 +1502,7 @@ const result = await stableWorkflowGraph(graph, {
 Convenience function for sequential phase chains.
 
 ```typescript
-import { createLinearWorkflowGraph } from '@emmvish/stable-request';
+import { createLinearWorkflowGraph } from '@emmvish/stable-infra';
 
 const phases = [
   {
@@ -1531,7 +1531,7 @@ const result = await stableWorkflowGraph(graph, {
 Enable branch racing in workflow graphs to accept the first successful branch node when multiple branches are executed in parallel.
 
 ```typescript
-import { stableWorkflowGraph, WorkflowGraphBuilder } from '@emmvish/stable-request';
+import { stableWorkflowGraph, WorkflowGraphBuilder } from '@emmvish/stable-infra';
 
 const branch1 = {
   id: 'provider-a',
@@ -1568,8 +1568,8 @@ const result = await stableWorkflowGraph(graph, {
 Define defaults globally; override at group, phase, branch, or item level.
 
 ```typescript
-import { stableWorkflow } from '@emmvish/stable-request';
-import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-request';
+import { stableWorkflow } from '@emmvish/stable-infra';
+import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-infra';
 
 const phases: STABLE_WORKFLOW_PHASE[] = [
   {
@@ -1607,8 +1607,8 @@ Pass mutable state across phases, branches, and items. For concurrency-safe shar
 #### Shared Buffer (Workflow/Gateway)
 
 ```typescript
-import { stableWorkflow } from '@emmvish/stable-request';
-import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-request';
+import { stableWorkflow } from '@emmvish/stable-infra';
+import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-infra';
 
 const phases: STABLE_WORKFLOW_PHASE[] = [
   {
@@ -1657,7 +1657,7 @@ const result = await stableWorkflow(phases, {
 #### Common Buffer (Request Level)
 
 ```typescript
-import { stableRequest, PersistenceStage } from '@emmvish/stable-request';
+import { stableRequest, PersistenceStage } from '@emmvish/stable-infra';
 
 const commonBuffer = { transactionId: null };
 
@@ -1687,7 +1687,7 @@ const result = await stableRequest({
 Modify config or state before execution.
 
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest } from '@emmvish/stable-infra';
 
 interface SecureRequest {}
 interface SecureResponse {
@@ -1724,7 +1724,7 @@ Validate responses and errors.
 #### Response Analyzer
 
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest } from '@emmvish/stable-infra';
 
 interface ResourceRequest {}
 interface ApiResponse {
@@ -1750,7 +1750,7 @@ const result = await stableRequest<ResourceRequest, ApiResponse>({
 Decide whether to suppress error gracefully.
 
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest } from '@emmvish/stable-infra';
 
 interface FeatureRequest {}
 interface FeatureResponse {
@@ -1786,7 +1786,7 @@ Custom logging and processing.
 #### Success Handler
 
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest } from '@emmvish/stable-infra';
 
 interface DataRequest {}
 interface DataResponse {
@@ -1835,8 +1835,8 @@ const result = await stableRequest<DataRequest, DataResponse>({
 #### Phase Handlers (Workflow)
 
 ```typescript
-import { stableWorkflow } from '@emmvish/stable-request';
-import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-request';
+import { stableWorkflow } from '@emmvish/stable-infra';
+import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-infra';
 
 const phases: STABLE_WORKFLOW_PHASE[] = [
   {
@@ -1864,8 +1864,8 @@ const result = await stableWorkflow(phases, {
 Dynamically determine workflow flow.
 
 ```typescript
-import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
-import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-request';
+import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-infra';
+import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-infra';
 
 const phases: STABLE_WORKFLOW_PHASE[] = [
   {
@@ -1895,7 +1895,7 @@ Automatic metrics collection across all execution modes.
 #### Request Metrics
 
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest } from '@emmvish/stable-infra';
 
 interface DataRequest {}
 interface DataResponse { data: any; }
@@ -1929,8 +1929,8 @@ console.log(result.metrics); // {
 #### API Gateway Metrics
 
 ```typescript
-import { stableApiGateway } from '@emmvish/stable-request';
-import type { API_GATEWAY_REQUEST } from '@emmvish/stable-request';
+import { stableApiGateway } from '@emmvish/stable-infra';
+import type { API_GATEWAY_REQUEST } from '@emmvish/stable-infra';
 
 interface ApiRequest {}
 interface ApiResponse { data: any; }
@@ -1974,8 +1974,8 @@ console.log(result.metrics); // {
 #### Workflow Metrics
 
 ```typescript
-import { stableWorkflow } from '@emmvish/stable-request';
-import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-request';
+import { stableWorkflow } from '@emmvish/stable-infra';
+import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-infra';
 
 const phases: STABLE_WORKFLOW_PHASE[] = [
   { id: 'p1', requests: [{ id: 'r1', requestOptions: { reqData: { path: '/a' }, resReq: true } }] },
@@ -2040,8 +2040,8 @@ if (result.errorLogs) {
 Dry-run workflows without side effects; simulate failures.
 
 ```typescript
-import { stableWorkflow } from '@emmvish/stable-request';
-import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-request';
+import { stableWorkflow } from '@emmvish/stable-infra';
+import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-infra';
 
 const phases: STABLE_WORKFLOW_PHASE[] = [
   {
@@ -2082,7 +2082,7 @@ Persist state across retry attempts for distributed tracing.
 The `persistenceFunction` receives a `persistenceStage` parameter (`PersistenceStage.BEFORE_HOOK` or `PersistenceStage.AFTER_HOOK`) to indicate when it is called.
 
 ```typescript
-import { stableRequest, PersistenceStage } from '@emmvish/stable-request';
+import { stableRequest, PersistenceStage } from '@emmvish/stable-infra';
 
 interface DataRequest {}
 interface DataResponse { data: any; }
@@ -2114,8 +2114,8 @@ const result = await stableRequest<DataRequest, DataResponse>({
 Combine API calls and computations in single phases with full type safety.
 
 ```typescript
-import { stableWorkflow, RequestOrFunction } from '@emmvish/stable-request';
-import type { STABLE_WORKFLOW_PHASE, API_GATEWAY_ITEM } from '@emmvish/stable-request';
+import { stableWorkflow, RequestOrFunction } from '@emmvish/stable-infra';
+import type { STABLE_WORKFLOW_PHASE, API_GATEWAY_ITEM } from '@emmvish/stable-infra';
 
 // Request types
 interface ProductRequest {}\ninterface ProductResponse {
@@ -2345,8 +2345,8 @@ await stableApiGateway<ServiceRequest, ServiceResponse>(requests, {
 Enforce performance and reliability SLAs with automatic validation.
 
 ```typescript
-import { stableWorkflow, MetricsGuardrails } from '@emmvish/stable-request';
-import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-request';
+import { stableWorkflow, MetricsGuardrails } from '@emmvish/stable-infra';
+import type { STABLE_WORKFLOW_PHASE } from '@emmvish/stable-infra';
 
 interface ApiRequest {}
 interface ApiResponse { data: any; }
@@ -2508,7 +2508,7 @@ await stableWorkflow(phases, {
 
 ## Summary
 
-@emmvish/stable-request provides a unified, type-safe framework for resilient execution:
+@emmvish/stable-infra provides a unified, type-safe framework for resilient execution:
 
 - **Single calls** via `stableRequest` (APIs) or `stableFunction` (pure functions)
 - **Batch orchestration** via `stableApiGateway` (concurrent/sequential mixed items)

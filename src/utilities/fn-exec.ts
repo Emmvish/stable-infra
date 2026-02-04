@@ -39,10 +39,10 @@ export async function fnExec<TArgs extends any[] = any[], TReturn = any>(
         Math.random() <= (trialMode?.reqFailureProbability ?? 0);
       if (trialCondition) {
         console.error(
-          `${formatLogContext(executionContext)}stable-request: Function execution failed in trial mode.\nFunction: ${fn.name || 'anonymous'}\nArgs:\n`,
+          `${formatLogContext(executionContext)}stable-infra: Function execution failed in trial mode.\nFunction: ${fn.name || 'anonymous'}\nArgs:\n`,
           safelyStringify(args, maxSerializableChars)
         );
-        throw new Error(`${formatLogContext(executionContext)}stable-request: Function execution failed in trial mode.`);
+        throw new Error(`${formatLogContext(executionContext)}stable-infra: Function execution failed in trial mode.`);
       } else {
         stopTime = Date.now();
         return {
@@ -76,7 +76,7 @@ export async function fnExec<TArgs extends any[] = any[], TReturn = any>(
     return {
       ok: false,
       isRetryable: true,
-      error: `${formatLogContext(executionContext)}stable-request: ${error.message || String(error)}`,
+      error: `${formatLogContext(executionContext)}stable-infra: ${error.message || String(error)}`,
       timestamp,
       executionTime
     };

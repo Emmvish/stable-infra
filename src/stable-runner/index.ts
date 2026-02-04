@@ -27,7 +27,7 @@ const RUN_ON_START = process.env.RUN_ON_START !== 'false';
 const MAX_RUNS = Number(process.env.MAX_RUNS || 0);
 
 if (!CONFIG_PATH) {
-  console.error('stable-request runner: CONFIG_PATH env var is required.');
+  console.error('stable-infra runner: CONFIG_PATH env var is required.');
   process.exit(1);
 }
 
@@ -170,7 +170,7 @@ const writeOutput = async (outputPath: string, payload: unknown) => {
       await fs.writeFile(outputPath, JSON.stringify(outputArray, null, 2), 'utf-8');
     })
     .catch((error) => {
-      console.error('stable-request runner: failed to write output.', error);
+      console.error('stable-infra runner: failed to write output.', error);
     });
 
   await writeOutputQueue;
@@ -191,7 +191,7 @@ const executeJob = async (job: RunnerJob) => {
     case RunnerJobs.STABLE_WORKFLOW_GRAPH:
       return stableWorkflowGraph(job.graph, job.options || {});
     default:
-      throw new Error(`stable-request runner: Unsupported job kind: ${(job as RunnerJob).kind}`);
+      throw new Error(`stable-infra runner: Unsupported job kind: ${(job as RunnerJob).kind}`);
   }
 };
 
@@ -289,7 +289,7 @@ const runOnce = async () => {
         activeSchedulerConfig = schedulerConfig;
       }
       if (!scheduler) {
-        throw new Error('stable-request runner: scheduler unavailable after initialization.');
+        throw new Error('stable-infra runner: scheduler unavailable after initialization.');
       }
       scheduler.setJobs(jobs);
       return;
@@ -302,14 +302,14 @@ const runOnce = async () => {
     }
 
     if (!config.job) {
-      throw new Error('stable-request runner: config must include a job or jobs array.');
+      throw new Error('stable-infra runner: config must include a job or jobs array.');
     }
 
     const result = await executeJob(config.job);
     const completedAt = new Date().toISOString();
 
     if (currentJobId && currentJobId !== config.jobId) {
-      console.warn(`stable-request runner: Job ID changed from ${currentJobId} to ${config.jobId}`);
+      console.warn(`stable-infra runner: Job ID changed from ${currentJobId} to ${config.jobId}`);
     }
     currentJobId = config.jobId ?? null;
 
@@ -352,13 +352,13 @@ const tick = async () => {
       await runOnce();
     }
   } catch (error: any) {
-    console.error('stable-request runner: unable to read CONFIG_PATH.', error?.message || error);
+    console.error('stable-infra runner: unable to read CONFIG_PATH.', error?.message || error);
   }
 };
 
 if (RUN_ON_START) {
   runOnce().catch((error) => {
-    console.error('stable-request runner: initial run failed.', error);
+    console.error('stable-infra runner: initial run failed.', error);
   });
 }
 

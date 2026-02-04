@@ -36,7 +36,7 @@ export async function executeGatewayRequest<RequestDataType = any, ResponseDataT
         const canExecute = await circuitBreaker.canExecute();
         if (!canExecute) {
             throw new CircuitBreakerOpenError(
-                `stable-request: Circuit breaker is ${circuitBreaker.getState().state}. Request blocked.`
+                `stable-infra: Circuit breaker is ${circuitBreaker.getState().state}. Request blocked.`
             );
         }
     }
@@ -108,7 +108,7 @@ export async function executeGatewayFunction<TArgs extends any[] = any[], TRetur
         const canExecute = await circuitBreaker.canExecute();
         if (!canExecute) {
             throw new CircuitBreakerOpenError(
-                `stable-request: Circuit breaker is ${circuitBreaker.getState().state}. Function execution blocked.`
+                `stable-infra: Circuit breaker is ${circuitBreaker.getState().state}. Function execution blocked.`
             );
         }
     }

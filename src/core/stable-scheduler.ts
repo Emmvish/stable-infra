@@ -459,7 +459,7 @@ export class StableScheduler<
         try {
           transactionLogs = await this.config.loadTransactionLogs({});
         } catch (e: any) {
-          console.error(`stable-request: Failed to load transaction logs: ${e.message}`);
+          console.error(`stable-infra: Failed to load transaction logs: ${e.message}`);
         }
       }
       

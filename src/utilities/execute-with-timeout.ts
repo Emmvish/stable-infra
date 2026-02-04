@@ -21,7 +21,7 @@ export async function executeWithTimeout<T>(
     timeoutId = setTimeout(() => {
       reject(
         new TimeoutError(
-          timeoutMessage || `stable-request: Function execution exceeded timeout of ${timeoutMs}ms`,
+          timeoutMessage || `stable-infra: Function execution exceeded timeout of ${timeoutMs}ms`,
           timeoutMs
         )
       );

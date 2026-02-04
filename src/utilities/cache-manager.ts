@@ -48,7 +48,7 @@ export class CacheManager {
                     this.restoreState(persistedState);
                 }
             } catch (error) {
-                console.warn('stable-request: Unable to load cache manager state from persistence.');
+                console.warn('stable-infra: Unable to load cache manager state from persistence.');
             }
         }
         this.initialized = true;
@@ -88,7 +88,7 @@ export class CacheManager {
             try {
                 await this.persistenceCoordinator.store(this.getPersistedState());
             } catch (error) {
-                console.warn('stable-request: Unable to store cache manager state to persistence.');
+                console.warn('stable-infra: Unable to store cache manager state to persistence.');
             }
         }
     }

@@ -41,10 +41,10 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
         Math.random() <= (trialMode?.reqFailureProbability ?? 0);
       if (trialCondition) {
         console.error(
-          `${formatLogContext(executionContext)}stable-request: Request failed in trial mode.\nRequest data:\n`,
+          `${formatLogContext(executionContext)}stable-infra: Request failed in trial mode.\nRequest data:\n`,
           safelyStringify(reqData, maxSerializableChars)
         );
-        throw new Error('stable-request: Request failed in trial mode.');
+        throw new Error('stable-infra: Request failed in trial mode.');
       } else {
         stopTime = Date.now();
         return {
@@ -95,7 +95,7 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
     if(axios.isCancel(e)) {
       return {
         ok: false,
-        error: 'stable-request: Request was cancelled.',
+        error: 'stable-infra: Request was cancelled.',
         isRetryable: false,
         timestamp,
         executionTime: stopTime - startTime,
@@ -105,7 +105,7 @@ export async function reqFn<RequestDataType = any, ResponseDataType = any>(
     }
     return {
       ok: false,
-      error: `stable-request: ${(e as AxiosError)?.response?.data ?? e?.message}`,
+      error: `stable-infra: ${(e as AxiosError)?.response?.data ?? e?.message}`,
       isRetryable: isRetryableError(e as AxiosError, trialMode),
       timestamp,
       executionTime: stopTime - startTime,

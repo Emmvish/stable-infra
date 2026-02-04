@@ -89,7 +89,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       }>((_, reject) => {
         setTimeout(() => {
           const contextStr = `workflowId=${workflowId}, branchId=${branchId}`;
-          reject(new Error(`stable-request: Branch execution exceeded maxTimeout of ${branch.maxTimeout}ms [${contextStr}]`));
+          reject(new Error(`stable-infra: Branch execution exceeded maxTimeout of ${branch.maxTimeout}ms [${contextStr}]`));
         }, branch.maxTimeout);
       });
 
@@ -138,12 +138,12 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
         if (result) {
           modifiedBranch = result;
           console.info(
-            `${formatLogContext({ workflowId, branchId })}stable-request: Branch configuration modified by preBranchExecutionHook`
+            `${formatLogContext({ workflowId, branchId })}stable-infra: Branch configuration modified by preBranchExecutionHook`
           );
         }
       } catch (error) {
         console.error(
-          `${formatLogContext({ workflowId, branchId })}stable-request: Error in preBranchExecutionHook:`,
+          `${formatLogContext({ workflowId, branchId })}stable-infra: Error in preBranchExecutionHook:`,
           error
         );
       }
@@ -202,7 +202,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       };
     } catch (error: any) {
       console.error(
-        `${formatLogContext({ workflowId })}stable-request: Branch ${branchId} failed:`,
+        `${formatLogContext({ workflowId })}stable-infra: Branch ${branchId} failed:`,
         error
       );
 
@@ -242,7 +242,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
   if (enableBranchRacing) {
     if (logPhaseResults) {
       console.info(
-        `${formatLogContext({ workflowId })}stable-request: Starting branch racing with ${branches.length} branches`
+        `${formatLogContext({ workflowId })}stable-infra: Starting branch racing with ${branches.length} branches`
       );
     }
 
@@ -257,7 +257,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       
       if (logPhaseResults) {
         console.info(
-          `${formatLogContext({ workflowId })}stable-request: Branch '${winner.branchId}' won the race`
+          `${formatLogContext({ workflowId })}stable-infra: Branch '${winner.branchId}' won the race`
         );
       }
 
@@ -297,7 +297,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
             );
           } catch (hookError) {
             console.error(
-              `${formatLogContext({ workflowId, branchId: result.branchResult.branchId })}stable-request: Error in handleBranchCompletion hook:`,
+              `${formatLogContext({ workflowId, branchId: result.branchResult.branchId })}stable-infra: Error in handleBranchCompletion hook:`,
               hookError
             );
           }
@@ -305,7 +305,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       } else {
         const error = 'error' in winner ? winner.error : undefined;
         console.error(
-          `${formatLogContext({ workflowId })}stable-request: Winning branch '${winner.branchId}' failed:`,
+          `${formatLogContext({ workflowId })}stable-infra: Winning branch '${winner.branchId}' failed:`,
           error
         );
         
@@ -318,7 +318,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
           completedPhases: 0,
           phaseResults: [],
           executionNumber: 1,
-          error: error?.message || 'stable-request: Branch execution failed'
+          error: error?.message || 'stable-infra: Branch execution failed'
         };
         
         errorResult.metrics = MetricsAggregator.extractBranchMetrics(errorResult);
@@ -340,7 +340,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
           phaseResults: [],
           executionNumber: 1,
           skipped: true,
-          error: 'stable-request: Cancelled - another branch won the race'
+          error: 'stable-infra: Cancelled - another branch won the race'
         };
         
         cancelledResult.metrics = MetricsAggregator.extractBranchMetrics(cancelledResult);
@@ -369,7 +369,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       };
     } catch (error) {
       console.error(
-        `${formatLogContext({ workflowId })}stable-request: Branch racing failed:`,
+        `${formatLogContext({ workflowId })}stable-infra: Branch racing failed:`,
         error
       );
       
@@ -395,7 +395,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     const branchIndex = branches.findIndex(b => b.id === currentBranchId);
     if (branchIndex === -1) {
       console.error(
-        `${formatLogContext({ workflowId })}stable-request: Branch '${currentBranchId}' not found`
+        `${formatLogContext({ workflowId })}stable-infra: Branch '${currentBranchId}' not found`
       );
       terminatedEarly = true;
       terminationReason = `Branch '${currentBranchId}' not found`;
@@ -410,7 +410,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     if (executionNumber > maxReplayCount + 1) {
       if (logPhaseResults) {
         console.warn(
-          `${formatLogContext({ workflowId })}stable-request: Branch '${currentBranchId}' exceeded max replay count (${maxReplayCount}). Skipping.`
+          `${formatLogContext({ workflowId })}stable-infra: Branch '${currentBranchId}' exceeded max replay count (${maxReplayCount}). Skipping.`
         );
       }
 
@@ -474,7 +474,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       if (logPhaseResults) {
         const branchIds = concurrentGroup.map(({ branch }) => branch.id).join(', ');
         console.info(
-          `${formatLogContext({ workflowId })}\nstable-request: Executing ${concurrentGroup.length} branches in parallel: [${branchIds}]`
+          `${formatLogContext({ workflowId })}\nstable-infra: Executing ${concurrentGroup.length} branches in parallel: [${branchIds}]`
         );
       }
 
@@ -526,7 +526,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
             );
           } catch (hookError) {
             console.error(
-              `${formatLogContext({ workflowId, branchId: result.branchResult.branchId })}stable-request: Error in handleBranchCompletion hook:`,
+              `${formatLogContext({ workflowId, branchId: result.branchResult.branchId })}stable-infra: Error in handleBranchCompletion hook:`,
               hookError
             );
           }
@@ -582,7 +582,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
                 );
               } catch (hookError) {
                 console.error(
-                  `${formatLogContext({ workflowId, branchId: branch.id })}stable-request: Error in handleBranchDecision hook:`,
+                  `${formatLogContext({ workflowId, branchId: branch.id })}stable-infra: Error in handleBranchDecision hook:`,
                   hookError
                 );
               }
@@ -600,14 +600,14 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
 
               if (logPhaseResults && decision.action !== PHASE_DECISION_ACTIONS.CONTINUE) {
                 console.info(
-                  `${formatLogContext({ workflowId })}stable-request: Concurrent group decision: ${decision.action}`,
+                  `${formatLogContext({ workflowId })}stable-infra: Concurrent group decision: ${decision.action}`,
                   decision.targetBranchId ? `-> ${decision.targetBranchId}` : ''
                 );
               }
             }
           } catch (decisionError) {
             console.error(
-              `${formatLogContext({ workflowId, branchId: branch.id })}stable-request: Error in branch decision hook for ${branch.id}:`,
+              `${formatLogContext({ workflowId, branchId: branch.id })}stable-infra: Error in branch decision hook for ${branch.id}:`,
               decisionError
             );
           }
@@ -627,7 +627,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
         if (lastBranchDecision.addBranches && Array.isArray(lastBranchDecision.addBranches) && lastBranchDecision.addBranches.length > 0) {
           if (logPhaseResults) {
             console.info(
-              `${formatLogContext({ workflowId })}stable-request: Adding ${lastBranchDecision.addBranches.length} dynamic branch(es) after concurrent group`
+              `${formatLogContext({ workflowId })}stable-infra: Adding ${lastBranchDecision.addBranches.length} dynamic branch(es) after concurrent group`
             );
           }
 
@@ -639,7 +639,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
             
             if (logPhaseResults) {
               console.info(
-                `${formatLogContext({ workflowId })}stable-request: Added dynamic branch '${newBranchId}' at index ${j + idx}`
+                `${formatLogContext({ workflowId })}stable-infra: Added dynamic branch '${newBranchId}' at index ${j + idx}`
               );
             }
           });
@@ -650,7 +650,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
           
           if (logPhaseResults) {
             console.info(
-              `${formatLogContext({ workflowId, branchId: lastBranch.id })}stable-request: Adding ${lastBranchDecision.addPhases.length} dynamic phase(s) to branch '${lastBranch.id}'`
+              `${formatLogContext({ workflowId, branchId: lastBranch.id })}stable-infra: Adding ${lastBranchDecision.addPhases.length} dynamic phase(s) to branch '${lastBranch.id}'`
             );
           }
 
@@ -716,7 +716,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     } else {
       if (logPhaseResults) {
         console.info(
-          `${formatLogContext({ workflowId })}\nstable-request: Executing branch: ${currentBranch.id} (execution #${executionNumber})`
+          `${formatLogContext({ workflowId })}\nstable-infra: Executing branch: ${currentBranch.id} (execution #${executionNumber})`
         );
       }
 
@@ -755,7 +755,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
           );
         } catch (hookError) {
           console.error(
-            `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-request: Error in handleBranchCompletion hook:`,
+            `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-infra: Error in handleBranchCompletion hook:`,
             hookError
           );
         }
@@ -797,7 +797,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
 
           if (logPhaseResults) {
             console.info(
-              `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-request: Branch '${currentBranchId}' decision: ${decision.action}`,
+              `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-infra: Branch '${currentBranchId}' decision: ${decision.action}`,
               decision.targetBranchId ? `-> ${decision.targetBranchId}` : ''
             );
           }
@@ -820,14 +820,14 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
               );
             } catch (hookError) {
               console.error(
-                `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-request: Error in handleBranchDecision hook:`,
+                `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-infra: Error in handleBranchDecision hook:`,
                 hookError
               );
             }
           }
         } catch (decisionError) {
           console.error(
-            `${formatLogContext({ workflowId, branchId: currentBranch.id })}stable-request: Error in branch decision hook for ${currentBranch.id}:`,
+            `${formatLogContext({ workflowId, branchId: currentBranch.id })}stable-infra: Error in branch decision hook for ${currentBranch.id}:`,
             decisionError
           );
           decision = { action: PHASE_DECISION_ACTIONS.CONTINUE };
@@ -837,7 +837,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       if (decision.addBranches && Array.isArray(decision.addBranches) && decision.addBranches.length > 0) {
         if (logPhaseResults) {
           console.info(
-            `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-request: Adding ${decision.addBranches.length} dynamic branch(es) after '${currentBranchId}'`
+            `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-infra: Adding ${decision.addBranches.length} dynamic branch(es) after '${currentBranchId}'`
           );
         }
 
@@ -849,7 +849,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
           
           if (logPhaseResults) {
             console.info(
-              `${formatLogContext({ workflowId })}stable-request: Added dynamic branch '${newBranchId}' at index ${branchIndex + 1 + idx}`
+              `${formatLogContext({ workflowId })}stable-infra: Added dynamic branch '${newBranchId}' at index ${branchIndex + 1 + idx}`
             );
           }
         });
@@ -858,7 +858,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
       if (decision.addPhases && Array.isArray(decision.addPhases) && decision.addPhases.length > 0) {
         if (logPhaseResults) {
           console.info(
-            `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-request: Adding ${decision.addPhases.length} dynamic phase(s) to branch '${currentBranchId}' and re-executing`
+            `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-infra: Adding ${decision.addPhases.length} dynamic phase(s) to branch '${currentBranchId}' and re-executing`
           );
         }
 
@@ -868,7 +868,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
 
         if (logPhaseResults) {
           console.info(
-            `${formatLogContext({ workflowId })}\nstable-request: Re-executing branch: ${currentBranch.id} with ${decision.addPhases.length} additional phase(s) (execution #${executionNumber + 1})`
+            `${formatLogContext({ workflowId })}\nstable-infra: Re-executing branch: ${currentBranch.id} with ${decision.addPhases.length} additional phase(s) (execution #${executionNumber + 1})`
           );
         }
 
@@ -906,7 +906,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
             const targetIndex = branches.findIndex(b => b.id === decision.targetBranchId);
             if (targetIndex === -1) {
               console.error(
-                `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-request: Jump target branch '${decision.targetBranchId}' not found`
+                `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-infra: Jump target branch '${decision.targetBranchId}' not found`
               );
               terminatedEarly = true;
               terminationReason = `Jump target branch '${decision.targetBranchId}' not found`;
@@ -922,7 +922,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
         case PHASE_DECISION_ACTIONS.SKIP:
           if (!currentBranch.allowSkip && currentBranch.allowSkip !== undefined) {
             console.warn(
-              `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-request: Branch '${currentBranchId}' attempted to skip but allowSkip is false. Continuing normally.`
+              `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-infra: Branch '${currentBranchId}' attempted to skip but allowSkip is false. Continuing normally.`
             );
             currentBranchId = branches[branchIndex + 1]?.id || null;
             break;
@@ -993,7 +993,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
         case PHASE_DECISION_ACTIONS.REPLAY:
           if (!currentBranch.allowReplay && currentBranch.allowReplay !== undefined) {
             console.warn(
-              `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-request: Branch '${currentBranchId}' attempted to replay but allowReplay is false. Continuing normally.`
+              `${formatLogContext({ workflowId, branchId: currentBranchId })}stable-infra: Branch '${currentBranchId}' attempted to replay but allowReplay is false. Continuing normally.`
             );
             currentBranchId = branches[branchIndex + 1]?.id || null;
             break;
@@ -1021,7 +1021,7 @@ export async function executeBranchWorkflow<RequestDataType = any, ResponseDataT
     
     if (logPhaseResults) {
       console.warn(
-        `${formatLogContext({ workflowId })}stable-request: ${terminationReason}`
+        `${formatLogContext({ workflowId })}stable-infra: ${terminationReason}`
       );
     }
   }

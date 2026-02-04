@@ -61,7 +61,7 @@ export async function stableApiGateway<RequestDataType = any, ResponseDataType =
                 const contextStr = finalOptions.executionContext 
                     ? ` [${Object.entries(finalOptions.executionContext).map(([k, v]) => `${k}=${v}`).join(', ')}]`
                     : '';
-                reject(new Error(`stable-request: Gateway execution exceeded maxTimeout of ${finalOptions.maxTimeout}ms${contextStr}`));
+                reject(new Error(`stable-infra: Gateway execution exceeded maxTimeout of ${finalOptions.maxTimeout}ms${contextStr}`));
             }, finalOptions.maxTimeout);
         });
 
@@ -83,7 +83,7 @@ async function executeGateway<RequestDataType = any, ResponseDataType = any, Fun
         try {
             transactionLogs = await finalOptions.loadTransactionLogs(finalOptions.executionContext || {});
         } catch (e: any) {
-            console.error(`stable-request: Failed to load transaction logs: ${e.message}`);
+            console.error(`stable-infra: Failed to load transaction logs: ${e.message}`);
         }
     }
 
