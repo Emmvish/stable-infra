@@ -827,7 +827,7 @@ function generateCode() {
 // Please enter a hostname in the Request Data section.`;
     }
     
-    let importLine = `import { ${imports.join(', ')} } from '@emmvish/stable-request';`;
+    let importLine = `import { ${imports.join(', ')} } from '@emmvish/stable-infra';`;
     
     // Generate StableBuffer code if enabled
     let bufferCode = '';
@@ -1691,7 +1691,7 @@ function generateSfCode() {
 // Please provide both in the Function Configuration section.`;
     }
     
-    let importLine = `import { ${imports.join(', ')} } from '@emmvish/stable-request';`;
+    let importLine = `import { ${imports.join(', ')} } from '@emmvish/stable-infra';`;
     
     // Generate StableBuffer code if enabled
     let stableBufferCode = '';
@@ -1982,7 +1982,7 @@ function generateStableBufferConfig() {
 function generateSbCode() {
     const options = generateStableBufferConfig();
     
-    let importLine = `import { StableBuffer } from '@emmvish/stable-request';`;
+    let importLine = `import { StableBuffer } from '@emmvish/stable-infra';`;
     
     const hasOptions = Object.keys(options).length > 0;
     const optionsStr = hasOptions ? formatConfigValue(options, 2, 0) : '';
@@ -3113,7 +3113,7 @@ function updateGwConfigOutput() {
     if (needsEnums) {
         imports.push('RETRY_STRATEGY');
     }
-    code += `import { ${imports.join(', ')} } from '@emmvish/stable-request';\n`;
+    code += `import { ${imports.join(', ')} } from '@emmvish/stable-infra';\n`;
     
     // Build generics string
     let genericsStr = '';

@@ -199,7 +199,7 @@ The scheduler persists `nextRunAt` and `lastRunAt` per job, so cron and interval
 Example config for the Stable Runner to schedule workflow and API gateway jobs:
 
 ```js
-import { RunnerJobs, ScheduleTypes } from '@emmvish/stable-request';
+import { RunnerJobs, ScheduleTypes } from '@emmvish/stable-infra';
 
 export default {
 	jobId: 'scheduled-runner',
@@ -246,7 +246,7 @@ import {
 	RunnerScheduledJob,
 	RunnerRequestJob,
     REQUEST_METHODS
-} from '@emmvish/stable-request';
+} from '@emmvish/stable-infra';
 
 interface MyRequest { query: string; }
 interface MyResponse { results: string[]; }

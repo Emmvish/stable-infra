@@ -154,7 +154,7 @@ Guardrails (if provided) are validated and exposed under `metrics.validation`.
 ### Basic Usage
 
 ```ts
-import { StableBuffer } from '@emmvish/stable-request';
+import { StableBuffer } from '@emmvish/stable-infra';
 
 const buffer = new StableBuffer({
 	initialState: { count: 0 }
@@ -204,7 +204,7 @@ import {
 	stableApiGateway,
 	stableWorkflow,
 	RequestOrFunction
-} from '@emmvish/stable-request';
+} from '@emmvish/stable-infra';
 
 const shared = new StableBuffer({
 	initialState: { traceId: 'trace-001' }

@@ -399,7 +399,7 @@ The `WorkflowGraphBuilder` class provides a fluent API for constructing workflow
 ### Creating a Builder
 
 ```typescript
-import { WorkflowGraphBuilder } from '@emmvish/stable-request';
+import { WorkflowGraphBuilder } from '@emmvish/stable-infra';
 
 const builder = new WorkflowGraphBuilder<RequestDataType, ResponseDataType>();
 ```
@@ -650,7 +650,7 @@ Before execution (if `validateGraph: true`):
 
 **Example:**
 ```typescript
-import { validateWorkflowGraph } from '@emmvish/stable-request';
+import { validateWorkflowGraph } from '@emmvish/stable-infra';
 
 const validation = validateWorkflowGraph(graph);
 
@@ -883,7 +883,7 @@ Internally, `detectUnreachableNodes()` powers reachability checks, `detectOrphan
 ### Example 1: Simple Sequential Graph
 
 ```typescript
-import { WorkflowGraphBuilder, stableWorkflowGraph, WorkflowNodeTypes } from '@emmvish/stable-request';
+import { WorkflowGraphBuilder, stableWorkflowGraph, WorkflowNodeTypes } from '@emmvish/stable-infra';
 
 const builder = new WorkflowGraphBuilder();
 
@@ -927,7 +927,7 @@ console.log(`Workflow: ${result.success ? 'Success' : 'Failed'}`);
 ### Example 2: Conditional Routing
 
 ```typescript
-import { WorkflowGraphBuilder, stableWorkflowGraph, WorkflowNodeTypes, WorkflowEdgeConditionTypes } from '@emmvish/stable-request';
+import { WorkflowGraphBuilder, stableWorkflowGraph, WorkflowNodeTypes, WorkflowEdgeConditionTypes } from '@emmvish/stable-infra';
 
 const builder = new WorkflowGraphBuilder();
 
@@ -973,7 +973,7 @@ const result = await stableWorkflowGraph(graph, {
 ### Example 3: Parallel Execution with Merge Point
 
 ```typescript
-import { WorkflowGraphBuilder, stableWorkflowGraph, WorkflowNodeTypes } from '@emmvish/stable-request';
+import { WorkflowGraphBuilder, stableWorkflowGraph, WorkflowNodeTypes } from '@emmvish/stable-infra';
 
 const builder = new WorkflowGraphBuilder();
 
@@ -1038,7 +1038,7 @@ console.log(`Parallel execution completed in ${result.executionTime}ms`);
 ### Example 4: Success/Failure Edge Conditions
 
 ```typescript
-import { WorkflowGraphBuilder, stableWorkflowGraph, WorkflowEdgeConditionTypes } from '@emmvish/stable-request';
+import { WorkflowGraphBuilder, stableWorkflowGraph, WorkflowEdgeConditionTypes } from '@emmvish/stable-infra';
 
 const builder = new WorkflowGraphBuilder();
 
@@ -1090,7 +1090,7 @@ const result = await stableWorkflowGraph(graph, {
 ### Example 5: Custom Edge Conditions
 
 ```typescript
-import { WorkflowGraphBuilder, stableWorkflowGraph, WorkflowEdgeConditionTypes } from '@emmvish/stable-request';
+import { WorkflowGraphBuilder, stableWorkflowGraph, WorkflowEdgeConditionTypes } from '@emmvish/stable-infra';
 
 const builder = new WorkflowGraphBuilder();
 
@@ -1152,7 +1152,7 @@ const result = await stableWorkflowGraph(graph, {
 ### Example 6: Branch Nodes in Graph
 
 ```typescript
-import { WorkflowGraphBuilder, stableWorkflowGraph, PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
+import { WorkflowGraphBuilder, stableWorkflowGraph, PHASE_DECISION_ACTIONS } from '@emmvish/stable-infra';
 
 const builder = new WorkflowGraphBuilder();
 
@@ -1234,7 +1234,7 @@ const result = await stableWorkflowGraph(graph, {
 ### Use Case 1: Complex ETL Pipeline with Error Handling
 
 ```typescript
-import { WorkflowGraphBuilder, stableWorkflowGraph, WorkflowEdgeConditionTypes } from '@emmvish/stable-request';
+import { WorkflowGraphBuilder, stableWorkflowGraph, WorkflowEdgeConditionTypes } from '@emmvish/stable-infra';
 
 const builder = new WorkflowGraphBuilder();
 
@@ -1398,7 +1398,7 @@ console.log(`Total execution time: ${result.executionTime}ms`);
 ### Use Case 2: Multi-Stage Approval Workflow
 
 ```typescript
-import { WorkflowGraphBuilder, stableWorkflowGraph, WorkflowEdgeConditionTypes } from '@emmvish/stable-request';
+import { WorkflowGraphBuilder, stableWorkflowGraph, WorkflowEdgeConditionTypes } from '@emmvish/stable-infra';
 
 const builder = new WorkflowGraphBuilder();
 const sharedBuffer: Record<string, any> = { approvals: [] };
@@ -1510,7 +1510,7 @@ console.log(`Approval workflow: ${result.success ? 'Completed' : 'Failed'}`);
 ### Use Case 3: Adaptive Processing Pipeline
 
 ```typescript
-import { WorkflowGraphBuilder, stableWorkflowGraph, WorkflowEdgeConditionTypes } from '@emmvish/stable-request';
+import { WorkflowGraphBuilder, stableWorkflowGraph, WorkflowEdgeConditionTypes } from '@emmvish/stable-infra';
 
 const builder = new WorkflowGraphBuilder();
 const sharedBuffer: Record<string, any> = {};
@@ -1977,6 +1977,6 @@ For detailed information on the validation result structure, severity levels, an
 
 For issues, questions, or contributions:
 
-- **GitHub**: [https://github.com/emmvish/stable-request](https://github.com/emmvish/stable-request)
-- **NPM**: [https://www.npmjs.com/package/@emmvish/stable-request](https://www.npmjs.com/package/@emmvish/stable-request)
-- **Issues**: [https://github.com/emmvish/stable-request/issues](https://github.com/emmvish/stable-request/issues)
+- **GitHub**: [https://github.com/emmvish/stable-infra](https://github.com/emmvish/stable-infra)
+- **NPM**: [https://www.npmjs.com/package/@emmvish/stable-infra](https://www.npmjs.com/package/@emmvish/stable-infra)
+- **Issues**: [https://github.com/emmvish/stable-infra/issues](https://github.com/emmvish/stable-infra/issues)

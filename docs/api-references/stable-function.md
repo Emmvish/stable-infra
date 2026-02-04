@@ -499,7 +499,7 @@ The following diagram illustrates the complete lifecycle of a `stableFunction` e
 ### Example 1: Basic Function with Retry
 
 ```typescript
-import { stableFunction, RETRY_STRATEGIES } from '@emmvish/stable-request';
+import { stableFunction, RETRY_STRATEGIES } from '@emmvish/stable-infra';
 
 const fetchData = async (userId: number): Promise<{ name: string; email: string }> => {
   const response = await fetch(`https://api.example.com/users/${userId}`);
@@ -530,7 +530,7 @@ if (result.success) {
 ### Example 2: Function with Caching
 
 ```typescript
-import { stableFunction } from '@emmvish/stable-request';
+import { stableFunction } from '@emmvish/stable-infra';
 
 const expensiveCalculation = (a: number, b: number): number => {
   // Simulate expensive operation
@@ -566,7 +566,7 @@ console.log('Cache hit:', cachedResult.metrics?.infrastructureMetrics?.cache?.hi
 ### Example 3: Function with Circuit Breaker
 
 ```typescript
-import { stableFunction, CircuitBreaker } from '@emmvish/stable-request';
+import { stableFunction, CircuitBreaker } from '@emmvish/stable-infra';
 
 const breaker = new CircuitBreaker({
   failureThresholdPercentage: 50,
@@ -611,7 +611,7 @@ console.log('CB State:', breaker.getState().state); // OPEN, CLOSED, or HALF_OPE
 ### Example 4: Function with Rate Limiting and Concurrency
 
 ```typescript
-import { stableFunction } from '@emmvish/stable-request';
+import { stableFunction } from '@emmvish/stable-infra';
 
 const processItem = async (itemId: number): Promise<{ processed: boolean }> => {
   // Simulate API call
@@ -643,7 +643,7 @@ console.log('Rate limiter stats:', results[0].metrics?.infrastructureMetrics?.ra
 ### Example 5: Function with Pre-Execution Hook
 
 ```typescript
-import { stableFunction } from '@emmvish/stable-request';
+import { stableFunction } from '@emmvish/stable-infra';
 
 interface ApiConfig {
   baseUrl: string;
@@ -691,7 +691,7 @@ console.log('Result:', result.data);
 ### Example 6: Function with Observability Hooks
 
 ```typescript
-import { stableFunction } from '@emmvish/stable-request';
+import { stableFunction } from '@emmvish/stable-infra';
 
 const dataProcessor = async (data: any[]): Promise<{ count: number }> => {
   if (data.length === 0) {
@@ -756,7 +756,7 @@ console.log('Metrics:', result.metrics);
 ### Example 7: Function with State Persistence
 
 ```typescript
-import { stableFunction } from '@emmvish/stable-request';
+import { stableFunction } from '@emmvish/stable-infra';
 
 const externalStorage = new Map<string, any>();
 
@@ -818,7 +818,7 @@ console.log('Persisted states:', Array.from(externalStorage.keys()));
 ### Example 8: Function with Trial Mode
 
 ```typescript
-import { stableFunction } from '@emmvish/stable-request';
+import { stableFunction } from '@emmvish/stable-infra';
 
 const criticalOperation = async (value: number): Promise<number> => {
   // This won't actually execute in trial mode
@@ -864,7 +864,7 @@ console.log('Trial result:', result);
 ### Use Case 1: Database Transaction with Retry
 
 ```typescript
-import { stableFunction } from '@emmvish/stable-request';
+import { stableFunction } from '@emmvish/stable-infra';
 
 interface Transaction {
   execute: () => Promise<void>;
@@ -904,7 +904,7 @@ const result = await stableFunction<[Transaction], boolean>({
 ### Use Case 2: Function Chain with Buffer Passing
 
 ```typescript
-import { stableFunction } from '@emmvish/stable-request';
+import { stableFunction } from '@emmvish/stable-infra';
 
 const sharedBuffer: Record<string, any> = {};
 
@@ -939,7 +939,7 @@ console.log('Final result:', step2.data);
 ### Use Case 3: Parallel Function Execution with Shared Circuit Breaker
 
 ```typescript
-import { stableFunction, CircuitBreaker } from '@emmvish/stable-request';
+import { stableFunction, CircuitBreaker } from '@emmvish/stable-infra';
 
 const sharedBreaker = new CircuitBreaker({
   failureThresholdPercentage: 50,
@@ -976,7 +976,7 @@ console.log('Circuit breaker state:', sharedBreaker.getState().state);
 ### Use Case 4: Function with Custom Metrics Collection
 
 ```typescript
-import { stableFunction } from '@emmvish/stable-request';
+import { stableFunction } from '@emmvish/stable-infra';
 
 class MetricsCollector {
   private metrics: any[] = [];
@@ -1220,14 +1220,12 @@ if (result.metrics?.validation) {
    }
    ```
 
-For detailed information on the validation result structure and severity levels, see the [stable-request documentation](./stable-request.md#metrics-guardrails-and-validation).
-
 ---
 
 ## Support
 
 For issues, questions, or contributions:
 
-- **GitHub**: [https://github.com/emmvish/stable-request](https://github.com/emmvish/stable-request)
-- **NPM**: [https://www.npmjs.com/package/@emmvish/stable-request](https://www.npmjs.com/package/@emmvish/stable-request)
-- **Issues**: [https://github.com/emmvish/stable-request/issues](https://github.com/emmvish/stable-request/issues)
+- **GitHub**: [https://github.com/emmvish/stable-infra](https://github.com/emmvish/stable-infra)
+- **NPM**: [https://www.npmjs.com/package/@emmvish/stable-infra](https://www.npmjs.com/package/@emmvish/stable-infra)
+- **Issues**: [https://github.com/emmvish/stable-infra/issues](https://github.com/emmvish/stable-infra/issues)

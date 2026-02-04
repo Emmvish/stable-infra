@@ -121,7 +121,7 @@ interface RunnerWorkflowGraphJob<
 ### Usage with Generics
 
 ```ts
-import { RunnerJobs, RunnerRequestJob, RunnerConfig, REQUEST_METHODS } from '@emmvish/stable-request';
+import { RunnerJobs, RunnerRequestJob, RunnerConfig, REQUEST_METHODS } from '@emmvish/stable-infra';
 
 interface MyRequest { userId: number; }
 interface MyResponse { id: number; name: string; }
@@ -197,7 +197,7 @@ If a job fails, the `error` field is written:
 ### ESM Config (runner-config.mjs)
 
 ```js
-import { RunnerJobs, REQUEST_METHODS } from '@emmvish/stable-request';
+import { RunnerJobs, REQUEST_METHODS } from '@emmvish/stable-infra';
 
 export default {
 	jobId: 'demo-001',
@@ -242,14 +242,14 @@ export default {
 Build the image and run the runner with a mounted config file:
 
 ```bash
-docker build -t stable-request-runner .
+docker build -t stable-infra-runner .
 
 docker run --rm \
 	-e CONFIG_PATH=/app/examples/runner-config.mjs \
 	-e OUTPUT_PATH=/app/output/result.json \
 	-v "$(pwd)/examples:/app/examples" \
 	-v "$(pwd)/output:/app/output" \
-	stable-request-runner
+	stable-infra-runner
 ```
 
 ---

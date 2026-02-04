@@ -19,7 +19,7 @@
 
 ## Overview
 
-The `@emmvish/stable-request` library provides a suite of infrastructure utilities that implement resilience patterns for production-ready applications. These utilities can be used independently or together to build robust, fault-tolerant systems.
+The `@emmvish/stable-infra` library provides a suite of infrastructure utilities that implement resilience patterns for production-ready applications. These utilities can be used independently or together to build robust, fault-tolerant systems.
 
 ### Key Utilities
 
@@ -200,7 +200,7 @@ console.log(`Pruned ${prunedCount} expired entries`);
 Use singleton pattern for shared cache across application.
 
 ```typescript
-import { getGlobalCacheManager, resetGlobalCacheManager } from '@emmvish/stable-request';
+import { getGlobalCacheManager, resetGlobalCacheManager } from '@emmvish/stable-infra';
 
 // Initialize global cache
 const cache = getGlobalCacheManager({
@@ -415,7 +415,7 @@ try {
 ### Global Instance
 
 ```typescript
-import { getGlobalCircuitBreaker, resetGlobalCircuitBreaker } from '@emmvish/stable-request';
+import { getGlobalCircuitBreaker, resetGlobalCircuitBreaker } from '@emmvish/stable-infra';
 
 const breaker = getGlobalCircuitBreaker({
   failureThresholdPercentage: 50,
@@ -534,7 +534,7 @@ console.log(`Throttle rate: ${state.throttleRate.toFixed(2)}%`);
 ### Global Instance
 
 ```typescript
-import { getGlobalRateLimiter, resetGlobalRateLimiter } from '@emmvish/stable-request';
+import { getGlobalRateLimiter, resetGlobalRateLimiter } from '@emmvish/stable-infra';
 
 const limiter = getGlobalRateLimiter(100, 60000);
 resetGlobalRateLimiter();
@@ -645,7 +645,7 @@ console.log(`Success rate: ${state.successRate.toFixed(2)}%`);
 ### Global Instance
 
 ```typescript
-import { getGlobalConcurrencyLimiter, resetGlobalConcurrencyLimiter } from '@emmvish/stable-request';
+import { getGlobalConcurrencyLimiter, resetGlobalConcurrencyLimiter } from '@emmvish/stable-infra';
 
 const limiter = getGlobalConcurrencyLimiter(10);
 resetGlobalConcurrencyLimiter();
@@ -765,7 +765,7 @@ console.log(`Size: ${stats.size}/${stats.maxSize}`);
 ### Global Instance
 
 ```typescript
-import { getGlobalFunctionCacheManager } from '@emmvish/stable-request';
+import { getGlobalFunctionCacheManager } from '@emmvish/stable-infra';
 
 const cache = getGlobalFunctionCacheManager({
   enabled: true,
@@ -787,7 +787,7 @@ Use `replayStableBufferTransactions` to rebuild buffer state from transaction lo
 ### Usage
 
 ```typescript
-import { replayStableBufferTransactions } from '@emmvish/stable-request';
+import { replayStableBufferTransactions } from '@emmvish/stable-infra';
 
 const replay = await replayStableBufferTransactions({
   logs,
@@ -1428,7 +1428,7 @@ if (deviation > 50) {
 #### Example 1: Request Validation
 
 ```typescript
-import { stableRequest, MetricsValidator } from '@emmvish/stable-request';
+import { stableRequest, MetricsValidator } from '@emmvish/stable-infra';
 
 const result = await stableRequest({
   reqData: {
@@ -1458,7 +1458,7 @@ if (!result.metrics?.validation?.isValid) {
 #### Example 2: API Gateway Validation
 
 ```typescript
-import { stableApiGateway, MetricsValidator, AnomalySeverity } from '@emmvish/stable-request';
+import { stableApiGateway, MetricsValidator, AnomalySeverity } from '@emmvish/stable-infra';
 
 const result = await stableApiGateway(
   requests,
@@ -1487,7 +1487,7 @@ if (result.metrics?.validation) {
 #### Example 3: Workflow Validation
 
 ```typescript
-import { stableWorkflow, MetricsValidator } from '@emmvish/stable-request';
+import { stableWorkflow, MetricsValidator } from '@emmvish/stable-infra';
 
 const result = await stableWorkflow(
   phases,
@@ -1548,7 +1548,7 @@ if (result.metrics?.validation?.isValid) {
 #### Example 5: Multi-Level Validation
 
 ```typescript
-import { stableWorkflow, ViolationType } from '@emmvish/stable-request';
+import { stableWorkflow, ViolationType } from '@emmvish/stable-infra';
 
 const result = await stableWorkflow(
   phases,
@@ -1610,7 +1610,7 @@ import {
   getGlobalCacheManager, 
   getGlobalCircuitBreaker,
   MetricsValidator 
-} from '@emmvish/stable-request';
+} from '@emmvish/stable-infra';
 
 const cache = getGlobalCacheManager({ enabled: true, ttl: 300000 });
 const breaker = getGlobalCircuitBreaker({
@@ -1655,7 +1655,7 @@ if (result.metrics?.validation) {
 ### Integration with Monitoring
 
 ```typescript
-import { MetricsValidator, AnomalySeverity, ViolationType } from '@emmvish/stable-request';
+import { MetricsValidator, AnomalySeverity, ViolationType } from '@emmvish/stable-infra';
 
 function sendMetricsToMonitoring(result: any) {
   if (!result.metrics?.validation) return;
@@ -1788,7 +1788,7 @@ function sendMetricsToMonitoring(result: any) {
 ### Example 1: HTTP Response Caching
 
 ```typescript
-import { CacheManager } from '@emmvish/stable-request';
+import { CacheManager } from '@emmvish/stable-infra';
 
 const cache = new CacheManager({
   enabled: true,
@@ -1822,7 +1822,7 @@ console.log(`Cache size: ${stats.size}/${stats.maxSize}`);
 ### Example 2: Circuit Breaker Protection
 
 ```typescript
-import { CircuitBreaker, CircuitBreakerState } from '@emmvish/stable-request';
+import { CircuitBreaker, CircuitBreakerState } from '@emmvish/stable-infra';
 
 const breaker = new CircuitBreaker({
   failureThresholdPercentage: 50, // Open at 50% failure
@@ -1855,7 +1855,7 @@ if (state.state === CircuitBreakerState.OPEN) {
 ### Example 3: Rate Limiting
 
 ```typescript
-import { RateLimiter } from '@emmvish/stable-request';
+import { RateLimiter } from '@emmvish/stable-infra';
 
 const limiter = new RateLimiter(100, 60000); // 100 requests per minute
 
@@ -1884,7 +1884,7 @@ console.log(`Current rate: ${state.currentRequestRate.toFixed(2)} req/s`);
 ### Example 4: Concurrency Control
 
 ```typescript
-import { ConcurrencyLimiter } from '@emmvish/stable-request';
+import { ConcurrencyLimiter } from '@emmvish/stable-infra';
 
 const limiter = new ConcurrencyLimiter(5); // Max 5 concurrent
 
@@ -1915,7 +1915,7 @@ console.log(`Average execution time: ${state.averageExecutionTime.toFixed(2)}ms`
 ### Example 5: Function Result Caching
 
 ```typescript
-import { FunctionCacheManager } from '@emmvish/stable-request';
+import { FunctionCacheManager } from '@emmvish/stable-infra';
 
 const cache = new FunctionCacheManager({
   enabled: true,
@@ -1962,7 +1962,7 @@ import {
   RateLimiter,
   ConcurrencyLimiter,
   stableRequest
-} from '@emmvish/stable-request';
+} from '@emmvish/stable-infra';
 
 // Initialize infrastructure
 const cache = new CacheManager({
@@ -2020,7 +2020,7 @@ console.log('Concurrency limiter stats:', concurrencyLimiter.getState());
 ### Use Case 1: Multi-Tier Caching Strategy
 
 ```typescript
-import { CacheManager, FunctionCacheManager } from '@emmvish/stable-request';
+import { CacheManager, FunctionCacheManager } from '@emmvish/stable-infra';
 
 // HTTP response cache (short TTL)
 const httpCache = new CacheManager({
@@ -2075,7 +2075,7 @@ const data3 = await getProcessedData('123');
 ### Use Case 2: Adaptive Circuit Breaker with Fallback
 
 ```typescript
-import { CircuitBreaker, CircuitBreakerState, CircuitBreakerOpenError } from '@emmvish/stable-request';
+import { CircuitBreaker, CircuitBreakerState, CircuitBreakerOpenError } from '@emmvish/stable-infra';
 
 const primaryBreaker = new CircuitBreaker({
   failureThresholdPercentage: 50,
@@ -2136,7 +2136,7 @@ setInterval(() => {
 ### Use Case 3: Smart Rate Limiting with Priority Queue
 
 ```typescript
-import { RateLimiter } from '@emmvish/stable-request';
+import { RateLimiter } from '@emmvish/stable-infra';
 
 class PriorityRateLimiter {
   private highPriorityLimiter: RateLimiter;
@@ -2181,7 +2181,7 @@ await priorityLimiter.execute(
 ### Use Case 4: Dynamic Concurrency Adjustment
 
 ```typescript
-import { ConcurrencyLimiter } from '@emmvish/stable-request';
+import { ConcurrencyLimiter } from '@emmvish/stable-infra';
 
 class AdaptiveConcurrencyLimiter {
   private limiter: ConcurrencyLimiter;
@@ -2242,7 +2242,7 @@ for (let i = 0; i < 1000; i++) {
 ### Use Case 5: Comprehensive Monitoring Dashboard
 
 ```typescript
-import { MetricsAggregator, CacheManager, CircuitBreaker, RateLimiter, ConcurrencyLimiter } from '@emmvish/stable-request';
+import { MetricsAggregator, CacheManager, CircuitBreaker, RateLimiter, ConcurrencyLimiter } from '@emmvish/stable-infra';
 
 class InfrastructureMonitor {
   private cache: CacheManager;
@@ -2482,6 +2482,6 @@ monitor.startMonitoring(10000); // Every 10 seconds
 
 For issues, questions, or contributions:
 
-- **GitHub**: [https://github.com/emmvish/stable-request](https://github.com/emmvish/stable-request)
-- **NPM**: [https://www.npmjs.com/package/@emmvish/stable-request](https://www.npmjs.com/package/@emmvish/stable-request)
-- **Issues**: [https://github.com/emmvish/stable-request/issues](https://github.com/emmvish/stable-request/issues)
+- **GitHub**: [https://github.com/emmvish/stable-infra](https://github.com/emmvish/stable-infra)
+- **NPM**: [https://www.npmjs.com/package/@emmvish/stable-infra](https://www.npmjs.com/package/@emmvish/stable-infra)
+- **Issues**: [https://github.com/emmvish/stable-infra/issues](https://github.com/emmvish/stable-infra/issues)

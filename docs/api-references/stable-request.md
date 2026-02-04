@@ -607,7 +607,7 @@ Non-retryable errors (immediate failure):
 ### Example 1: Basic HTTP Request with Retry
 
 ```typescript
-import { stableRequest, RETRY_STRATEGIES, REQUEST_METHODS, VALID_REQUEST_PROTOCOLS } from '@emmvish/stable-request';
+import { stableRequest, RETRY_STRATEGIES, REQUEST_METHODS, VALID_REQUEST_PROTOCOLS } from '@emmvish/stable-infra';
 
 const result = await stableRequest<never, { id: number; name: string }>({
   reqData: {
@@ -636,7 +636,7 @@ if (result.success) {
 ### Example 2: POST Request with Body
 
 ```typescript
-import { stableRequest, REQUEST_METHODS } from '@emmvish/stable-request';
+import { stableRequest, REQUEST_METHODS } from '@emmvish/stable-infra';
 
 const result = await stableRequest<{ name: string; email: string }, { id: number }>({
   reqData: {
@@ -667,7 +667,7 @@ console.log('Created user ID:', result.data?.id);
 ### Example 3: Request with Response Validation
 
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest } from '@emmvish/stable-infra';
 
 interface UserResponse {
   id: number;
@@ -709,7 +709,7 @@ if (result.success) {
 ### Example 4: Request with Circuit Breaker
 
 ```typescript
-import { stableRequest, CircuitBreaker } from '@emmvish/stable-request';
+import { stableRequest, CircuitBreaker } from '@emmvish/stable-infra';
 
 // Shared circuit breaker for all requests to same service
 const breaker = new CircuitBreaker({
@@ -745,7 +745,7 @@ console.log('Circuit breaker state:', breaker.getState().state);
 ### Example 5: Request with Caching
 
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest } from '@emmvish/stable-infra';
 
 const result = await stableRequest<never, { items: any[] }>({
   reqData: {
@@ -776,7 +776,7 @@ console.log('Cache hit:', cachedResult.metrics?.infrastructureMetrics?.cache?.hi
 ### Example 6: Request with Pre-Execution Hook
 
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest } from '@emmvish/stable-infra';
 
 const getAuthToken = async (): Promise<string> => {
   // Fetch dynamic auth token
@@ -814,7 +814,7 @@ const result = await stableRequest({
 ### Example 7: Request with Query Parameters
 
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest } from '@emmvish/stable-infra';
 
 const result = await stableRequest({
   reqData: {
@@ -837,7 +837,7 @@ const result = await stableRequest({
 ### Example 8: Request with State Persistence
 
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest } from '@emmvish/stable-infra';
 
 const externalStorage = new Map<string, any>();
 
@@ -872,7 +872,7 @@ console.log('Persisted states:', Array.from(externalStorage.keys()));
 ### Example 9: Request with Trial Mode
 
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest } from '@emmvish/stable-infra';
 
 const result = await stableRequest({
   reqData: {
@@ -901,7 +901,7 @@ console.log('Trial result:', result);
 ### Example 10: Request with Timeout and AbortSignal
 
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest } from '@emmvish/stable-infra';
 
 const controller = new AbortController();
 
@@ -938,7 +938,7 @@ try {
 ### Use Case 1: API with Rate Limiting
 
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest } from '@emmvish/stable-infra';
 
 // Handles HTTP 429 responses automatically
 const result = await stableRequest({
@@ -965,7 +965,7 @@ const result = await stableRequest({
 ### Use Case 2: Chained Requests with Buffer Passing
 
 ```typescript
-import { stableRequest } from '@emmvish/stable-request';
+import { stableRequest } from '@emmvish/stable-infra';
 
 const sharedBuffer: Record<string, any> = {};
 
@@ -1000,7 +1000,7 @@ console.log('Account data:', step2.data);
 ### Use Case 3: Parallel Requests with Shared Circuit Breaker
 
 ```typescript
-import { stableRequest, CircuitBreaker } from '@emmvish/stable-request';
+import { stableRequest, CircuitBreaker } from '@emmvish/stable-infra';
 
 const breaker = new CircuitBreaker({
   failureThresholdPercentage: 50,
@@ -1033,7 +1033,7 @@ console.log('Circuit breaker state:', breaker.getState());
 ### Use Case 4: Webhook with Retry and Error Analysis
 
 ```typescript
-import { stableRequest, REQUEST_METHODS } from '@emmvish/stable-request';
+import { stableRequest, REQUEST_METHODS } from '@emmvish/stable-infra';
 
 interface WebhookPayload {
   event: string;
@@ -1083,7 +1083,7 @@ const sendWebhook = async (payload: WebhookPayload) => {
 ### Use Case 5: GraphQL Request
 
 ```typescript
-import { stableRequest, REQUEST_METHODS } from '@emmvish/stable-request';
+import { stableRequest, REQUEST_METHODS } from '@emmvish/stable-infra';
 
 interface GraphQLRequest {
   query: string;
@@ -1141,7 +1141,7 @@ const result = await executeGraphQL<{ user: { id: number; name: string } }>(
 ### Use Case 6: File Upload with Progress Tracking
 
 ```typescript
-import { stableRequest, REQUEST_METHODS } from '@emmvish/stable-request';
+import { stableRequest, REQUEST_METHODS } from '@emmvish/stable-infra';
 import FormData from 'form-data';
 
 const uploadFile = async (file: Buffer, filename: string) => {
@@ -1423,6 +1423,6 @@ Anomalies are automatically classified by severity based on deviation magnitude:
 
 For issues, questions, or contributions:
 
-- **GitHub**: [https://github.com/emmvish/stable-request](https://github.com/emmvish/stable-request)
-- **NPM**: [https://www.npmjs.com/package/@emmvish/stable-request](https://www.npmjs.com/package/@emmvish/stable-request)
-- **Issues**: [https://github.com/emmvish/stable-request/issues](https://github.com/emmvish/stable-request/issues)
+- **GitHub**: [https://github.com/emmvish/stable-infra](https://github.com/emmvish/stable-infra)
+- **NPM**: [https://www.npmjs.com/package/@emmvish/stable-infra](https://www.npmjs.com/package/@emmvish/stable-infra)
+- **Issues**: [https://github.com/emmvish/stable-infra/issues](https://github.com/emmvish/stable-infra/issues)

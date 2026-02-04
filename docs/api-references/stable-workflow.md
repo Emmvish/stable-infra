@@ -1188,7 +1188,7 @@ interface BranchExecutionResult<ResponseDataType = any> {
 ### Example 1: Basic Sequential Workflow
 
 ```typescript
-import { stableWorkflow, REQUEST_METHODS } from '@emmvish/stable-request';
+import { stableWorkflow, REQUEST_METHODS } from '@emmvish/stable-infra';
 
 const result = await stableWorkflow([
   {
@@ -1237,7 +1237,7 @@ console.log(`Success rate: ${(result.successfulRequests / result.totalRequests *
 ### Example 2: Concurrent Phase Execution
 
 ```typescript
-import { stableWorkflow } from '@emmvish/stable-request';
+import { stableWorkflow } from '@emmvish/stable-infra';
 
 const result = await stableWorkflow([
   {
@@ -1263,7 +1263,7 @@ console.log(`Execution time: ${result.executionTime}ms`);
 ### Example 3: Mixed Mode with Concurrent Groups
 
 ```typescript
-import { stableWorkflow } from '@emmvish/stable-request';
+import { stableWorkflow } from '@emmvish/stable-infra';
 
 const result = await stableWorkflow([
   {
@@ -1311,7 +1311,7 @@ console.log('Mixed workflow completed with concurrent group optimization');
 ### Example 4: Shared Buffer for Data Passing
 
 ```typescript
-import { stableWorkflow } from '@emmvish/stable-request';
+import { stableWorkflow } from '@emmvish/stable-infra';
 
 const sharedBuffer: Record<string, any> = {};
 
@@ -1359,7 +1359,7 @@ const result = await stableWorkflow([
 ### Example 5: Non-Linear Workflow with Decisions
 
 ```typescript
-import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
+import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-infra';
 
 const result = await stableWorkflow([
   {
@@ -1435,7 +1435,7 @@ console.log(`Execution history:`, result.executionHistory);
 ### Example 6: Phase-Level Configuration
 
 ```typescript
-import { stableWorkflow, RETRY_STRATEGIES } from '@emmvish/stable-request';
+import { stableWorkflow, RETRY_STRATEGIES } from '@emmvish/stable-infra';
 
 const result = await stableWorkflow([
   {
@@ -1482,7 +1482,7 @@ const result = await stableWorkflow([
 ### Example 7: Pre-Phase Execution Hook
 
 ```typescript
-import { stableWorkflow } from '@emmvish/stable-request';
+import { stableWorkflow } from '@emmvish/stable-infra';
 
 const result = await stableWorkflow([
   {
@@ -1517,7 +1517,7 @@ const result = await stableWorkflow([
 ### Example 8: Branched Workflow
 
 ```typescript
-import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
+import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-infra';
 
 const result = await stableWorkflow([], {  // Empty phases array for branched mode
   workflowId: 'multi-tenant-workflow',
@@ -1628,7 +1628,7 @@ console.log(`Branch execution history:`, result.branchExecutionHistory);
 ### Use Case 1: ETL Pipeline
 
 ```typescript
-import { stableWorkflow, REQUEST_METHODS } from '@emmvish/stable-request';
+import { stableWorkflow, REQUEST_METHODS } from '@emmvish/stable-infra';
 
 const sharedBuffer: Record<string, any> = { extractedData: [] };
 
@@ -1710,7 +1710,7 @@ console.log(`Processed ${result.totalRequests} operations in ${result.executionT
 ### Use Case 2: Conditional Workflow with Recovery
 
 ```typescript
-import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
+import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-infra';
 
 const result = await stableWorkflow([
   {
@@ -1757,7 +1757,7 @@ console.log(`Skipped ${skippedPhases.length} phases`);
 ### Use Case 3: State Machine Workflow
 
 ```typescript
-import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-request';
+import { stableWorkflow, PHASE_DECISION_ACTIONS } from '@emmvish/stable-infra';
 
 const sharedBuffer: Record<string, any> = { state: 'IDLE' };
 
@@ -1854,7 +1854,7 @@ console.log(`Total iterations: ${result.executionHistory.length}`);
 ### Use Case 4: Monitoring Dashboard Data Collection
 
 ```typescript
-import { stableWorkflow, REQUEST_METHODS } from '@emmvish/stable-request';
+import { stableWorkflow, REQUEST_METHODS } from '@emmvish/stable-infra';
 
 const services = [
   { name: 'auth-service', url: 'auth.example.com/metrics' },
@@ -1926,7 +1926,7 @@ const result = await stableWorkflow([
 ### Use Case 5: Multi-Region Data Synchronization
 
 ```typescript
-import { stableWorkflow, PHASE_DECISION_ACTIONS, REQUEST_METHODS } from '@emmvish/stable-request';
+import { stableWorkflow, PHASE_DECISION_ACTIONS, REQUEST_METHODS } from '@emmvish/stable-infra';
 
 const regions = ['us-east', 'us-west', 'eu-west', 'ap-south'];
 const sharedBuffer: Record<string, any> = {};
@@ -2036,7 +2036,7 @@ console.log(`Successful branches: ${result.branches?.filter(b => b.success).leng
 ### Use Case 6: A/B Testing Workflow
 
 ```typescript
-import { stableWorkflow, PHASE_DECISION_ACTIONS, REQUEST_METHODS } from '@emmvish/stable-request';
+import { stableWorkflow, PHASE_DECISION_ACTIONS, REQUEST_METHODS } from '@emmvish/stable-infra';
 
 const variants = ['control', 'variant-a', 'variant-b'];
 
@@ -2369,14 +2369,12 @@ result.branches?.forEach(branch => {
    }
    ```
 
-For detailed information on the validation result structure and severity levels, see the [stable-request documentation](./stable-request.md#metrics-guardrails-and-validation).
-
 ---
 
 ## Support
 
 For issues, questions, or contributions:
 
-- **GitHub**: [https://github.com/emmvish/stable-request](https://github.com/emmvish/stable-request)
-- **NPM**: [https://www.npmjs.com/package/@emmvish/stable-request](https://www.npmjs.com/package/@emmvish/stable-request)
-- **Issues**: [https://github.com/emmvish/stable-request/issues](https://github.com/emmvish/stable-request/issues)
+- **GitHub**: [https://github.com/emmvish/stable-infra](https://github.com/emmvish/stable-infra)
+- **NPM**: [https://www.npmjs.com/package/@emmvish/stable-infra](https://www.npmjs.com/package/@emmvish/stable-infra)
+- **Issues**: [https://github.com/emmvish/stable-infra/issues](https://github.com/emmvish/stable-infra/issues)

@@ -1,10 +1,10 @@
 # API Reference Documentation
 
-Complete API reference documentation for `@emmvish/stable-request` - a production-grade TypeScript framework for resilient workflow execution.
+Complete API reference documentation for `@emmvish/stable-infra` - a production-grade TypeScript framework for resilient workflow execution.
 
 ## 📚 Core Modules
 
-### [Stable Request](./stable-request.md)
+### [Stable Request](./stable-infra.md)
 Robust HTTP/HTTPS request client with automatic retries, caching, and error recovery.
 
 **Key Features:**
@@ -140,7 +140,7 @@ Config-driven runner for executing Stable Request jobs via JSON or ESM config fi
 
 **Single Operations:**
 - Simple function execution → [Stable Function](./stable-function.md)
-- Single HTTP request → [Stable Request](./stable-request.md)
+- Single HTTP request → [Stable Request](./stable-infra.md)
 
 **Batch Operations:**
 - Multiple requests/functions → [Stable API Gateway](./stable-api-gateway.md)
@@ -176,9 +176,9 @@ Each API reference includes:
 
 ## 🔗 External Resources
 
-- **GitHub Repository**: [https://github.com/emmvish/stable-request](https://github.com/emmvish/stable-request)
-- **NPM Package**: [https://www.npmjs.com/package/@emmvish/stable-request](https://www.npmjs.com/package/@emmvish/stable-request)
-- **Issues & Support**: [https://github.com/emmvish/stable-request/issues](https://github.com/emmvish/stable-request/issues)
+- **GitHub Repository**: [https://github.com/emmvish/stable-infra](https://github.com/emmvish/stable-infra)
+- **NPM Package**: [https://www.npmjs.com/package/@emmvish/stable-infra](https://www.npmjs.com/package/@emmvish/stable-infra)
+- **Issues & Support**: [https://github.com/emmvish/stable-infra/issues](https://github.com/emmvish/stable-infra/issues)
 
 ---
 
@@ -187,13 +187,13 @@ Each API reference includes:
 ### Installation
 
 ```bash
-npm install @emmvish/stable-request
+npm install @emmvish/stable-infra
 ```
 
 ### Basic Usage
 
 ```typescript
-import { stableRequest, stableFunction, stableWorkflow } from '@emmvish/stable-request';
+import { stableRequest, stableFunction, stableWorkflow } from '@emmvish/stable-infra';
 
 // Single resilient request
 const result = await stableRequest({

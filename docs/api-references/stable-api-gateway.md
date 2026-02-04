@@ -646,7 +646,7 @@ The following diagram illustrates the complete lifecycle of a `stableApiGateway`
 ### Example 1: Basic Batch Requests
 
 ```typescript
-import { stableApiGateway } from '@emmvish/stable-request';
+import { stableApiGateway } from '@emmvish/stable-infra';
 
 const requests: API_GATEWAY_REQUEST[] = [
   {
@@ -687,7 +687,7 @@ result.forEach(res => {
 ### Example 2: Common Configuration with Request Groups
 
 ```typescript
-import { stableApiGateway, RETRY_STRATEGIES, VALID_REQUEST_PROTOCOLS } from '@emmvish/stable-request';
+import { stableApiGateway, RETRY_STRATEGIES, VALID_REQUEST_PROTOCOLS } from '@emmvish/stable-infra';
 
 const result = await stableApiGateway(
   [
@@ -760,7 +760,7 @@ result.metrics.requestGroups?.forEach(group => {
 ### Example 3: Sequential Execution with Shared Buffer
 
 ```typescript
-import { stableApiGateway, REQUEST_METHODS } from '@emmvish/stable-request';
+import { stableApiGateway, REQUEST_METHODS } from '@emmvish/stable-infra';
 
 const sharedBuffer: Record<string, any> = {};
 
@@ -818,7 +818,7 @@ console.log('User data:', result[1]);
 ### Example 4: Mixed Requests and Functions
 
 ```typescript
-import { stableApiGateway, RequestOrFunction, REQUEST_METHODS } from '@emmvish/stable-request';
+import { stableApiGateway, RequestOrFunction, REQUEST_METHODS } from '@emmvish/stable-infra';
 
 const items: API_GATEWAY_ITEM[] = [
   // HTTP Request
@@ -904,7 +904,7 @@ console.log('Pipeline result:', result.metrics.successRate === 100 ? 'Success' :
 ### Example 5: Circuit Breaker and Rate Limiting
 
 ```typescript
-import { stableApiGateway, CircuitBreaker } from '@emmvish/stable-request';
+import { stableApiGateway, CircuitBreaker } from '@emmvish/stable-infra';
 
 const breaker = new CircuitBreaker({
   failureThresholdPercentage: 50,
@@ -944,7 +944,7 @@ console.log('Concurrency:', result.metrics.infrastructureMetrics?.concurrencyLim
 ### Example 6: Error Handling and Observability
 
 ```typescript
-import { stableApiGateway } from '@emmvish/stable-request';
+import { stableApiGateway } from '@emmvish/stable-infra';
 
 const result = await stableApiGateway(
   [
@@ -990,7 +990,7 @@ if (failed.length > 0) {
 ### Example 7: Stop on First Error
 
 ```typescript
-import { stableApiGateway } from '@emmvish/stable-request';
+import { stableApiGateway } from '@emmvish/stable-infra';
 
 const result = await stableApiGateway(
   [
@@ -1021,7 +1021,7 @@ if (!result[0].success) {
 ### Use Case 1: Multi-Source Data Aggregation
 
 ```typescript
-import { stableApiGateway } from '@emmvish/stable-request';
+import { stableApiGateway } from '@emmvish/stable-infra';
 
 interface UserData {
   id: number;
@@ -1084,7 +1084,7 @@ console.log('Aggregated user data:', aggregatedData);
 ### Use Case 2: Parallel File Processing Pipeline
 
 ```typescript
-import { stableApiGateway, RequestOrFunction, REQUEST_METHODS } from '@emmvish/stable-request';
+import { stableApiGateway, RequestOrFunction, REQUEST_METHODS } from '@emmvish/stable-infra';
 
 const fileUrls = [
   'https://cdn.example.com/file1.json',
@@ -1165,7 +1165,7 @@ console.log('Processing complete:', result.metrics);
 ### Use Case 3: Health Check with Circuit Breaker
 
 ```typescript
-import { stableApiGateway, CircuitBreaker } from '@emmvish/stable-request';
+import { stableApiGateway, CircuitBreaker } from '@emmvish/stable-infra';
 
 const serviceBreaker = new CircuitBreaker({
   failureThresholdPercentage: 50,
@@ -1213,7 +1213,7 @@ setInterval(async () => {
 ### Use Case 4: Batch User Creation with Validation
 
 ```typescript
-import { stableApiGateway, RequestOrFunction, REQUEST_METHODS } from '@emmvish/stable-request';
+import { stableApiGateway, RequestOrFunction, REQUEST_METHODS } from '@emmvish/stable-infra';
 
 interface NewUser {
   name: string;
@@ -1288,7 +1288,7 @@ console.log(`Created ${created.length}/${newUsers.length} users`);
 ### Use Case 5: Distributed Cache Warming
 
 ```typescript
-import { stableApiGateway, REQUEST_METHODS } from '@emmvish/stable-request';
+import { stableApiGateway, REQUEST_METHODS } from '@emmvish/stable-infra';
 
 const cacheKeys = [
   'popular-products',
@@ -1564,14 +1564,12 @@ if (result.metrics?.validation) {
    }
    ```
 
-For detailed information on the validation result structure and severity levels, see the [stable-request documentation](./stable-request.md#metrics-guardrails-and-validation).
-
 ---
 
 ## Support
 
 For issues, questions, or contributions:
 
-- **GitHub**: [https://github.com/emmvish/stable-request](https://github.com/emmvish/stable-request)
-- **NPM**: [https://www.npmjs.com/package/@emmvish/stable-request](https://www.npmjs.com/package/@emmvish/stable-request)
-- **Issues**: [https://github.com/emmvish/stable-request/issues](https://github.com/emmvish/stable-request/issues)
+- **GitHub**: [https://github.com/emmvish/stable-infra](https://github.com/emmvish/stable-infra)
+- **NPM**: [https://www.npmjs.com/package/@emmvish/stable-infra](https://www.npmjs.com/package/@emmvish/stable-infra)
+- **Issues**: [https://github.com/emmvish/stable-infra/issues](https://github.com/emmvish/stable-infra/issues)
