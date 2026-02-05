@@ -95,3 +95,14 @@ export enum ScheduleTypes {
   TIMESTAMP = 'timestamp',
   TIMESTAMPS = 'timestamps'
 }
+
+export enum InfrastructurePersistenceOperations {
+  LOAD = 'load',
+  STORE = 'store'
+}
+
+export enum ReplaySkipReasons {
+  FILTERED = 'filtered',
+  DUPLICATE = 'duplicate',
+  MISSING_HANDLER = 'missing-handler'
+}

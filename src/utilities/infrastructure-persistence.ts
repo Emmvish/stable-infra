@@ -1,5 +1,6 @@
 import { StableBuffer } from '../core/stable-buffer.js';
 import { isStableBuffer } from './buffer-utils.js';
+import { InfrastructurePersistenceOperations } from '../enums/index.js';
 import type {
   BufferLike,
   InfrastructurePersistence,
@@ -60,10 +61,10 @@ export class InfrastructurePersistenceCoordinator<TState> {
       return undefined;
     }
 
-    const operationId = this.nextOperationId('load');
+    const operationId = this.nextOperationId(InfrastructurePersistenceOperations.LOAD);
     const result = await this.runTransaction({
       operationId,
-      type: 'load',
+      type: InfrastructurePersistenceOperations.LOAD,
       timestamp: Date.now()
     });
 
@@ -75,10 +76,10 @@ export class InfrastructurePersistenceCoordinator<TState> {
       return;
     }
 
-    const operationId = this.nextOperationId('store');
+    const operationId = this.nextOperationId(InfrastructurePersistenceOperations.STORE);
     await this.runTransaction({
       operationId,
-      type: 'store',
+      type: InfrastructurePersistenceOperations.STORE,
       timestamp: Date.now(),
       state
     });
@@ -111,11 +112,11 @@ export class InfrastructurePersistenceCoordinator<TState> {
       return this.persistence.transaction(operation);
     }
 
-    if (operation.type === 'load') {
+    if (operation.type === InfrastructurePersistenceOperations.LOAD) {
       return this.persistence?.load?.();
     }
 
-    if (operation.type === 'store' && this.persistence?.store) {
+    if (operation.type === InfrastructurePersistenceOperations.STORE && this.persistence?.store) {
       return this.persistence.store(operation.state as TState);
     }
 

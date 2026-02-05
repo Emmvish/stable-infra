@@ -23,7 +23,9 @@ export {
     ViolationType,
     PersistenceStage,
     RunnerJobs,
-    ScheduleTypes
+    ScheduleTypes,
+    InfrastructurePersistenceOperations,
+    ReplaySkipReasons
 } from './enums/index.js';
 
 export type {

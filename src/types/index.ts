@@ -14,7 +14,9 @@ import {
   PersistenceStage,
   RunnerJobs,
   ScheduleTypes,
-  CircuitBreakerState
+  CircuitBreakerState,
+  InfrastructurePersistenceOperations,
+  ReplaySkipReasons
 } from '../enums/index.js';
 
 import { CircuitBreaker, RateLimiter, ConcurrencyLimiter, CacheManager } from '../utilities/index.js';
@@ -262,7 +264,7 @@ export interface StableBufferReplayOptions {
   allowUnknownHooks?: boolean;
   activityFilter?: (log: StableBufferTransactionLog) => boolean;
   onApply?: (log: StableBufferTransactionLog) => void;
-  onSkip?: (log: StableBufferTransactionLog, reason: 'filtered' | 'duplicate' | 'missing-handler') => void;
+  onSkip?: (log: StableBufferTransactionLog, reason: ReplaySkipReasons) => void;
   onError?: (log: StableBufferTransactionLog, error: unknown) => void;
 }
 
@@ -945,7 +947,7 @@ export interface HandlePhaseDecisionHookOptions<RequestDataType = any, ResponseD
   transactionLogs?: StableBufferTransactionLog[];
 }
 
-export type InfrastructurePersistenceOperationType = 'load' | 'store';
+export type InfrastructurePersistenceOperationType = InfrastructurePersistenceOperations.LOAD | InfrastructurePersistenceOperations.STORE;
 
 export interface InfrastructurePersistenceOperation<TState> {
   operationId: string;
