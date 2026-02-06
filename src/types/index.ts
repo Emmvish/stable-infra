@@ -278,6 +278,7 @@ export interface StableBufferReplayResult {
 export type TransactionLogsLoader = (context: ExecutionContext) => StableBufferTransactionLog[] | Promise<StableBufferTransactionLog[]>;
 
 export interface ExecutionContext {
+  jobId?: string;
   workflowId?: string;
   branchId?: string;
   phaseId?: string;
@@ -1584,6 +1585,14 @@ export interface SchedulerSharedInfrastructure {
   cacheManager?: CacheManager;
 }
 
+export interface SchedulerExecutionContext {
+  jobId: string;
+  scheduledAt: string;
+  schedule?: SchedulerSchedule;
+}
+
+export type SchedulerTransactionLogsLoader = (context: SchedulerExecutionContext) => StableBufferTransactionLog[] | Promise<StableBufferTransactionLog[]>;
+
 export interface SchedulerConfig<TJob = unknown> {
   maxParallel?: number;
   tickIntervalMs?: number;
@@ -1595,7 +1604,7 @@ export interface SchedulerConfig<TJob = unknown> {
   metricsGuardrails?: MetricsGuardrails;
   sharedBuffer?: BufferLike;
   sharedInfrastructure?: SchedulerSharedInfrastructure;
-  loadTransactionLogs?: TransactionLogsLoader;
+  loadTransactionLogs?: SchedulerTransactionLogsLoader;
 }
 
 export interface SchedulerRunContext {
@@ -1663,7 +1672,7 @@ export interface InternalSchedulerConfig<TJob = any> {
   metricsGuardrails?: SchedulerConfig<TJob>['metricsGuardrails'];
   sharedBuffer?: BufferLike;
   sharedInfrastructure?: SchedulerSharedInfrastructure;
-  loadTransactionLogs?: TransactionLogsLoader;
+  loadTransactionLogs?: SchedulerTransactionLogsLoader;
 }
 
 export interface RunnerRequestJob<RequestDataType = any, ResponseDataType = any> {

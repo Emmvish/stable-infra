@@ -212,6 +212,53 @@ const applySharedBuffer = (job: RunnerScheduledJob, sharedBuffer: BufferLike): R
   }
 };
 
+const applyJobId = (job: RunnerJob, jobId: string): RunnerJob => {
+  switch (job.kind) {
+    case RunnerJobs.STABLE_REQUEST:
+      return { 
+        ...job, 
+        options: { 
+          ...job.options, 
+          executionContext: { ...job.options.executionContext, jobId } 
+        } 
+      };
+    case RunnerJobs.STABLE_FUNCTION:
+      return { 
+        ...job, 
+        options: { 
+          ...job.options, 
+          executionContext: { ...job.options.executionContext, jobId } 
+        } 
+      };
+    case RunnerJobs.STABLE_API_GATEWAY:
+      return { 
+        ...job, 
+        options: { 
+          ...job.options, 
+          executionContext: { ...job.options?.executionContext, jobId } 
+        } 
+      };
+    case RunnerJobs.STABLE_WORKFLOW:
+      return { 
+        ...job, 
+        options: { 
+          ...(job.options || {}), 
+          executionContext: { ...job.options?.executionContext, jobId } 
+        } 
+      };
+    case RunnerJobs.STABLE_WORKFLOW_GRAPH:
+      return { 
+        ...job, 
+        options: { 
+          ...(job.options || {}), 
+          executionContext: { ...job.options?.executionContext, jobId } 
+        } 
+      };
+    default:
+      return job;
+  }
+};
+
 const executeScheduledJob = async (
   job: RunnerScheduledJob,
   context: SchedulerRunContext,
@@ -220,7 +267,8 @@ const executeScheduledJob = async (
 ) => {
   const startedMs = Date.now();
   try {
-    const resolvedJob = sharedBuffer ? applySharedBuffer(job, sharedBuffer) : (job as RunnerJob);
+    let resolvedJob: RunnerJob = sharedBuffer ? applySharedBuffer(job, sharedBuffer) : (job as RunnerJob);
+    resolvedJob = applyJobId(resolvedJob, context.jobId);
     const result = await executeJob(resolvedJob);
     const completedAt = new Date().toISOString();
     await writeOutput(outputPath, {

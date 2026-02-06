@@ -457,7 +457,11 @@ export class StableScheduler<
     const executeHandler = async (): Promise<unknown> => {
       if (this.config.loadTransactionLogs) {
         try {
-          transactionLogs = await this.config.loadTransactionLogs({});
+          transactionLogs = await this.config.loadTransactionLogs({
+            jobId: job.id,
+            scheduledAt: new Date(job.nextRunAt ?? startedAt).toISOString(),
+            schedule: job.schedule
+          });
         } catch (e: any) {
           console.error(`stable-infra: Failed to load transaction logs: ${e.message}`);
         }

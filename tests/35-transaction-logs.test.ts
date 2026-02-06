@@ -722,4 +722,133 @@ describe('Transaction Logs Feature', () => {
       expect(preExecutionCallArgs.transactionLogs ?? []).toEqual([]);
     });
   });
+
+  describe('StableScheduler', () => {
+    it('should pass job context to loadTransactionLogs hook', async () => {
+      const { StableScheduler, ScheduleTypes } = await import('../src/index.js');
+      type TestJob = { id: string; name: string; schedule?: any };
+
+      const sampleLogs: StableBufferTransactionLog[] = [
+        {
+          transactionId: 'tx-scheduler-001',
+          queuedAt: '2024-01-01T00:00:00Z',
+          startedAt: '2024-01-01T00:00:01Z',
+          finishedAt: '2024-01-01T00:00:02Z',
+          durationMs: 1000,
+          queueWaitMs: 1000,
+          success: true,
+          stateBefore: {},
+          stateAfter: { processed: true }
+        }
+      ];
+
+      let capturedContext: any;
+      let loadTransactionLogsCalled = false;
+      const scheduler = new StableScheduler<TestJob>(
+        {
+          maxParallel: 1,
+          tickIntervalMs: 50,
+          loadTransactionLogs: async (context) => {
+            loadTransactionLogsCalled = true;
+            capturedContext = context;
+            return sampleLogs;
+          }
+        },
+        async (job, context) => {
+          // Job handler receives transaction logs
+          expect(context.transactionLogs).toBeDefined();
+          expect(context.transactionLogs).toHaveLength(1);
+        }
+      );
+
+      const testSchedule = { type: ScheduleTypes.TIMESTAMP, at: Date.now() };
+      scheduler.addJob({ id: 'job-1', name: 'Test Job', schedule: testSchedule });
+      scheduler.start();
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+      scheduler.stop();
+
+      expect(loadTransactionLogsCalled).toBe(true);
+      expect(capturedContext).toBeDefined();
+      expect(capturedContext.jobId).toBe('job-1');
+      expect(capturedContext.scheduledAt).toBeDefined();
+      expect(capturedContext.schedule).toBeDefined();
+      expect(capturedContext.schedule.type).toBe(ScheduleTypes.TIMESTAMP);
+    });
+
+    it('should pass correct job-specific context when multiple jobs are scheduled', async () => {
+      const { StableScheduler, ScheduleTypes } = await import('../src/index.js');
+      type TestJob = { id: string; name: string; schedule?: any };
+
+      const capturedContexts: any[] = [];
+      const scheduler = new StableScheduler<TestJob>(
+        {
+          maxParallel: 2,
+          tickIntervalMs: 50,
+          loadTransactionLogs: async (context) => {
+            capturedContexts.push({ ...context });
+            return [];
+          }
+        },
+        async () => {}
+      );
+
+      scheduler.addJob({ 
+        id: 'job-alpha', 
+        name: 'Alpha Job', 
+        schedule: { type: ScheduleTypes.TIMESTAMP, at: Date.now() } 
+      });
+      scheduler.addJob({ 
+        id: 'job-beta', 
+        name: 'Beta Job', 
+        schedule: { type: ScheduleTypes.TIMESTAMP, at: Date.now() } 
+      });
+      scheduler.start();
+
+      await new Promise(resolve => setTimeout(resolve, 300));
+      scheduler.stop();
+
+      expect(capturedContexts.length).toBeGreaterThanOrEqual(2);
+      const jobIds = capturedContexts.map(c => c.jobId);
+      expect(jobIds).toContain('job-alpha');
+      expect(jobIds).toContain('job-beta');
+    });
+
+    it('should handle loadTransactionLogs errors gracefully in scheduler', async () => {
+      const { StableScheduler, ScheduleTypes } = await import('../src/index.js');
+      type TestJob = { id: string; name: string; schedule?: any };
+
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      let handlerCalled = false;
+      const scheduler = new StableScheduler<TestJob>(
+        {
+          maxParallel: 1,
+          tickIntervalMs: 50,
+          loadTransactionLogs: async () => {
+            throw new Error('Failed to load');
+          }
+        },
+        async (job, context) => {
+          handlerCalled = true;
+          // Handler should still execute even if logs loading fails
+          expect(context.transactionLogs).toBeUndefined();
+        }
+      );
+
+      scheduler.addJob({ 
+        id: 'job-error', 
+        name: 'Error Test Job', 
+        schedule: { type: ScheduleTypes.TIMESTAMP, at: Date.now() } 
+      });
+      scheduler.start();
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+      scheduler.stop();
+
+      expect(handlerCalled).toBe(true);
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to load transaction logs'));
+      consoleSpy.mockRestore();
+    });
+  });
 });
