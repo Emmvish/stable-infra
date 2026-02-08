@@ -105,6 +105,22 @@ Transactional buffer for concurrency-safe shared state across core modules.
 
 ---
 
+### [Distributed Infrastructure](./distributed-infrastructure.md)
+Multi-node coordination with distributed locking, state management, leader election, pub/sub, and transactions — all via a pluggable backend adapter.
+
+**Key Features:**
+- Distributed locking with fencing tokens and auto-renewal
+- Compare-and-swap (CAS) for optimistic concurrency
+- Quorum-based leader election with partition detection
+- Pub/sub with at-most-once, at-least-once, and exactly-once delivery
+- Two-phase commit (2PC) distributed transactions
+- Distributed `StableBuffer` with configurable conflict resolution
+- Distributed `StableScheduler` with leader-based execution
+- Infrastructure bundle for shared circuit breaker, rate limiter, cache across nodes
+- Pluggable `DistributedAdapter` interface (built-in `InMemoryDistributedAdapter` for testing)
+
+---
+
 ## 🛠️ Infrastructure Utilities
 
 ### [Infrastructure Utilities](./infra-utilities.md)
@@ -151,9 +167,15 @@ Config-driven runner for executing Stable Request jobs via JSON or ESM config fi
 
 **Scheduling:**
 - Scheduled execution → [Stable Scheduler](./stable-scheduler.md)
+- Distributed leader-based scheduling → [Distributed Infrastructure](./distributed-infrastructure.md)
 
 **Shared State:**
 - Transactional shared buffer → [Stable Buffer](./stable-buffer.md)
+- Cross-node synchronized buffer → [Distributed Infrastructure](./distributed-infrastructure.md)
+
+**Multi-Node Coordination:**
+- Distributed locking, leader election, pub/sub → [Distributed Infrastructure](./distributed-infrastructure.md)
+- Shared circuit breaker, rate limiter, cache across nodes → [Distributed Infrastructure](./distributed-infrastructure.md)
 
 **Infrastructure:**
 - Caching, circuit breaking, rate limiting → [Infrastructure Utilities](./infra-utilities.md)

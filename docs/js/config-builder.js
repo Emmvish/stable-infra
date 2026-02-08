@@ -167,7 +167,7 @@ const builderContents = document.querySelectorAll('.builder-content');
 
 // Modules with available builders
 const availableModules = ['stableRequest', 'stableFunction', 'StableBuffer'];
-const comingSoonModules = ['stableApiGateway', 'stableWorkflow', 'stableWorkflowGraph', 'StableScheduler'];
+const comingSoonModules = ['stableApiGateway', 'stableWorkflow', 'stableWorkflowGraph', 'StableScheduler', 'DistributedInfra'];
 
 function updateBuilderModule(selectedModule) {
     // Update status indicator

@@ -116,6 +116,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
           StableScheduler
         </a>
+        <a href="#tab-distributedInfra" data-tab="distributedInfra">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><circle cx="12" cy="12" r="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="18" x2="16" y2="18"/><line x1="6" y1="8" x2="6" y2="16"/><line x1="18" y1="8" x2="18" y2="16"/><line x1="7.5" y1="7.5" x2="10.5" y2="10.5"/><line x1="13.5" y1="13.5" x2="16.5" y2="16.5"/></svg>
+          Distributed Infra
+        </a>
       </nav>
     </div>
     <div class="sidebar-section">
@@ -338,8 +342,8 @@ export default {
     <!-- Core APIs Section -->
     <section class="section" id="core-apis">
       <div class="section-header">
-        <h2><span class="gradient-text">Seven Core APIs</span></h2>
-        <p>From single HTTP requests to complex DAG-based workflow orchestration and scheduled execution — every execution mode shares the same powerful resilience stack.</p>
+        <h2><span class="gradient-text">Eight Core APIs</span></h2>
+        <p>From single HTTP requests to complex DAG-based workflow orchestration, scheduled execution, and distributed coordination — every execution mode shares the same powerful resilience stack.</p>
       </div>
 
       <div class="tabs-container">
@@ -351,6 +355,7 @@ export default {
           <button class="tab-btn" data-tab="stableWorkflow">stableWorkflow</button>
           <button class="tab-btn" data-tab="stableWorkflowGraph">stableWorkflowGraph</button>
           <button class="tab-btn" data-tab="stableScheduler">StableScheduler</button>
+          <button class="tab-btn" data-tab="distributedInfra">Distributed Infra</button>
         </div>
 
         <!-- stableRequest Tab -->
@@ -1527,6 +1532,112 @@ scheduler.<span class="function">start</span>();
 
 <span class="comment">// Stop after 2 seconds in demo environments</span>
 setTimeout(<span class="keyword">() =></span> scheduler.<span class="function">stop</span>(), <span class="number">2000</span>);
+
+})();</code></pre>
+          </div>
+        </div>
+        <!-- Distributed Infrastructure Tab -->
+        <div class="tab-content" id="tab-distributedInfra">
+          <div class="tab-info">
+            <h3><code>DistributedCoordinator</code></h3>
+            <p>Deploy stable-infra components across multiple nodes with distributed locking (with fencing tokens), compare-and-swap state management, quorum-based leader election, pub/sub messaging with configurable delivery guarantees, two-phase commit transactions, and distributed buffers & schedulers.</p>
+          </div>
+          <div class="problem-statement">
+            <h4>Problem Statement</h4>
+            <p>You're running multiple instances of your service and need to coordinate access to shared resources without conflicts. You want distributed locks with fencing tokens to prevent stale holders, leader election with quorum support for split-brain prevention, and atomic multi-key transactions across distributed state — all with the same stability guarantees as the rest of the framework.</p>
+          </div>
+          <div class="code-box">
+            <div class="code-box-header">
+              <div class="code-box-dots">
+                <span></span><span></span><span></span>
+              </div>
+              <span class="code-box-lang">TypeScript</span>
+              <button class="copy-btn" onclick="copyCode(this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <pre><code><span class="keyword">import</span> {
+  DistributedCoordinator,
+  InMemoryDistributedAdapter,
+  DistributedTransactionOperationType
+} <span class="keyword">from</span> <span class="string">'@emmvish/stable-infra'</span>;
+
+(<span class="keyword">async</span> () => {
+
+<span class="comment">// Create coordinator with an adapter (use your own for Redis, etcd, etc.)</span>
+<span class="keyword">const</span> adapter = <span class="keyword">new</span> <span class="function">InMemoryDistributedAdapter</span>();
+<span class="keyword">const</span> coordinator = <span class="keyword">new</span> <span class="function">DistributedCoordinator</span>(adapter);
+
+<span class="comment">// 1. Distributed Locking with fencing tokens</span>
+<span class="keyword">const</span> lock = <span class="keyword">await</span> coordinator.<span class="function">acquireLock</span>({
+  <span class="property">resource</span>: <span class="string">'order:123'</span>,
+  <span class="property">ttlMs</span>: <span class="number">30000</span>,
+  <span class="property">autoRenew</span>: <span class="keyword">true</span>,
+  <span class="property">autoRenewIntervalMs</span>: <span class="number">10000</span>
+});
+
+<span class="keyword">if</span> (lock.acquired) {
+  console.log(<span class="string">`Lock acquired, fencing token: ${lock.fencingToken}`</span>);
+  <span class="comment">// Perform work while holding the lock...</span>
+  <span class="keyword">await</span> coordinator.<span class="function">releaseLock</span>(lock);
+}
+
+<span class="comment">// 2. Compare-and-Swap for optimistic concurrency</span>
+<span class="keyword">await</span> coordinator.<span class="function">setState</span>(<span class="string">'account:balance'</span>, { <span class="property">balance</span>: <span class="number">100</span> });
+<span class="keyword">const</span> casResult = <span class="keyword">await</span> coordinator.<span class="function">compareAndSwap</span>({
+  <span class="property">key</span>: <span class="string">'account:balance'</span>,
+  <span class="property">expectedVersion</span>: <span class="number">1</span>,
+  <span class="property">newValue</span>: { <span class="property">balance</span>: <span class="number">150</span> }
+});
+console.log(<span class="string">`CAS swapped: ${casResult.swapped}`</span>);
+
+<span class="comment">// 3. Leader Election with quorum</span>
+<span class="keyword">await</span> coordinator.<span class="function">campaignForLeader</span>({
+  <span class="property">electionKey</span>: <span class="string">'scheduler-leader'</span>,
+  <span class="property">quorumSize</span>: <span class="number">3</span>,
+  <span class="property">onPartitionDetected</span>: () => {
+    console.log(<span class="string">'Network partition detected'</span>);
+  }
+});
+
+<span class="comment">// 4. Two-Phase Commit Transaction</span>
+<span class="keyword">const</span> txResult = <span class="keyword">await</span> coordinator.<span class="function">executeTransaction</span>([
+  { <span class="property">type</span>: DistributedTransactionOperationType.<span class="property">SET</span>,
+    <span class="property">key</span>: <span class="string">'account:A'</span>, <span class="property">value</span>: { <span class="property">balance</span>: <span class="number">50</span> } },
+  { <span class="property">type</span>: DistributedTransactionOperationType.<span class="property">SET</span>,
+    <span class="property">key</span>: <span class="string">'account:B'</span>, <span class="property">value</span>: { <span class="property">balance</span>: <span class="number">150</span> } },
+  { <span class="property">type</span>: DistributedTransactionOperationType.<span class="property">INCREMENT</span>,
+    <span class="property">key</span>: <span class="string">'transfers:count'</span>, <span class="property">delta</span>: <span class="number">1</span> }
+]);
+console.log(<span class="string">`Transaction committed: ${txResult.committed}`</span>);
+
+<span class="comment">// 5. Pub/Sub Messaging</span>
+<span class="keyword">const</span> subId = <span class="keyword">await</span> coordinator.<span class="function">subscribe</span>(
+  <span class="string">'order-events'</span>,
+  <span class="keyword">async</span> (<span class="property">message</span>) => {
+    console.log(<span class="string">`Received: ${message.data}`</span>);
+  },
+  { <span class="property">deliveryGuarantee</span>: <span class="string">'at-least-once'</span> }
+);
+
+<span class="keyword">await</span> coordinator.<span class="function">publish</span>(<span class="string">'order-events'</span>, {
+  <span class="property">type</span>: <span class="string">'ORDER_COMPLETED'</span>,
+  <span class="property">orderId</span>: <span class="string">'123'</span>
+});
+
+<span class="comment">// 6. Distributed Buffer &amp; Scheduler</span>
+<span class="keyword">const</span> { buffer, scheduler } = <span class="keyword">await</span> coordinator
+  .<span class="function">createDistributedInfrastructure</span>({
+    <span class="property">buffer</span>: { <span class="property">initialState</span>: { <span class="property">count</span>: <span class="number">0</span> } },
+    <span class="property">scheduler</span>: {
+      <span class="property">handler</span>: <span class="keyword">async</span> (<span class="property">job</span>) => {
+        console.log(<span class="string">`Executing job: ${job.id}`</span>);
+      }
+    }
+  });
+
+console.log(<span class="string">'Distributed infrastructure ready'</span>);
 
 })();</code></pre>
           </div>
