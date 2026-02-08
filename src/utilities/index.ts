@@ -34,3 +34,41 @@ export { getNodeCrypto, simpleHashToHex } from './hash-utils.js';
 export { isStableBuffer, withBuffer } from './buffer-utils.js';
 export { InfrastructurePersistenceCoordinator } from './infrastructure-persistence.js';
 export { replayStableBufferTransactions } from './stable-buffer-replay.js';
+export { DistributedCoordinator, createDistributedCoordinator } from './distributed-coordinator.js';
+export { InMemoryDistributedAdapter, createInMemoryAdapter } from './distributed-adapters.js';
+export { 
+  createDistributedCircuitBreaker,
+  createDistributedRateLimiter,
+  createDistributedConcurrencyLimiter,
+  createDistributedCacheManager,
+  createDistributedFunctionCacheManager,
+  createDistributedInfrastructureBundle
+} from './distributed-infrastructure.js';
+export type {
+  DistributedInfrastructureOptions,
+  DistributedCircuitBreakerOptions,
+  DistributedRateLimiterOptions,
+  DistributedConcurrencyLimiterOptions,
+  DistributedCacheManagerOptions,
+  DistributedFunctionCacheManagerOptions,
+  DistributedInfrastructureBundle,
+  CreateDistributedInfrastructureBundleOptions
+} from './distributed-infrastructure.js';
+export { 
+  createDistributedSchedulerConfig,
+  runAsDistributedScheduler
+} from './distributed-scheduler.js';
+export type {
+  DistributedSchedulerOptions,
+  DistributedSchedulerSetup,
+  RunAsDistributedSchedulerOptions,
+  DistributedSchedulerRunner
+} from './distributed-scheduler.js';
+export {
+  createDistributedStableBuffer,
+  withDistributedBufferLock,
+  createDistributedSharedBuffer
+} from './distributed-buffer.js';
+export type {
+  DistributedStableBuffer
+} from './distributed-buffer.js';

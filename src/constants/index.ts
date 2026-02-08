@@ -147,3 +147,5 @@ export const STABLE_BUFFER_METRICS_TO_VALIDATE_KEYS = [
     'totalTransactions',
     'averageQueueWaitMs'
 ] as const;
+
+export const DEFAULT_STATE_KEY_PREFIX = 'infra' as const;

@@ -16,7 +16,10 @@ import {
   ScheduleTypes,
   CircuitBreakerState,
   InfrastructurePersistenceOperations,
-  ReplaySkipReasons
+  ReplaySkipReasons,
+  DistributedIsolationLevel,
+  DistributedBufferOperation,
+  DistributedConflictResolution
 } from '../enums/index.js';
 
 import { CircuitBreaker, RateLimiter, ConcurrencyLimiter, CacheManager } from '../utilities/index.js';
@@ -1740,6 +1743,516 @@ export type RunnerConfig<T extends RunnerJob = RunnerJob> = {
   jobs?: RunnerScheduledJob<T>[];
   scheduler?: SchedulerConfig;
 };
+
+// ============================================================================
+// Distributed Infrastructure Types
+// ============================================================================
+
+import { 
+  DistributedLockStatus, 
+  DistributedLeaderStatus, 
+  DistributedOperationType,
+  DistributedConsistencyLevel,
+  DistributedTransactionStatus,
+  DistributedTransactionOperationType,
+  DistributedMessageDelivery,
+  DistributedLockRenewalMode
+} from '../enums/index.js';
+
+/**
+ * Distributed lock handle returned when a lock is acquired
+ */
+export interface DistributedLockHandle {
+  lockId: string;
+  resource: string;
+  acquiredAt: number;
+  expiresAt: number;
+  ownerId: string;
+  /** Fencing token to prevent stale lock holders from making changes */
+  fencingToken: number;
+  /** Auto-renewal timer ID (if auto-renewal is enabled) */
+  renewalTimerId?: NodeJS.Timeout;
+}
+
+/**
+ * Result of a distributed lock operation
+ */
+export interface DistributedLockResult {
+  status: DistributedLockStatus;
+  handle?: DistributedLockHandle;
+  error?: string;
+  /** The fencing token for this lock acquisition */
+  fencingToken?: number;
+}
+
+/**
+ * Options for acquiring a distributed lock
+ */
+export interface DistributedLockOptions {
+  resource: string;
+  ttlMs?: number;
+  waitTimeoutMs?: number;
+  retryIntervalMs?: number;
+  /** Enable automatic lock renewal */
+  renewalMode?: DistributedLockRenewalMode;
+  /** Renewal interval (defaults to ttlMs / 3) */
+  renewalIntervalMs?: number;
+  /** Callback when renewal fails */
+  onRenewalFailure?: (handle: DistributedLockHandle, error: Error) => void;
+}
+
+/**
+ * Options for fenced operations that require a valid fencing token
+ */
+export interface DistributedFencedOperationOptions {
+  /** The fencing token from the lock that authorizes this operation */
+  fencingToken: number;
+  /** The resource/lock this token belongs to */
+  resource: string;
+}
+
+/**
+ * Leader election state
+ */
+export interface DistributedLeaderState {
+  leaderId: string | null;
+  status: DistributedLeaderStatus;
+  term: number;
+  lastHeartbeat: number;
+  nodeId: string;
+  /** Quorum information */
+  quorum?: DistributedQuorumInfo;
+  /** Whether this node believes there's a network partition */
+  partitionDetected?: boolean;
+}
+
+/**
+ * Quorum information for leader election
+ */
+export interface DistributedQuorumInfo {
+  /** Total number of known nodes */
+  totalNodes: number;
+  /** Number of nodes that voted for current leader */
+  votesReceived: number;
+  /** Required number of nodes for quorum */
+  required: number;
+  /** Required votes for quorum (usually majority) - alias for required */
+  quorumThreshold: number;
+  /** Whether quorum is currently satisfied */
+  hasQuorum: boolean;
+  /** List of node IDs that have acknowledged */
+  acknowledgedNodes: string[];
+}
+
+/**
+ * Options for leader election
+ */
+export interface DistributedLeaderOptions {
+  electionKey: string;
+  ttlMs?: number;
+  heartbeatIntervalMs?: number;
+  onBecomeLeader?: () => void | Promise<void>;
+  onLoseLeadership?: () => void | Promise<void>;
+  /** Minimum nodes required for quorum (0 = no quorum required) */
+  quorumSize?: number;
+  /** Callback when partition is detected */
+  onPartitionDetected?: () => void | Promise<void>;
+  /** Callback when partition is resolved */
+  onPartitionResolved?: () => void | Promise<void>;
+  /** Time without heartbeat before considering node dead */
+  nodeTimeoutMs?: number;
+}
+
+/**
+ * Distributed counter for atomic increment/decrement operations
+ */
+export interface DistributedCounter {
+  key: string;
+  value: number;
+  lastUpdated: number;
+}
+
+/**
+ * Options for distributed state operations
+ */
+export interface DistributedStateOptions {
+  key: string;
+  ttlMs?: number;
+  /** Version for optimistic concurrency control */
+  version?: number;
+  /** Consistency level for this operation */
+  consistencyLevel?: DistributedConsistencyLevel;
+  /** Fencing token to validate operation authorization */
+  fencingToken?: number;
+}
+
+/**
+ * Result of a distributed state operation
+ */
+export interface DistributedStateResult<T = any> {
+  success: boolean;
+  value?: T;
+  /** Current version of this state entry */
+  version?: number;
+  error?: string;
+  /** Whether a CAS operation conflicted */
+  conflicted?: boolean;
+}
+
+/**
+ * Options for compare-and-swap operations
+ */
+export interface DistributedCompareAndSwapOptions<T = any> {
+  key: string;
+  /** Expected current value (or version) */
+  expectedValue?: T;
+  /** Expected version number */
+  expectedVersion?: number;
+  /** New value to set if condition matches */
+  newValue: T;
+  /** TTL for the new value */
+  ttlMs?: number;
+}
+
+/**
+ * Result of a compare-and-swap operation
+ */
+export interface DistributedCompareAndSwapResult<T = any> {
+  success: boolean;
+  /** Whether the swap was performed */
+  swapped: boolean;
+  /** Current value after operation */
+  currentValue?: T;
+  /** Current version after operation */
+  currentVersion?: number;
+  /** New version after successful swap */
+  version?: number;
+  error?: string;
+}
+
+/**
+ * A single operation within a distributed transaction
+ */
+export interface DistributedTransactionOperation {
+  type: DistributedTransactionOperationType;
+  key: string;
+  value?: any;
+  /** For CAS operations */
+  expectedVersion?: number;
+  /** Delta for increment/decrement */
+  delta?: number;
+}
+
+/**
+ * Distributed transaction for atomic multi-key operations
+ */
+export interface DistributedTransaction {
+  transactionId: string;
+  status: DistributedTransactionStatus;
+  operations: DistributedTransactionOperation[];
+  createdAt: number;
+  /** Timeout for transaction completion */
+  timeoutMs: number;
+  /** Node that initiated the transaction */
+  initiatorNodeId: string;
+  /** Prepared state for 2PC */
+  preparedAt?: number;
+  /** Commit/rollback timestamp */
+  completedAt?: number;
+  /** Error if transaction failed */
+  error?: string;
+}
+
+/**
+ * Options for beginning a distributed transaction
+ */
+export interface DistributedTransactionOptions {
+  /** Transaction timeout in milliseconds */
+  timeoutMs?: number;
+  /** Isolation level (for future use) */
+  isolationLevel?: DistributedIsolationLevel;
+}
+
+/**
+ * Result of a distributed transaction
+ */
+export interface DistributedTransactionResult {
+  transactionId: string;
+  status: DistributedTransactionStatus;
+  /** Whether the operation was successful */
+  success: boolean;
+  /** Results of individual operations (on commit) */
+  results?: Array<{ key: string; success: boolean; value?: any; version?: number }>;
+  error?: string;
+}
+
+/**
+ * Message for distributed pub/sub
+ */
+export interface DistributedMessage<T = any> {
+  channel: string;
+  payload: T;
+  publisherId: string;
+  timestamp: number;
+  messageId: string;
+  /** Delivery guarantee for this message */
+  deliveryMode?: DistributedMessageDelivery;
+  /** Sequence number for exactly-once delivery */
+  sequenceNumber?: number;
+  /** Whether acknowledgement is required */
+  requiresAck?: boolean;
+}
+
+/**
+ * Options for publishing messages
+ */
+export interface DistributedPublishOptions {
+  /** Delivery guarantee mode */
+  deliveryMode?: DistributedMessageDelivery;
+  /** Whether to wait for acknowledgement */
+  waitForAck?: boolean;
+  /** Ack timeout in milliseconds */
+  ackTimeoutMs?: number;
+  /** Number of retries for at-least-once delivery */
+  maxRetries?: number;
+}
+
+/**
+ * Subscription handle for pub/sub
+ */
+export interface DistributedSubscription {
+  subscriptionId: string;
+  channel: string;
+  unsubscribe: () => Promise<void>;
+  /** Acknowledge a message (for at-least-once/exactly-once) */
+  acknowledge?: (messageId: string) => Promise<void>;
+}
+
+/**
+ * Core distributed adapter interface that users implement for their backend (Redis, Postgres, etc.)
+ */
+export interface DistributedAdapter {
+  /** Unique identifier for this node/instance */
+  readonly nodeId: string;
+
+  /** Initialize the adapter and establish connections */
+  connect(): Promise<void>;
+
+  /** Gracefully disconnect from the backend */
+  disconnect(): Promise<void>;
+
+  /** Check if the adapter is connected and healthy */
+  isHealthy(): Promise<boolean>;
+
+  // ---- Distributed Locking ----
+  
+  /** Acquire a distributed lock on a resource */
+  acquireLock(options: DistributedLockOptions): Promise<DistributedLockResult>;
+
+  /** Release a previously acquired lock */
+  releaseLock(handle: DistributedLockHandle): Promise<boolean>;
+
+  /** Extend the TTL of an existing lock */
+  extendLock(handle: DistributedLockHandle, additionalMs: number): Promise<DistributedLockResult>;
+
+  /** Validate if a fencing token is still valid for a resource */
+  validateFencingToken(resource: string, token: number): Promise<boolean>;
+
+  /** Get the current fencing token for a resource */
+  getCurrentFencingToken(resource: string): Promise<number>;
+
+  // ---- Distributed State ----
+  
+  /** Get a value from distributed state */
+  getState<T = any>(key: string, options?: { consistencyLevel?: DistributedConsistencyLevel }): Promise<DistributedStateResult<T>>;
+
+  /** Set a value in distributed state */
+  setState<T = any>(key: string, value: T, options?: Omit<DistributedStateOptions, 'key'>): Promise<DistributedStateResult<T>>;
+
+  /** Update a value atomically using a compare-and-swap operation */
+  updateState<T = any>(
+    key: string, 
+    updater: (current: T | undefined) => T, 
+    options?: Omit<DistributedStateOptions, 'key'>
+  ): Promise<DistributedStateResult<T>>;
+
+  /** Delete a value from distributed state */
+  deleteState(key: string): Promise<boolean>;
+
+  /** Compare-and-swap: atomically update if current value/version matches */
+  compareAndSwap<T = any>(options: DistributedCompareAndSwapOptions<T>): Promise<DistributedCompareAndSwapResult<T>>;
+
+  // ---- Distributed Counters ----
+  
+  /** Get the current value of a counter */
+  getCounter(key: string): Promise<number>;
+
+  /** Atomically increment a counter and return the new value */
+  incrementCounter(key: string, delta?: number): Promise<number>;
+
+  /** Atomically decrement a counter and return the new value */
+  decrementCounter(key: string, delta?: number): Promise<number>;
+
+  /** Reset a counter to a specific value */
+  resetCounter(key: string, value?: number): Promise<void>;
+
+  // ---- Leader Election ----
+  
+  /** Campaign to become the leader for a specific key */
+  campaignForLeader(options: DistributedLeaderOptions): Promise<DistributedLeaderState>;
+
+  /** Resign from leadership */
+  resignLeadership(electionKey: string): Promise<void>;
+
+  /** Check current leader status */
+  getLeaderStatus(electionKey: string): Promise<DistributedLeaderState>;
+
+  /** Send a heartbeat to maintain leadership */
+  sendLeaderHeartbeat(electionKey: string): Promise<boolean>;
+
+  /** Register a node for quorum-based election */
+  registerNode(electionKey: string): Promise<void>;
+
+  /** Unregister a node from quorum-based election */
+  unregisterNode(electionKey: string): Promise<void>;
+
+  /** Get list of known nodes for an election */
+  getKnownNodes(electionKey: string): Promise<string[]>;
+
+  // ---- Pub/Sub ----
+  
+  /** Publish a message to a channel */
+  publish<T = any>(channel: string, payload: T, options?: DistributedPublishOptions): Promise<void>;
+
+  /** Subscribe to messages on a channel */
+  subscribe<T = any>(
+    channel: string, 
+    handler: (message: DistributedMessage<T>) => void | Promise<void>,
+    options?: { deliveryMode?: DistributedMessageDelivery }
+  ): Promise<DistributedSubscription>;
+
+  /** Acknowledge receipt of a message (for at-least-once/exactly-once) */
+  acknowledgeMessage(channel: string, messageId: string): Promise<void>;
+
+  /** Get unacknowledged messages for redelivery */
+  getUnacknowledgedMessages<T = any>(channel: string, subscriberId: string): Promise<DistributedMessage<T>[]>;
+
+  // ---- Distributed Transactions ----
+  
+  /** Begin a new distributed transaction */
+  beginTransaction(options?: DistributedTransactionOptions): Promise<DistributedTransaction>;
+
+  /** Add an operation to a pending transaction */
+  addTransactionOperation(transactionId: string, operation: DistributedTransactionOperation): Promise<void>;
+
+  /** Prepare a transaction for commit (2PC phase 1) */
+  prepareTransaction(transactionId: string): Promise<DistributedTransactionResult>;
+
+  /** Commit a prepared transaction (2PC phase 2) */
+  commitTransaction(transactionId: string): Promise<DistributedTransactionResult>;
+
+  /** Rollback a transaction */
+  rollbackTransaction(transactionId: string): Promise<DistributedTransactionResult>;
+
+  /** Execute a transaction atomically (combines begin, add operations, prepare, commit) */
+  executeTransaction(
+    operations: DistributedTransactionOperation[],
+    options?: DistributedTransactionOptions
+  ): Promise<DistributedTransactionResult>;
+}
+
+/**
+ * Configuration for distributed mode
+ */
+export interface DistributedConfig {
+  /** The adapter implementation for distributed operations */
+  adapter: DistributedAdapter;
+
+  /** Namespace prefix for all keys to avoid collisions */
+  namespace?: string;
+
+  /** Default TTL for locks in milliseconds */
+  defaultLockTtlMs?: number;
+
+  /** Default TTL for state entries in milliseconds */
+  defaultStateTtlMs?: number;
+
+  /** Whether to enable leader election for scheduler */
+  enableLeaderElection?: boolean;
+
+  /** Heartbeat interval for leader election */
+  leaderHeartbeatMs?: number;
+
+  /** Whether to sync state on every change (vs batched) */
+  syncOnEveryChange?: boolean;
+
+  /** Batch sync interval in milliseconds (if syncOnEveryChange is false) */
+  syncIntervalMs?: number;
+
+  /** Retry configuration for distributed operations */
+  retryConfig?: {
+    maxAttempts?: number;
+    baseDelayMs?: number;
+    maxDelayMs?: number;
+  };
+}
+
+/**
+ * Distributed infrastructure configuration for scheduler
+ */
+export interface DistributedSchedulerConfig {
+  distributed?: DistributedConfig;
+}
+
+/**
+ * Extended scheduler config with distributed support
+ */
+export interface DistributedSchedulerSharedInfrastructure extends SchedulerSharedInfrastructure {
+  distributed?: DistributedConfig;
+}
+
+/**
+ * State sync event for distributed buffer
+ */
+export interface DistributedBufferSyncEvent {
+  nodeId: string;
+  timestamp: number;
+  operation: DistributedBufferOperation;
+  key?: string;
+  state?: Record<string, any>;
+}
+
+/**
+ * Options for distributed stable buffer
+ */
+export interface DistributedStableBufferOptions extends StableBufferOptions {
+  distributed?: DistributedConfig;
+  stateKey?: string;
+  syncOnTransaction?: boolean;
+  conflictResolution?: DistributedConflictResolution;
+  mergeStrategy?: (local: Record<string, any>, remote: Record<string, any>) => Record<string, any>;
+}
+
+/**
+ * Distributed infrastructure metrics
+ */
+export interface DistributedInfrastructureMetrics {
+  nodeId: string;
+  isLeader: boolean;
+  connectedNodes: number;
+  lockAcquisitions: number;
+  lockReleases: number;
+  lockConflicts: number;
+  stateOperations: number;
+  messagesSent: number;
+  messagesReceived: number;
+  lastSyncTimestamp: number;
+  averageSyncLatencyMs: number;
+}
+
+// ============================================================================
+// End Distributed Infrastructure Types
+// ============================================================================
 
 export type StableBufferState = Record<string, any>;
 

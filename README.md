@@ -14,6 +14,11 @@ A stability-first production-grade TypeScript framework for resilient API integr
   - [stableWorkflowGraph](#stableworkflowgraph)
   - [StableScheduler](#stablescheduler)
   - [StableBuffer](#stablebuffer)
+  - [Distributed Infrastructure](#distributed-infrastructure)
+    - [Distributed Buffer](#distributed-buffer--cross-node-stablebuffer)
+    - [Distributed Resilience](#distributed-resilience--shared-circuit-breaker-rate-limiter-cache)
+    - [Distributed Scheduler](#distributed-scheduler--leader-based-execution)
+    - [Multi-Node Integration Example](#multi-node-integration-example)
 - [Stable Runner](#stable-runner)
 - [Resilience Mechanisms](#resilience-mechanisms)
   - [Retry Strategies](#retry-strategies)
@@ -58,8 +63,9 @@ A stability-first production-grade TypeScript framework for resilient API integr
 4. **Generic function execution** via `stableFunction`, inheriting all resilience guards
 5. **Queue based scheduling** via `StableScheduler`, with option to preserve scheduler state and recover from saved state
 6. **Transactional shared state** via `StableBuffer`, a concurrency-safe buffer you can pass as `commonBuffer` or `sharedBuffer`
+7. **Distributed coordination** via `DistributedCoordinator` for multi-node locking, state, leader election, pub/sub, and 2PC transactions
 
-All seven core modules support the same resilience stack: retries, jitter, circuit breaking, caching, rate/concurrency limits, config cascading, shared buffers, trial mode, comprehensive hooks, and metrics. This uniformity makes it trivial to compose requests and functions in any topology. Finally, `Stable Runner` executes jobs from config.
+All core modules support the same resilience stack: retries, jitter, circuit breaking, caching, rate/concurrency limits, config cascading, shared buffers, trial mode, comprehensive hooks, and metrics. This uniformity makes it trivial to compose requests and functions in any topology. Finally, `Stable Runner` executes jobs from config.
 
 ---
 
@@ -539,6 +545,198 @@ const replay = await replayStableBufferTransactions({
 });
 
 console.log(replay.buffer.getState());
+```
+
+### Distributed Infrastructure
+
+Multi-node coordination via a shared backend (Redis, PostgreSQL, etcd, etc.). Nodes connect independently to the backend — no peer-to-peer discovery or IP exchange required. All coordination goes through the `DistributedCoordinator`, backed by a pluggable `DistributedAdapter`.
+
+**Key capabilities:** distributed locking with fencing tokens, compare-and-swap (CAS), quorum-based leader election, pub/sub with delivery guarantees (at-most-once / at-least-once / exactly-once), two-phase commit transactions, distributed buffers, and distributed schedulers.
+
+```typescript
+import { DistributedCoordinator, InMemoryDistributedAdapter } from '@emmvish/stable-infra';
+
+const coordinator = new DistributedCoordinator({
+  adapter: new InMemoryDistributedAdapter('node-1'), // Use Redis/Postgres adapter in production
+  namespace: 'my-app',
+  enableLeaderElection: true,
+  leaderHeartbeatMs: 5000,
+});
+
+await coordinator.connect();
+
+// Distributed lock with fencing token
+const lock = await coordinator.acquireLock({ resource: 'order:123', ttlMs: 30000 });
+
+// Leader election — nodes register via shared backend, no IP discovery needed
+await coordinator.registerForElection('scheduler-leader');
+await coordinator.campaignForLeader({ electionKey: 'scheduler-leader' });
+
+// Shared state & pub/sub across nodes
+await coordinator.setState('user:123', { balance: 100 });
+await coordinator.publish('events', { type: 'ORDER_CREATED', orderId: 123 });
+```
+
+An `InMemoryDistributedAdapter` is included for testing and single-instance use. For production multi-node deployments, implement the `DistributedAdapter` interface with your backend of choice.
+
+#### Distributed Buffer — Cross-Node StableBuffer
+
+Wrap a `StableBuffer` with distributed sync so transactions on one node propagate to all others via pub/sub. Conflict resolution is configurable.
+
+```typescript
+import {
+  createDistributedStableBuffer,
+  DistributedConflictResolution,
+  withDistributedBufferLock
+} from '@emmvish/stable-infra';
+
+const { buffer, sync, refresh, disconnect } = await createDistributedStableBuffer({
+  distributed: { adapter, namespace: 'my-app' },
+  initialState: { counter: 0, items: [] },
+  conflictResolution: DistributedConflictResolution.LAST_WRITE_WINS, // or MERGE, CUSTOM
+  syncOnTransaction: true // auto-push state after each buffer.run()
+});
+
+// Use exactly like a local StableBuffer — sync happens automatically
+await buffer.run(state => { state.counter += 1; });
+
+// Acquire a distributed lock for critical sections
+await withDistributedBufferLock({ buffer, coordinator }, async () => {
+  await buffer.run(state => { state.counter -= 100; }); // exclusive cross-node access
+}, { ttlMs: 10000 });
+
+await refresh();    // Force pull latest state from remote
+await disconnect();
+```
+
+#### Distributed Resilience — Shared Circuit Breaker, Rate Limiter, Cache
+
+Every resilience component (`CircuitBreaker`, `RateLimiter`, `ConcurrencyLimiter`, `CacheManager`) supports a `persistence` interface. The distributed layer provides an implementation backed by `coordinator.getState/setState`, so component state (failure counts, open/closed status, rate windows) is synchronized across nodes.
+
+Create them individually or as a bundle:
+
+```typescript
+import { createDistributedInfrastructureBundle } from '@emmvish/stable-infra';
+
+// One coordinator, all components share the same backend
+const infra = await createDistributedInfrastructureBundle({
+  distributed: { adapter, namespace: 'my-service' },
+  circuitBreaker: {
+    failureThresholdPercentage: 50,
+    minimumRequests: 10,
+    recoveryTimeoutMs: 30000
+  },
+  rateLimiter: { maxRequests: 1000, windowMs: 60000 },
+  concurrencyLimiter: { limit: 50 },
+  cacheManager: { enabled: true, ttl: 300000 }
+});
+
+// Plug directly into any core module via sharedInfrastructure
+const scheduler = new StableScheduler({
+  maxParallel: 10,
+  sharedInfrastructure: {
+    circuitBreaker: infra.circuitBreaker,   // shared state across nodes
+    rateLimiter: infra.rateLimiter,
+    concurrencyLimiter: infra.concurrencyLimiter,
+    cacheManager: infra.cacheManager
+  }
+}, handler);
+
+await infra.disconnect(); // cleanup
+```
+
+Standalone factories are also available: `createDistributedCircuitBreaker()`, `createDistributedRateLimiter()`, `createDistributedConcurrencyLimiter()`, `createDistributedCacheManager()`.
+
+#### Distributed Scheduler — Leader-Based Execution
+
+Wrap `StableScheduler` so only the elected leader node processes jobs, with distributed state persistence and shared resilience infrastructure.
+
+```typescript
+import { runAsDistributedScheduler } from '@emmvish/stable-infra';
+
+const runner = await runAsDistributedScheduler({
+  distributed: { adapter, namespace: 'workers' },
+  scheduler: { maxParallel: 5 },
+  circuitBreaker: { failureThresholdPercentage: 50, minimumRequests: 10, recoveryTimeoutMs: 30000 },
+  rateLimiter: { maxRequests: 100, windowMs: 60000 },
+  createScheduler: (config) => new StableScheduler(config, async (job) => {
+    await processJob(job);
+  })
+});
+
+await runner.start();    // Campaigns for leadership, starts scheduler when elected
+runner.isLeader();       // Check current status
+await runner.stop();     // Graceful shutdown, resigns leadership
+```
+
+Internally, scheduler state (job queue, execution history) is persisted via the coordinator, so a new leader can recover from where the previous one left off.
+
+#### Multi-Node Integration Example
+
+Combining distributed buffer, shared circuit breaker, leader election, pub/sub, locking, and workflows:
+
+```typescript
+import {
+  createDistributedStableBuffer, createDistributedSchedulerConfig,
+  DistributedCoordinator, DistributedConflictResolution,
+  DistributedTransactionOperationType, withDistributedBufferLock,
+  StableScheduler
+} from '@emmvish/stable-infra';
+
+// 1. Distributed buffer with custom conflict resolution
+const { buffer: sharedBuffer } = await createDistributedStableBuffer({
+  distributed: { adapter, namespace: 'orders' },
+  initialState: { orderCount: 0, totalRevenue: 0, failedOrders: [] },
+  conflictResolution: DistributedConflictResolution.CUSTOM,
+  mergeStrategy: (local, remote) => ({
+    orderCount: Math.max(local.orderCount, remote.orderCount),
+    totalRevenue: Math.max(local.totalRevenue, remote.totalRevenue),
+    failedOrders: [...new Set([...local.failedOrders, ...remote.failedOrders])]
+  }),
+  syncOnTransaction: true
+});
+
+// 2. Distributed scheduler with leader election + circuit breaker
+const setup = await createDistributedSchedulerConfig({
+  distributed: { adapter, namespace: 'orders' },
+  scheduler: { maxParallel: 10 },
+  enableLeaderElection: true,
+  circuitBreaker: { failureThresholdPercentage: 40, minimumRequests: 5, recoveryTimeoutMs: 30000 }
+});
+
+// 3. Job handler — lock, process, update shared state atomically
+const orderHandler = async (job) => {
+  const lock = await coordinator.acquireLock({
+    resource: `order:${job.orderId}:processing`, ttlMs: 60000
+  });
+  try {
+    await processOrderWorkflow(job); // stableWorkflow under the hood
+
+    // Update shared buffer with distributed lock
+    await withDistributedBufferLock({ buffer: sharedBuffer, coordinator }, async () => {
+      await sharedBuffer.run(state => {
+        state.orderCount += 1;
+        state.totalRevenue += job.total;
+      });
+    });
+
+    // Publish completion for other services
+    await coordinator.publish('order-events', { type: 'COMPLETED', orderId: job.orderId });
+  } catch (error) {
+    // Atomic error handling via 2PC transaction
+    await coordinator.executeTransaction([
+      { type: DistributedTransactionOperationType.SET, key: `order:${job.orderId}:status`, value: { status: 'FAILED' } },
+      { type: DistributedTransactionOperationType.INCREMENT, key: 'metrics:failed-orders', delta: 1 }
+    ]);
+  } finally {
+    await coordinator.releaseLock(lock.handle);
+  }
+};
+
+// 4. Start — only the leader processes jobs
+const scheduler = new StableScheduler({ ...setup.config, sharedBuffer }, orderHandler);
+const isLeader = await setup.waitForLeadership(30000);
+if (isLeader) scheduler.start();
 ```
 
 ---
@@ -2514,6 +2712,7 @@ await stableWorkflow(phases, {
 - **Batch orchestration** via `stableApiGateway` (concurrent/sequential mixed items)
 - **Phased workflows** via `stableWorkflow` (array-based, non-linear, branched)
 - **Graph workflows** via `stableWorkflowGraph` (DAG, explicit parallelism)
+- **Distributed coordination** via `DistributedCoordinator` (locking, leader election, pub/sub, 2PC)
 
 All modes inherit robust resilience (retries, jitter, circuit breaking, caching, rate/concurrency limits), config cascading, shared state, hooks, and metrics. Use together or independently; compose freely.
 

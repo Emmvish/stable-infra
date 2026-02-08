@@ -25,7 +25,21 @@ export {
     RunnerJobs,
     ScheduleTypes,
     InfrastructurePersistenceOperations,
-    ReplaySkipReasons
+    ReplaySkipReasons,
+    DistributedLockStatus,
+    DistributedLeaderStatus,
+    DistributedOperationType,
+    DistributedConsistencyLevel,
+    DistributedTransactionStatus,
+    DistributedMessageDelivery,
+    DistributedLockRenewalMode,
+    DistributedTransactionOperationType,
+    DistributedIsolationLevel,
+    DistributedBufferOperation,
+    DistributedConflictResolution,
+    DistributedBufferKey,
+    DistributedSchedulerKey,
+    DistributedInfrastructureKey
 } from './enums/index.js';
 
 export type {
@@ -186,7 +200,26 @@ export type {
     StableBufferReplayHandler,
     StableBufferReplayOptions,
     StableBufferReplayResult,
-    TransactionLogsLoader
+    TransactionLogsLoader,
+    SchedulerExecutionContext,
+    SchedulerTransactionLogsLoader,
+    DistributedAdapter,
+    DistributedConfig,
+    DistributedLockHandle,
+    DistributedLockOptions,
+    DistributedLockResult,
+    DistributedLeaderState,
+    DistributedLeaderOptions,
+    DistributedStateOptions,
+    DistributedStateResult,
+    DistributedMessage,
+    DistributedSubscription,
+    DistributedCounter,
+    DistributedSchedulerConfig,
+    DistributedSchedulerSharedInfrastructure,
+    DistributedBufferSyncEvent,
+    DistributedStableBufferOptions,
+    DistributedInfrastructureMetrics
 } from './types/index.js';
 
 export {
@@ -241,5 +274,17 @@ export {
     isStableBuffer,
     withBuffer,
     InfrastructurePersistenceCoordinator,
-    replayStableBufferTransactions
+    replayStableBufferTransactions,
+    DistributedCoordinator,
+    createDistributedCoordinator,
+    InMemoryDistributedAdapter,
+    createInMemoryAdapter,
+    createDistributedCircuitBreaker,
+    createDistributedRateLimiter,
+    createDistributedConcurrencyLimiter,
+    createDistributedCacheManager,
+    createDistributedFunctionCacheManager,
+    createDistributedInfrastructureBundle,
+    createDistributedSchedulerConfig,
+    runAsDistributedScheduler
 } from './utilities/index.js';
