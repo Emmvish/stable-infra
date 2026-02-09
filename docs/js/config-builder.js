@@ -167,16 +167,16 @@ const builderContents = document.querySelectorAll('.builder-content');
 
 // Modules with available builders
 const availableModules = ['stableRequest', 'stableFunction', 'StableBuffer'];
-const comingSoonModules = ['stableApiGateway', 'stableWorkflow', 'stableWorkflowGraph', 'StableScheduler', 'DistributedInfra'];
+const premiumModules = ['stableApiGateway', 'stableWorkflow', 'stableWorkflowGraph', 'StableScheduler', 'DistributedInfra'];
 
 function updateBuilderModule(selectedModule) {
     // Update status indicator
-    if (comingSoonModules.includes(selectedModule)) {
-        moduleStatus.textContent = '(Coming Soon)';
-        moduleStatus.classList.add('coming-soon');
+    if (premiumModules.includes(selectedModule)) {
+        moduleStatus.textContent = '(Premium)';
+        moduleStatus.classList.add('premium');
     } else {
         moduleStatus.textContent = '';
-        moduleStatus.classList.remove('coming-soon');
+        moduleStatus.classList.remove('premium');
     }
     
     // Switch builder content
@@ -3511,7 +3511,7 @@ if (document.readyState === 'loading') {
         initConfigBuilder();
         initStableFunctionBuilder();
         initStableBufferBuilder();
-        // stableApiGateway builder disabled (coming soon)
+        // stableApiGateway builder disabled (premium)
     });
 } else {
     initConfigBuilder();

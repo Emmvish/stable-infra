@@ -82,7 +82,7 @@ body:not(:has(.sidebar)) .main-content {
   font-style: italic;
 }
 
-.module-status.coming-soon {
+.module-status.premium {
   color: #fbbf24;
 }
 
@@ -151,7 +151,7 @@ body:not(:has(.sidebar)) .main-content {
   display: block;
 }
 
-/* Placeholder for Coming Soon modules */
+/* Placeholder for Premium feature modules */
 .builder-placeholder-content {
   display: flex;
   flex-direction: column;
@@ -171,12 +171,21 @@ body:not(:has(.sidebar)) .main-content {
 .builder-placeholder-content h3 {
   font-size: 1.75rem;
   margin-bottom: 0.75rem;
-  color: var(--text-primary);
+  color: #fbbf24;
 }
 
 .builder-placeholder-content p {
   color: var(--text-secondary);
   margin-bottom: 0.5rem;
+}
+
+.builder-placeholder-content p a {
+  color: var(--accent-start);
+  text-decoration: underline;
+}
+
+.builder-placeholder-content p a:hover {
+  color: var(--primary-mid);
 }
 
 .placeholder-hint {
