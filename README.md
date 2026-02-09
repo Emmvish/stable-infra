@@ -2538,7 +2538,7 @@ await stableApiGateway<ServiceRequest, ServiceResponse>(requests, {
 });
 ```
 
-### 6. Define Metrics Guardrails for SLA Monitoring
+### 5. Define Metrics Guardrails for SLA Monitoring
 
 Enforce performance and reliability SLAs with automatic validation.
 
@@ -2602,7 +2602,7 @@ await stableApiGateway<ApiRequest, ApiResponse>(requests, {
 });
 ```
 
-### 6. Use Shared Buffers for Cross-Phase Coordination
+### 7. Use Shared Buffers for Cross-Phase Coordination
 
 Avoid global state; pass computed data cleanly.
 
@@ -2617,7 +2617,7 @@ await stableWorkflow(phases, {
 });
 ```
 
-### 7. Log Selectively with Max Serialization Cap
+### 8. Log Selectively with Max Serialization Cap
 
 Prevent noisy logs from large payloads.
 
@@ -2635,7 +2635,7 @@ await stableRequest<DataRequest, DataResponse>({
 });
 ```
 
-### 8. Use Non-Linear Workflows for Polling
+### 9. Use Non-Linear Workflows for Polling
 
 REPLAY action simplifies polling logic.
 
@@ -2670,7 +2670,7 @@ await stableWorkflow(phases, {
 });
 ```
 
-### 9. Use Graph Workflows for Complex Parallelism
+### 10. Use Graph Workflows for Complex Parallelism
 
 DAGs make dependencies explicit and enable maximum parallelism.
 
@@ -2686,7 +2686,7 @@ const graph = new WorkflowGraphBuilder()
 await stableWorkflowGraph(graph);
 ```
 
-### 10. Prefer Dry-Run (Trial Mode) Before Production
+### 11. Prefer Dry-Run (Trial Mode) Before Production
 
 Test workflows and retry logic safely.
 
