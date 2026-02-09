@@ -174,7 +174,14 @@ export const runAsDistributedScheduler = async <TJob = unknown>(
   const setup = await createDistributedSchedulerConfig(setupOptions);
   let scheduler: ReturnType<typeof createScheduler> | null = null;
   let running = false;
-  
+
+  const restoreSchedulerState = async (s: ReturnType<typeof createScheduler>): Promise<void> => {
+    const withRestore = s as unknown as { restoreState?: () => Promise<boolean> };
+    if (typeof withRestore.restoreState === 'function') {
+      await withRestore.restoreState();
+    }
+  };
+
   const checkLeadershipInterval = setInterval(async () => {
     if (!running) return;
     
@@ -184,6 +191,7 @@ export const runAsDistributedScheduler = async <TJob = unknown>(
     
     if (!wasLeader && isNowLeader) {
       scheduler = createScheduler(setup.config);
+      await restoreSchedulerState(scheduler);
       scheduler.start();
     }
     
@@ -201,6 +209,7 @@ export const runAsDistributedScheduler = async <TJob = unknown>(
       
       if (setup.isLeader()) {
         scheduler = createScheduler(setup.config);
+        await restoreSchedulerState(scheduler);
         scheduler.start();
       }
     },

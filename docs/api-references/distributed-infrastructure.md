@@ -842,7 +842,7 @@ const { buffer } = await createDistributedStableBuffer({
 
 ## Distributed Scheduler
 
-Runs schedulers across multiple nodes with leader election.
+Runs schedulers across multiple nodes with leader election. When a new leader is elected (e.g. after the previous leader crashes), it automatically restores scheduler state from the coordinator and runs remaining jobs.
 
 ### Create Distributed Scheduler Config
 
@@ -908,6 +908,8 @@ console.log('Is leader:', runner.isLeader());
 // Graceful shutdown
 await runner.stop();
 ```
+
+When using `runAsDistributedScheduler`, the runner restores persisted state (via the scheduler’s `restoreState()` when available) before starting the scheduler on the new leader, so queued and remaining jobs are executed after failover.
 
 ---
 

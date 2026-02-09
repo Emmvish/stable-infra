@@ -669,7 +669,7 @@ runner.isLeader();       // Check current status
 await runner.stop();     // Graceful shutdown, resigns leadership
 ```
 
-Internally, scheduler state (job queue, execution history) is persisted via the coordinator, so a new leader can recover from where the previous one left off.
+Internally, scheduler state (job queue, execution history) is persisted via the coordinator. When the leader crashes or resigns, a new leader is elected (after the previous leader’s lease expires). The new leader automatically restores state from the coordinator and runs remaining jobs, so work resumes from where the previous leader left off.
 
 #### Multi-Node Integration Example
 
