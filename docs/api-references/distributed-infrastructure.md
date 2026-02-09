@@ -1093,9 +1093,8 @@ This example demonstrates a **distributed order processing system** with multipl
 
 ```typescript
 import {
+  stableWorkflow,
   StableScheduler,
-  StableWorkflow,
-  StableRequest,
   DistributedCoordinator,
   InMemoryDistributedAdapter,
   createDistributedStableBuffer,
@@ -1104,9 +1103,20 @@ import {
   DistributedTransactionOperationType,
   DistributedConflictResolution,
   DistributedLockRenewalMode,
-  DistributedMessageDelivery,
   ScheduleTypes,
-  REQUEST_METHODS
+  REQUEST_METHODS,
+  RequestOrFunction,
+  DistributedLockStatus
+} from '@emmvish/stable-infra';
+
+import type {
+  STABLE_WORKFLOW_PHASE,
+  STABLE_WORKFLOW_RESULT,
+  SchedulerRunContext,
+  SchedulerSchedule,
+  HandlePhaseCompletionHookOptions,
+  HandlePhaseErrorHookOptions,
+  DistributedStableBuffer
 } from '@emmvish/stable-infra';
 
 // =============================================================================
@@ -1127,13 +1137,13 @@ await coordinator.connect();
 // 2. Create Distributed Shared Buffer for Cross-Node State
 // =============================================================================
 
-const { buffer: sharedBuffer, sync } = await createDistributedStableBuffer({
+const distributedBuffer: DistributedStableBuffer = await createDistributedStableBuffer({
   distributed: { adapter, namespace: 'order-processing' },
   initialState: {
     orderCount: 0,
     totalRevenue: 0,
-    failedOrders: [],
-    processingNodes: []
+    failedOrders: [] as { orderId: string; error: string }[],
+    processingNodes: [] as string[]
   },
   conflictResolution: DistributedConflictResolution.CUSTOM,
   mergeStrategy: (local, remote) => ({
@@ -1144,6 +1154,8 @@ const { buffer: sharedBuffer, sync } = await createDistributedStableBuffer({
   }),
   syncOnTransaction: true
 });
+
+const { buffer: sharedBuffer, sync } = distributedBuffer;
 
 // =============================================================================
 // 3. Create Distributed Scheduler with Leader Election
@@ -1180,141 +1192,182 @@ const schedulerSetup = await createDistributedSchedulerConfig({
 // 4. Define Order Processing Workflow
 // =============================================================================
 
-const createOrderWorkflow = (orderId: string, orderData: any) => {
-  return new StableWorkflow({
-    workflowId: `order-${orderId}`,
-    phases: [
-      // Phase 1: Validate Order
-      {
-        phaseId: 'validate',
-        requests: [
-          new StableRequest({
-            requestId: 'validate-inventory',
-            url: 'https://api.example.com/inventory/check',
-            method: REQUEST_METHODS.POST,
-            body: { items: orderData.items }
-          })
-        ]
-      },
-      // Phase 2: Process Payment
-      {
-        phaseId: 'payment',
-        requests: [
-          new StableRequest({
-            requestId: 'process-payment',
-            url: 'https://api.example.com/payments/charge',
-            method: REQUEST_METHODS.POST,
-            body: { 
-              amount: orderData.total,
-              customerId: orderData.customerId
+// stableWorkflow is a function, not a class. It accepts (phases, options) and
+// returns Promise<STABLE_WORKFLOW_RESULT>. Phases use API_GATEWAY_REQUEST
+// objects with { id, requestOptions: { reqData: { hostname, method, path, body } } }.
+
+const executeOrderWorkflow = async (orderId: string, orderData: any): Promise<STABLE_WORKFLOW_RESULT> => {
+  const phases: STABLE_WORKFLOW_PHASE[] = [
+    // Phase 1: Validate Order
+    {
+      id: 'validate',
+      requests: [
+        {
+          id: 'validate-inventory',
+          requestOptions: {
+            reqData: {
+              hostname: 'api.example.com',
+              protocol: 'https',
+              method: REQUEST_METHODS.POST,
+              path: '/inventory/check',
+              body: { items: orderData.items }
             }
-          })
-        ]
-      },
-      // Phase 3: Fulfill Order
-      {
-        phaseId: 'fulfill',
-        requests: [
-          new StableRequest({
-            requestId: 'create-shipment',
-            url: 'https://api.example.com/shipping/create',
-            method: REQUEST_METHODS.POST,
-            body: { 
-              orderId,
-              address: orderData.shippingAddress
-            }
-          })
-        ]
-      }
-    ],
-    hooks: {
-      onPhaseComplete: async (result, context) => {
-        console.log(`Order ${orderId}: Phase ${result.phaseId} completed`);
-      },
-      onWorkflowComplete: async (result, context) => {
-        if (result.success) {
-          // Update shared buffer atomically with distributed lock
-          await withDistributedBufferLock({ buffer: sharedBuffer, coordinator }, async () => {
-            await sharedBuffer.run(state => {
-              state.orderCount += 1;
-              state.totalRevenue += orderData.total;
-            });
-          });
-          
-          // Publish completion event
-          await coordinator.publish('order-events', {
-            type: 'ORDER_COMPLETED',
-            orderId,
-            total: orderData.total,
-            timestamp: Date.now()
-          });
-        }
-      },
-      onWorkflowError: async (error, context) => {
-        // Use distributed transaction for consistent error handling
-        await coordinator.executeTransaction([
-          {
-            type: DistributedTransactionOperationType.SET,
-            key: `order:${orderId}:status`,
-            value: { status: 'FAILED', error: error.message }
-          },
-          {
-            type: DistributedTransactionOperationType.INCREMENT,
-            key: 'metrics:failed-orders',
-            delta: 1
           }
-        ]);
-        
-        await sharedBuffer.run(state => {
-          state.failedOrders.push({ orderId, error: error.message });
-        });
-      }
+        }
+      ]
+    },
+    // Phase 2: Process Payment
+    {
+      id: 'payment',
+      requests: [
+        {
+          id: 'process-payment',
+          requestOptions: {
+            reqData: {
+              hostname: 'api.example.com',
+              protocol: 'https',
+              method: REQUEST_METHODS.POST,
+              path: '/payments/charge',
+              body: {
+                amount: orderData.total,
+                customerId: orderData.customerId
+              }
+            }
+          }
+        }
+      ]
+    },
+    // Phase 3: Fulfill Order
+    {
+      id: 'fulfill',
+      requests: [
+        {
+          id: 'create-shipment',
+          requestOptions: {
+            reqData: {
+              hostname: 'api.example.com',
+              protocol: 'https',
+              method: REQUEST_METHODS.POST,
+              path: '/shipping/create',
+              body: {
+                orderId,
+                address: orderData.shippingAddress
+              }
+            }
+          }
+        }
+      ]
+    }
+  ];
+
+  const result = await stableWorkflow(phases, {
+    workflowId: `order-${orderId}`,
+    sharedBuffer,
+    stopOnFirstPhaseError: true,
+    logPhaseResults: true,
+
+    // handlePhaseCompletion receives HandlePhaseCompletionHookOptions
+    handlePhaseCompletion: async (options: HandlePhaseCompletionHookOptions) => {
+      console.log(`Order ${orderId}: Phase ${options.phaseResult.phaseId} completed`);
+    },
+
+    // handlePhaseError receives HandlePhaseErrorHookOptions (extends HandlePhaseCompletionHookOptions + error)
+    handlePhaseError: async (options: HandlePhaseErrorHookOptions) => {
+      console.error(`Order ${orderId}: Phase ${options.phaseResult.phaseId} failed:`, options.error);
     }
   });
+
+  // Post-workflow processing based on result
+  if (result.success) {
+    // Update shared buffer atomically with distributed lock
+    await withDistributedBufferLock(distributedBuffer, async () => {
+      await sharedBuffer.run(state => {
+        state.orderCount += 1;
+        state.totalRevenue += orderData.total;
+      });
+    });
+
+    // Publish completion event
+    await coordinator.publish('order-events', {
+      type: 'ORDER_COMPLETED',
+      orderId,
+      total: orderData.total,
+      timestamp: Date.now()
+    });
+  } else {
+    // Use distributed transaction for consistent error handling
+    await coordinator.executeTransaction([
+      {
+        type: DistributedTransactionOperationType.SET,
+        key: `order:${orderId}:status`,
+        value: { status: 'FAILED', error: result.error || 'Unknown error' }
+      },
+      {
+        type: DistributedTransactionOperationType.INCREMENT,
+        key: 'metrics:failed-orders',
+        delta: 1
+      }
+    ]);
+
+    await sharedBuffer.run(state => {
+      state.failedOrders.push({ orderId, error: result.error || 'Unknown error' });
+    });
+  }
+
+  return result;
 };
 
 // =============================================================================
 // 5. Create Job Handler
 // =============================================================================
 
-const orderHandler = async (job: { orderId: string; orderData: any }, context: any) => {
+// TJob must extend { id?: string; schedule?: SchedulerSchedule }
+interface OrderJob {
+  id: string;
+  orderId: string;
+  orderData: any;
+  schedule?: SchedulerSchedule;
+}
+
+const orderHandler = async (job: OrderJob, context: SchedulerRunContext) => {
   const { orderId, orderData } = job;
-  
+
   // Acquire a lock on the specific order to prevent duplicate processing
   const lockResult = await coordinator.acquireLock({
     resource: `order:${orderId}:processing`,
     ttlMs: 60000,
     renewalMode: DistributedLockRenewalMode.AUTO
   });
-  
-  if (lockResult.status !== 'acquired') {
+
+  if (lockResult.status !== DistributedLockStatus.ACQUIRED) {
     console.log(`Order ${orderId} is being processed by another node`);
     return { skipped: true };
   }
-  
+
   try {
     // Execute workflow with fencing token validation
-    await coordinator.withFencedAccess(
+    const result = await coordinator.withFencedAccess(
       `order:${orderId}:processing`,
       lockResult.fencingToken!,
       async () => {
-        const workflow = createOrderWorkflow(orderId, orderData);
-        const result = await workflow.execute();
-        
+        const workflowResult = await executeOrderWorkflow(orderId, orderData);
+
         // Store result with CAS for safety
         await coordinator.compareAndSwap({
           key: `order:${orderId}:result`,
           expectedVersion: 0,
           newValue: {
-            success: result.success,
+            success: workflowResult.success,
             completedAt: Date.now(),
             processedBy: coordinator.nodeId
           }
         });
-        
-        return result;
+
+        return workflowResult;
       }
     );
+
+    return result;
   } finally {
     await coordinator.releaseLock(lockResult.handle!);
   }
@@ -1324,7 +1377,7 @@ const orderHandler = async (job: { orderId: string; orderData: any }, context: a
 // 6. Create Scheduler and Start Processing
 // =============================================================================
 
-const scheduler = new StableScheduler(
+const scheduler = new StableScheduler<OrderJob>(
   {
     ...schedulerSetup.config,
     sharedBuffer // Use distributed buffer for scheduler state
@@ -1333,13 +1386,14 @@ const scheduler = new StableScheduler(
 );
 
 // Subscribe to order events from other services
-await coordinator.subscribe('incoming-orders', async (message) => {
+await coordinator.subscribe<{ orderId: string; orderData: any }>('incoming-orders', async (message) => {
   const { orderId, orderData } = message.payload;
-  
-  // Schedule order for processing
-  scheduler.schedule({
+
+  // addJob is the scheduler method for adding jobs (not schedule)
+  scheduler.addJob({
     id: `process-order-${orderId}`,
-    job: { orderId, orderData },
+    orderId,
+    orderData,
     schedule: { type: ScheduleTypes.TIMESTAMP, at: Date.now() }
   });
 });
@@ -1359,7 +1413,7 @@ if (isLeader) {
 setInterval(async () => {
   const metrics = coordinator.getMetrics();
   const state = sharedBuffer.read();
-  
+
   console.log('Distributed System Metrics:', {
     nodeId: metrics.nodeId,
     isLeader: metrics.isLeader,
@@ -1377,11 +1431,11 @@ setInterval(async () => {
 
 process.on('SIGTERM', async () => {
   console.log('Shutting down gracefully...');
-  
+
   scheduler.stop();
   await schedulerSetup.disconnect();
   await coordinator.disconnect();
-  
+
   console.log('Shutdown complete');
   process.exit(0);
 });
