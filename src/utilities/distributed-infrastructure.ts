@@ -9,7 +9,15 @@ import type {
   RateLimitConfig,
   ConcurrencyLimiterConfig,
   CacheConfig,
-  FunctionCacheConfig
+  FunctionCacheConfig,
+  DistributedInfrastructureOptions,
+  DistributedCircuitBreakerOptions,
+  DistributedRateLimiterOptions,
+  DistributedConcurrencyLimiterOptions,
+  DistributedCacheManagerOptions,
+  DistributedFunctionCacheManagerOptions,
+  DistributedInfrastructureBundle,
+  CreateDistributedInfrastructureBundleOptions
 } from '../types/index.js';
 import { DistributedCoordinator } from './distributed-coordinator.js';
 import { CircuitBreaker } from './circuit-breaker.js';
@@ -20,12 +28,6 @@ import { FunctionCacheManager } from './function-cache-manager.js';
 import { DEFAULT_STATE_KEY_PREFIX } from '../constants/index.js';
 import { DistributedInfrastructureKey } from '../enums/index.js';
 
-
-export interface DistributedInfrastructureOptions {
-  distributed: DistributedConfig;
-  stateKeyPrefix?: string;
-  syncIntervalMs?: number;
-}
 
 const createDistributedPersistence = <TState>(
   coordinator: DistributedCoordinator,
@@ -41,11 +43,6 @@ const createDistributedPersistence = <TState>(
     }
   };
 };
-
-export interface DistributedCircuitBreakerOptions extends Omit<CircuitBreakerConfig, 'persistence'> {
-  distributed: DistributedConfig;
-  stateKey?: string;
-}
 
 export const createDistributedCircuitBreaker = async (
   options: DistributedCircuitBreakerOptions
@@ -70,11 +67,6 @@ export const createDistributedCircuitBreaker = async (
   return circuitBreaker;
 };
 
-export interface DistributedRateLimiterOptions extends Omit<RateLimitConfig, 'persistence'> {
-  distributed: DistributedConfig;
-  stateKey?: string;
-}
-
 export const createDistributedRateLimiter = async (
   options: DistributedRateLimiterOptions
 ): Promise<RateLimiter> => {
@@ -97,11 +89,6 @@ export const createDistributedRateLimiter = async (
   
   return rateLimiter;
 };
-
-export interface DistributedConcurrencyLimiterOptions extends Omit<ConcurrencyLimiterConfig, 'persistence'> {
-  distributed: DistributedConfig;
-  stateKey?: string;
-}
 
 export const createDistributedConcurrencyLimiter = async (
   options: DistributedConcurrencyLimiterOptions
@@ -126,11 +113,6 @@ export const createDistributedConcurrencyLimiter = async (
   return limiter;
 };
 
-export interface DistributedCacheManagerOptions extends Omit<CacheConfig, 'persistence'> {
-  distributed: DistributedConfig;
-  stateKey?: string;
-}
-
 export const createDistributedCacheManager = async (
   options: DistributedCacheManagerOptions
 ): Promise<CacheManager> => {
@@ -154,11 +136,6 @@ export const createDistributedCacheManager = async (
   return cacheManager;
 };
 
-export interface DistributedFunctionCacheManagerOptions extends Omit<FunctionCacheConfig, 'persistence'> {
-  distributed: DistributedConfig;
-  stateKey?: string;
-}
-
 export const createDistributedFunctionCacheManager = async (
   options: DistributedFunctionCacheManagerOptions
 ): Promise<FunctionCacheManager> => {
@@ -181,26 +158,6 @@ export const createDistributedFunctionCacheManager = async (
   
   return functionCacheManager;
 };
-
-export interface DistributedInfrastructureBundle {
-  coordinator: DistributedCoordinator;
-  circuitBreaker?: CircuitBreaker;
-  rateLimiter?: RateLimiter;
-  concurrencyLimiter?: ConcurrencyLimiter;
-  cacheManager?: CacheManager;
-  functionCacheManager?: FunctionCacheManager;
-  disconnect: () => Promise<void>;
-}
-
-export interface CreateDistributedInfrastructureBundleOptions {
-  distributed: DistributedConfig;
-  circuitBreaker?: Omit<CircuitBreakerConfig, 'persistence'>;
-  rateLimiter?: Omit<RateLimitConfig, 'persistence'>;
-  concurrencyLimiter?: Omit<ConcurrencyLimiterConfig, 'persistence'>;
-  cacheManager?: Omit<CacheConfig, 'persistence'>;
-  functionCacheManager?: Omit<FunctionCacheConfig, 'persistence'>;
-  stateKeyPrefix?: string;
-}
 
 export const createDistributedInfrastructureBundle = async (
   options: CreateDistributedInfrastructureBundleOptions

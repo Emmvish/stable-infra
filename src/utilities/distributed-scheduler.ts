@@ -2,6 +2,10 @@ import type {
   DistributedConfig,
   SchedulerConfig,
   SchedulerState,
+  DistributedSchedulerOptions,
+  DistributedSchedulerSetup,
+  RunAsDistributedSchedulerOptions,
+  DistributedSchedulerRunner
 } from '../types/index.js';
 import { DistributedCoordinator } from './distributed-coordinator.js';
 import { DistributedLeaderStatus, DistributedSchedulerKey } from '../enums/index.js';
@@ -15,46 +19,6 @@ import { CircuitBreaker } from './circuit-breaker.js';
 import { RateLimiter } from './rate-limiter.js';
 import { ConcurrencyLimiter } from './concurrency-limiter.js';
 import { CacheManager } from './cache-manager.js';
-
-export interface DistributedSchedulerOptions<TJob = unknown> {
-  distributed: DistributedConfig;
-  scheduler?: Omit<SchedulerConfig<TJob>, 'persistence' | 'sharedInfrastructure'>;
-  stateKey?: string;
-  leaderElectionKey?: string;
-  enableLeaderElection?: boolean;
-  persistenceDebounceMs?: number;
-  circuitBreaker?: {
-    failureThresholdPercentage: number;
-    minimumRequests: number;
-    recoveryTimeoutMs: number;
-    successThresholdPercentage?: number;
-    halfOpenMaxRequests?: number;
-  };
-  rateLimiter?: {
-    maxRequests: number;
-    windowMs: number;
-  };
-  concurrencyLimiter?: {
-    limit: number;
-  };
-  cacheManager?: {
-    enabled: boolean;
-    ttl?: number;
-    maxSize?: number;
-  };
-  onBecomeLeader?: () => void | Promise<void>;
-  onLoseLeadership?: () => void | Promise<void>;
-}
-
-export interface DistributedSchedulerSetup<TJob = unknown> {
-  config: SchedulerConfig<TJob>;
-  coordinator: DistributedCoordinator;
-  isLeader: () => boolean;
-  campaignForLeader: () => Promise<void>;
-  resignLeadership: () => Promise<void>;
-  waitForLeadership: (timeoutMs?: number) => Promise<boolean>;
-  disconnect: () => Promise<void>;
-}
 
 export const createDistributedSchedulerConfig = async <TJob = unknown>(
   options: DistributedSchedulerOptions<TJob>
@@ -201,20 +165,6 @@ export const createDistributedSchedulerConfig = async <TJob = unknown>(
     disconnect
   };
 };
-
-export interface RunAsDistributedSchedulerOptions<TJob = unknown> extends DistributedSchedulerOptions<TJob> {
-  createScheduler: (config: SchedulerConfig<TJob>) => {
-    start: () => void;
-    stop: () => void;
-  };
-}
-
-export interface DistributedSchedulerRunner {
-  start: () => Promise<void>;
-  stop: () => Promise<void>;
-  isLeader: () => boolean;
-  coordinator: DistributedCoordinator;
-}
 
 export const runAsDistributedScheduler = async <TJob = unknown>(
   options: RunAsDistributedSchedulerOptions<TJob>

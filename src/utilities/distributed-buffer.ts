@@ -3,19 +3,12 @@ import type {
   StableBufferInstance,
   StableBufferTransactionOptions,
   DistributedBufferSyncEvent,
-  DistributedMessage
+  DistributedMessage,
+  DistributedStableBuffer
 } from '../types/index.js';
 import { DistributedConflictResolution, DistributedBufferOperation, DistributedBufferKey } from '../enums/index.js';
 import { DistributedCoordinator } from './distributed-coordinator.js';
 import { StableBuffer } from '../core/stable-buffer.js';
-
-export interface DistributedStableBuffer {
-  buffer: StableBufferInstance;
-  coordinator: DistributedCoordinator;
-  sync: () => Promise<void>;
-  refresh: () => Promise<void>;
-  disconnect: () => Promise<void>;
-}
 
 export const createDistributedStableBuffer = async (
   options: DistributedStableBufferOptions

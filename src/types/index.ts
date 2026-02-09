@@ -22,7 +22,7 @@ import {
   DistributedConflictResolution
 } from '../enums/index.js';
 
-import { CircuitBreaker, RateLimiter, ConcurrencyLimiter, CacheManager } from '../utilities/index.js';
+import { CircuitBreaker, RateLimiter, ConcurrencyLimiter, CacheManager, FunctionCacheManager, DistributedCoordinator } from '../utilities/index.js';
 
 export type CreateHash = (algorithm: string) => { update: (data: string) => { digest: (encoding: 'hex') => string } };
 export type NodeCryptoLike = { createHash?: CreateHash };
@@ -2248,6 +2248,164 @@ export interface DistributedInfrastructureMetrics {
   messagesReceived: number;
   lastSyncTimestamp: number;
   averageSyncLatencyMs: number;
+}
+
+
+
+// ============================================================================
+// Distributed Infrastructure Utility Types
+// ============================================================================
+
+/**
+ * Options for creating distributed infrastructure components
+ */
+export interface DistributedInfrastructureOptions {
+  distributed: DistributedConfig;
+  stateKeyPrefix?: string;
+  syncIntervalMs?: number;
+}
+
+/**
+ * Options for creating a distributed circuit breaker
+ */
+export interface DistributedCircuitBreakerOptions extends Omit<CircuitBreakerConfig, 'persistence'> {
+  distributed: DistributedConfig;
+  stateKey?: string;
+}
+
+/**
+ * Options for creating a distributed rate limiter
+ */
+export interface DistributedRateLimiterOptions extends Omit<RateLimitConfig, 'persistence'> {
+  distributed: DistributedConfig;
+  stateKey?: string;
+}
+
+/**
+ * Options for creating a distributed concurrency limiter
+ */
+export interface DistributedConcurrencyLimiterOptions extends Omit<ConcurrencyLimiterConfig, 'persistence'> {
+  distributed: DistributedConfig;
+  stateKey?: string;
+}
+
+/**
+ * Options for creating a distributed cache manager
+ */
+export interface DistributedCacheManagerOptions extends Omit<CacheConfig, 'persistence'> {
+  distributed: DistributedConfig;
+  stateKey?: string;
+}
+
+/**
+ * Options for creating a distributed function cache manager
+ */
+export interface DistributedFunctionCacheManagerOptions extends Omit<FunctionCacheConfig, 'persistence'> {
+  distributed: DistributedConfig;
+  stateKey?: string;
+}
+
+/**
+ * Bundle of distributed infrastructure components sharing one coordinator
+ */
+export interface DistributedInfrastructureBundle {
+  coordinator: DistributedCoordinator;
+  circuitBreaker?: CircuitBreaker;
+  rateLimiter?: RateLimiter;
+  concurrencyLimiter?: ConcurrencyLimiter;
+  cacheManager?: CacheManager;
+  functionCacheManager?: FunctionCacheManager;
+  disconnect: () => Promise<void>;
+}
+
+/**
+ * Options for creating a distributed infrastructure bundle
+ */
+export interface CreateDistributedInfrastructureBundleOptions {
+  distributed: DistributedConfig;
+  circuitBreaker?: Omit<CircuitBreakerConfig, 'persistence'>;
+  rateLimiter?: Omit<RateLimitConfig, 'persistence'>;
+  concurrencyLimiter?: Omit<ConcurrencyLimiterConfig, 'persistence'>;
+  cacheManager?: Omit<CacheConfig, 'persistence'>;
+  functionCacheManager?: Omit<FunctionCacheConfig, 'persistence'>;
+  stateKeyPrefix?: string;
+}
+
+/**
+ * Options for creating a distributed scheduler with leader election
+ */
+export interface DistributedSchedulerOptions<TJob = unknown> {
+  distributed: DistributedConfig;
+  scheduler?: Omit<SchedulerConfig<TJob>, 'persistence' | 'sharedInfrastructure'>;
+  stateKey?: string;
+  leaderElectionKey?: string;
+  enableLeaderElection?: boolean;
+  persistenceDebounceMs?: number;
+  circuitBreaker?: {
+    failureThresholdPercentage: number;
+    minimumRequests: number;
+    recoveryTimeoutMs: number;
+    successThresholdPercentage?: number;
+    halfOpenMaxRequests?: number;
+  };
+  rateLimiter?: {
+    maxRequests: number;
+    windowMs: number;
+  };
+  concurrencyLimiter?: {
+    limit: number;
+  };
+  cacheManager?: {
+    enabled: boolean;
+    ttl?: number;
+    maxSize?: number;
+  };
+  onBecomeLeader?: () => void | Promise<void>;
+  onLoseLeadership?: () => void | Promise<void>;
+}
+
+/**
+ * Setup result from creating a distributed scheduler config
+ */
+export interface DistributedSchedulerSetup<TJob = unknown> {
+  config: SchedulerConfig<TJob>;
+  coordinator: DistributedCoordinator;
+  isLeader: () => boolean;
+  campaignForLeader: () => Promise<void>;
+  resignLeadership: () => Promise<void>;
+  waitForLeadership: (timeoutMs?: number) => Promise<boolean>;
+  disconnect: () => Promise<void>;
+}
+
+/**
+ * Options for running as a distributed scheduler (convenience wrapper)
+ */
+export interface RunAsDistributedSchedulerOptions<TJob = unknown> extends DistributedSchedulerOptions<TJob> {
+  createScheduler: (config: SchedulerConfig<TJob>) => {
+    start: () => void;
+    stop: () => void;
+  };
+}
+
+/**
+ * Runner interface for a distributed scheduler
+ */
+export interface DistributedSchedulerRunner {
+  start: () => Promise<void>;
+  stop: () => Promise<void>;
+  isLeader: () => boolean;
+  coordinator: DistributedCoordinator;
+}
+
+/**
+ * Distributed buffer with cross-node synchronization
+ */
+export interface DistributedStableBuffer {
+  buffer: StableBufferInstance;
+  coordinator: DistributedCoordinator;
+  sync: () => Promise<void>;
+  refresh: () => Promise<void>;
+  disconnect: () => Promise<void>;
 }
 
 // ============================================================================

@@ -44,31 +44,12 @@ export {
   createDistributedFunctionCacheManager,
   createDistributedInfrastructureBundle
 } from './distributed-infrastructure.js';
-export type {
-  DistributedInfrastructureOptions,
-  DistributedCircuitBreakerOptions,
-  DistributedRateLimiterOptions,
-  DistributedConcurrencyLimiterOptions,
-  DistributedCacheManagerOptions,
-  DistributedFunctionCacheManagerOptions,
-  DistributedInfrastructureBundle,
-  CreateDistributedInfrastructureBundleOptions
-} from './distributed-infrastructure.js';
 export { 
   createDistributedSchedulerConfig,
   runAsDistributedScheduler
-} from './distributed-scheduler.js';
-export type {
-  DistributedSchedulerOptions,
-  DistributedSchedulerSetup,
-  RunAsDistributedSchedulerOptions,
-  DistributedSchedulerRunner
 } from './distributed-scheduler.js';
 export {
   createDistributedStableBuffer,
   withDistributedBufferLock,
   createDistributedSharedBuffer
-} from './distributed-buffer.js';
-export type {
-  DistributedStableBuffer
 } from './distributed-buffer.js';

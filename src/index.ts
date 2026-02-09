@@ -219,7 +219,29 @@ export type {
     DistributedSchedulerSharedInfrastructure,
     DistributedBufferSyncEvent,
     DistributedStableBufferOptions,
-    DistributedInfrastructureMetrics
+    DistributedInfrastructureMetrics,
+    DistributedCompareAndSwapOptions,
+    DistributedCompareAndSwapResult,
+    DistributedTransaction,
+    DistributedTransactionOperation,
+    DistributedTransactionOptions,
+    DistributedTransactionResult,
+    DistributedPublishOptions,
+    DistributedFencedOperationOptions,
+    DistributedQuorumInfo,
+    DistributedInfrastructureOptions,
+    DistributedCircuitBreakerOptions,
+    DistributedRateLimiterOptions,
+    DistributedConcurrencyLimiterOptions,
+    DistributedCacheManagerOptions,
+    DistributedFunctionCacheManagerOptions,
+    DistributedInfrastructureBundle,
+    CreateDistributedInfrastructureBundleOptions,
+    DistributedSchedulerOptions,
+    DistributedSchedulerSetup,
+    RunAsDistributedSchedulerOptions,
+    DistributedSchedulerRunner,
+    DistributedStableBuffer
 } from './types/index.js';
 
 export {
@@ -286,5 +308,8 @@ export {
     createDistributedFunctionCacheManager,
     createDistributedInfrastructureBundle,
     createDistributedSchedulerConfig,
-    runAsDistributedScheduler
+    runAsDistributedScheduler,
+    createDistributedStableBuffer,
+    withDistributedBufferLock,
+    createDistributedSharedBuffer
 } from './utilities/index.js';

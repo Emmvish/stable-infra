@@ -1558,32 +1558,64 @@ setTimeout(<span class="keyword">() =></span> scheduler.<span class="function">s
               </button>
             </div>
             <pre><code><span class="keyword">import</span> {
+  stableWorkflow,
+  StableScheduler,
   DistributedCoordinator,
   InMemoryDistributedAdapter,
-  DistributedTransactionOperationType
+  createDistributedStableBuffer,
+  createDistributedSchedulerConfig,
+  withDistributedBufferLock,
+  DistributedTransactionOperationType,
+  DistributedConflictResolution,
+  DistributedLockStatus,
+  DistributedLockRenewalMode,
+  DistributedTransactionStatus,
+  DistributedMessageDelivery,
+  ScheduleTypes,
+  REQUEST_METHODS
+} <span class="keyword">from</span> <span class="string">'@emmvish/stable-infra'</span>;
+
+<span class="keyword">import</span> <span class="keyword">type</span> {
+  SchedulerSchedule,
+  SchedulerRunContext,
+  STABLE_WORKFLOW_PHASE,
+  DistributedStableBuffer
 } <span class="keyword">from</span> <span class="string">'@emmvish/stable-infra'</span>;
 
 (<span class="keyword">async</span> () => {
 
-<span class="comment">// Create coordinator with an adapter (use your own for Redis, etcd, etc.)</span>
-<span class="keyword">const</span> adapter = <span class="keyword">new</span> <span class="function">InMemoryDistributedAdapter</span>();
-<span class="keyword">const</span> coordinator = <span class="keyword">new</span> <span class="function">DistributedCoordinator</span>(adapter);
+<span class="comment">// ==========================================================</span>
+<span class="comment">// 1. Distributed Coordinator</span>
+<span class="comment">// ==========================================================</span>
 
-<span class="comment">// 1. Distributed Locking with fencing tokens</span>
+<span class="keyword">const</span> adapter = <span class="keyword">new</span> <span class="function">InMemoryDistributedAdapter</span>();
+<span class="keyword">const</span> coordinator = <span class="keyword">new</span> <span class="function">DistributedCoordinator</span>({
+  <span class="property">adapter</span>,
+  <span class="property">namespace</span>: <span class="string">'order-service'</span>,
+  <span class="property">enableLeaderElection</span>: <span class="keyword">true</span>
+});
+<span class="keyword">await</span> coordinator.<span class="function">connect</span>();
+
+<span class="comment">// ==========================================================</span>
+<span class="comment">// 2. Distributed Locking with Fencing Tokens</span>
+<span class="comment">// ==========================================================</span>
+
 <span class="keyword">const</span> lock = <span class="keyword">await</span> coordinator.<span class="function">acquireLock</span>({
   <span class="property">resource</span>: <span class="string">'order:123'</span>,
   <span class="property">ttlMs</span>: <span class="number">30000</span>,
-  <span class="property">autoRenew</span>: <span class="keyword">true</span>,
-  <span class="property">autoRenewIntervalMs</span>: <span class="number">10000</span>
+  <span class="property">renewalMode</span>: DistributedLockRenewalMode.<span class="property">AUTO</span>,
+  <span class="property">renewalIntervalMs</span>: <span class="number">10000</span>
 });
 
-<span class="keyword">if</span> (lock.acquired) {
+<span class="keyword">if</span> (lock.status === DistributedLockStatus.<span class="property">ACQUIRED</span>) {
   console.log(<span class="string">`Lock acquired, fencing token: ${lock.fencingToken}`</span>);
-  <span class="comment">// Perform work while holding the lock...</span>
-  <span class="keyword">await</span> coordinator.<span class="function">releaseLock</span>(lock);
+  <span class="keyword">await</span> coordinator.<span class="function">releaseLock</span>(lock.handle!);
 }
 
-<span class="comment">// 2. Compare-and-Swap for optimistic concurrency</span>
+<span class="comment">// ==========================================================</span>
+<span class="comment">// 3. Compare-and-Swap &amp; 2PC Transaction</span>
+<span class="comment">// ==========================================================</span>
+
 <span class="keyword">await</span> coordinator.<span class="function">setState</span>(<span class="string">'account:balance'</span>, { <span class="property">balance</span>: <span class="number">100</span> });
 <span class="keyword">const</span> casResult = <span class="keyword">await</span> coordinator.<span class="function">compareAndSwap</span>({
   <span class="property">key</span>: <span class="string">'account:balance'</span>,
@@ -1592,16 +1624,6 @@ setTimeout(<span class="keyword">() =></span> scheduler.<span class="function">s
 });
 console.log(<span class="string">`CAS swapped: ${casResult.swapped}`</span>);
 
-<span class="comment">// 3. Leader Election with quorum</span>
-<span class="keyword">await</span> coordinator.<span class="function">campaignForLeader</span>({
-  <span class="property">electionKey</span>: <span class="string">'scheduler-leader'</span>,
-  <span class="property">quorumSize</span>: <span class="number">3</span>,
-  <span class="property">onPartitionDetected</span>: () => {
-    console.log(<span class="string">'Network partition detected'</span>);
-  }
-});
-
-<span class="comment">// 4. Two-Phase Commit Transaction</span>
 <span class="keyword">const</span> txResult = <span class="keyword">await</span> coordinator.<span class="function">executeTransaction</span>([
   { <span class="property">type</span>: DistributedTransactionOperationType.<span class="property">SET</span>,
     <span class="property">key</span>: <span class="string">'account:A'</span>, <span class="property">value</span>: { <span class="property">balance</span>: <span class="number">50</span> } },
@@ -1610,15 +1632,18 @@ console.log(<span class="string">`CAS swapped: ${casResult.swapped}`</span>);
   { <span class="property">type</span>: DistributedTransactionOperationType.<span class="property">INCREMENT</span>,
     <span class="property">key</span>: <span class="string">'transfers:count'</span>, <span class="property">delta</span>: <span class="number">1</span> }
 ]);
-console.log(<span class="string">`Transaction committed: ${txResult.committed}`</span>);
+console.log(<span class="string">`TX status: ${txResult.status}, success: ${txResult.success}`</span>);
 
-<span class="comment">// 5. Pub/Sub Messaging</span>
-<span class="keyword">const</span> subId = <span class="keyword">await</span> coordinator.<span class="function">subscribe</span>(
+<span class="comment">// ==========================================================</span>
+<span class="comment">// 4. Pub/Sub Messaging</span>
+<span class="comment">// ==========================================================</span>
+
+<span class="keyword">const</span> subscription = <span class="keyword">await</span> coordinator.<span class="function">subscribe</span>(
   <span class="string">'order-events'</span>,
   <span class="keyword">async</span> (<span class="property">message</span>) => {
-    console.log(<span class="string">`Received: ${message.data}`</span>);
+    console.log(<span class="string">`Received: ${JSON.stringify(message.payload)}`</span>);
   },
-  { <span class="property">deliveryGuarantee</span>: <span class="string">'at-least-once'</span> }
+  { <span class="property">deliveryMode</span>: DistributedMessageDelivery.<span class="property">AT_LEAST_ONCE</span> }
 );
 
 <span class="keyword">await</span> coordinator.<span class="function">publish</span>(<span class="string">'order-events'</span>, {
@@ -1626,18 +1651,154 @@ console.log(<span class="string">`Transaction committed: ${txResult.committed}`<
   <span class="property">orderId</span>: <span class="string">'123'</span>
 });
 
-<span class="comment">// 6. Distributed Buffer &amp; Scheduler</span>
-<span class="keyword">const</span> { buffer, scheduler } = <span class="keyword">await</span> coordinator
-  .<span class="function">createDistributedInfrastructure</span>({
-    <span class="property">buffer</span>: { <span class="property">initialState</span>: { <span class="property">count</span>: <span class="number">0</span> } },
-    <span class="property">scheduler</span>: {
-      <span class="property">handler</span>: <span class="keyword">async</span> (<span class="property">job</span>) => {
-        console.log(<span class="string">`Executing job: ${job.id}`</span>);
-      }
+<span class="comment">// ==========================================================</span>
+<span class="comment">// 5. Distributed Buffer (Cross-Node Shared State)</span>
+<span class="comment">// ==========================================================</span>
+
+<span class="keyword">const</span> distributedBuffer = <span class="keyword">await</span> <span class="function">createDistributedStableBuffer</span>({
+  <span class="property">distributed</span>: { <span class="property">adapter</span>, <span class="property">namespace</span>: <span class="string">'order-service'</span> },
+  <span class="property">initialState</span>: {
+    <span class="property">orderCount</span>: <span class="number">0</span>,
+    <span class="property">totalRevenue</span>: <span class="number">0</span>,
+    <span class="property">failedOrders</span>: [] <span class="keyword">as</span> <span class="type">string</span>[]
+  },
+  <span class="property">conflictResolution</span>: DistributedConflictResolution.<span class="property">CUSTOM</span>,
+  <span class="property">mergeStrategy</span>: <span class="keyword">(local, remote) =></span> ({
+    <span class="property">orderCount</span>: Math.max(local.orderCount, remote.orderCount),
+    <span class="property">totalRevenue</span>: Math.max(local.totalRevenue, remote.totalRevenue),
+    <span class="property">failedOrders</span>: [...<span class="keyword">new</span> Set([...local.failedOrders, ...remote.failedOrders])]
+  }),
+  <span class="property">syncOnTransaction</span>: <span class="keyword">true</span>
+});
+<span class="keyword">const</span> { <span class="property">buffer</span>: sharedBuffer } = distributedBuffer;
+
+<span class="comment">// Atomic update with distributed lock</span>
+<span class="keyword">await</span> <span class="function">withDistributedBufferLock</span>(distributedBuffer, <span class="keyword">async</span> () => {
+  <span class="keyword">await</span> sharedBuffer.<span class="function">run</span>(<span class="keyword">state =></span> {
+    state.orderCount += <span class="number">1</span>;
+    state.totalRevenue += <span class="number">99.99</span>;
+  });
+});
+
+<span class="comment">// ==========================================================</span>
+<span class="comment">// 6. Distributed Scheduler + Workflow Execution</span>
+<span class="comment">// ==========================================================</span>
+
+<span class="keyword">interface</span> <span class="type">OrderJob</span> {
+  <span class="property">id</span>: <span class="type">string</span>;
+  <span class="property">orderId</span>: <span class="type">string</span>;
+  <span class="property">schedule</span>?: <span class="type">SchedulerSchedule</span>;
+}
+
+<span class="keyword">const</span> setup = <span class="keyword">await</span> <span class="function">createDistributedSchedulerConfig</span>&lt;<span class="type">OrderJob</span>&gt;({
+  <span class="property">distributed</span>: { <span class="property">adapter</span>, <span class="property">namespace</span>: <span class="string">'order-service'</span> },
+  <span class="property">scheduler</span>: { <span class="property">maxParallel</span>: <span class="number">5</span>, <span class="property">tickIntervalMs</span>: <span class="number">500</span> },
+  <span class="property">enableLeaderElection</span>: <span class="keyword">true</span>,
+  <span class="property">circuitBreaker</span>: {
+    <span class="property">failureThresholdPercentage</span>: <span class="number">50</span>,
+    <span class="property">minimumRequests</span>: <span class="number">5</span>,
+    <span class="property">recoveryTimeoutMs</span>: <span class="number">30000</span>
+  },
+  <span class="property">onBecomeLeader</span>: () => console.log(<span class="string">'Became leader'</span>),
+  <span class="property">onLoseLeadership</span>: () => console.log(<span class="string">'Lost leadership'</span>)
+});
+
+<span class="comment">// Each job runs a workflow with distributed shared state</span>
+<span class="keyword">const</span> handler = <span class="keyword">async</span> (
+  <span class="property">job</span>: <span class="type">OrderJob</span>,
+  <span class="property">ctx</span>: <span class="type">SchedulerRunContext</span>
+) => {
+  <span class="keyword">const</span> phases: <span class="type">STABLE_WORKFLOW_PHASE</span>[] = [
+    {
+      <span class="property">id</span>: <span class="string">'validate'</span>,
+      <span class="property">requests</span>: [{
+        <span class="property">id</span>: <span class="string">'check-inventory'</span>,
+        <span class="property">requestOptions</span>: {
+          <span class="property">reqData</span>: {
+            <span class="property">hostname</span>: <span class="string">'api.example.com'</span>,
+            <span class="property">method</span>: REQUEST_METHODS.<span class="property">POST</span>,
+            <span class="property">path</span>: <span class="string">'/inventory/check'</span>,
+            <span class="property">body</span>: { <span class="property">orderId</span>: job.orderId }
+          }
+        }
+      }]
+    },
+    {
+      <span class="property">id</span>: <span class="string">'fulfill'</span>,
+      <span class="property">requests</span>: [{
+        <span class="property">id</span>: <span class="string">'create-shipment'</span>,
+        <span class="property">requestOptions</span>: {
+          <span class="property">reqData</span>: {
+            <span class="property">hostname</span>: <span class="string">'api.example.com'</span>,
+            <span class="property">method</span>: REQUEST_METHODS.<span class="property">POST</span>,
+            <span class="property">path</span>: <span class="string">'/shipping/create'</span>,
+            <span class="property">body</span>: { <span class="property">orderId</span>: job.orderId }
+          }
+        }
+      }]
     }
+  ];
+
+  <span class="keyword">const</span> result = <span class="keyword">await</span> <span class="function">stableWorkflow</span>(phases, {
+    <span class="property">workflowId</span>: <span class="string">`order-${job.orderId}`</span>,
+    <span class="property">sharedBuffer</span>,
+    <span class="property">stopOnFirstPhaseError</span>: <span class="keyword">true</span>
   });
 
-console.log(<span class="string">'Distributed infrastructure ready'</span>);
+  <span class="keyword">if</span> (result.success) {
+    <span class="keyword">await</span> <span class="function">withDistributedBufferLock</span>(distributedBuffer, <span class="keyword">async</span> () => {
+      <span class="keyword">await</span> sharedBuffer.<span class="function">run</span>(<span class="keyword">s =></span> { s.orderCount += <span class="number">1</span>; });
+    });
+  }
+  <span class="keyword">return</span> result;
+};
+
+<span class="keyword">const</span> scheduler = <span class="keyword">new</span> <span class="function">StableScheduler</span>&lt;<span class="type">OrderJob</span>&gt;(
+  { ...setup.config, <span class="property">sharedBuffer</span> } <span class="keyword">as any</span>,
+  handler
+);
+
+<span class="comment">// Subscribe to incoming orders and schedule them</span>
+<span class="keyword">await</span> coordinator.<span class="function">subscribe</span>&lt;{ <span class="property">orderId</span>: <span class="type">string</span> }&gt;(
+  <span class="string">'incoming-orders'</span>,
+  <span class="keyword">async</span> (<span class="property">msg</span>) => {
+    scheduler.<span class="function">addJob</span>({
+      <span class="property">id</span>: <span class="string">`order-${msg.payload.orderId}`</span>,
+      <span class="property">orderId</span>: msg.payload.orderId,
+      <span class="property">schedule</span>: {
+        <span class="property">type</span>: ScheduleTypes.<span class="property">TIMESTAMP</span>,
+        <span class="property">at</span>: Date.now()
+      }
+    });
+  }
+);
+
+<span class="keyword">const</span> isLeader = <span class="keyword">await</span> setup.<span class="function">waitForLeadership</span>(<span class="number">10000</span>);
+<span class="keyword">if</span> (isLeader) {
+  scheduler.<span class="function">start</span>();
+  console.log(<span class="string">'Distributed scheduler started'</span>);
+}
+
+<span class="comment">// ==========================================================</span>
+<span class="comment">// 7. Monitoring &amp; Graceful Shutdown</span>
+<span class="comment">// ==========================================================</span>
+
+<span class="keyword">const</span> metrics = coordinator.<span class="function">getMetrics</span>();
+console.log(<span class="string">'Metrics:'</span>, {
+  <span class="property">nodeId</span>: metrics.nodeId,
+  <span class="property">isLeader</span>: metrics.isLeader,
+  <span class="property">locks</span>: metrics.lockAcquisitions,
+  <span class="property">state</span>: sharedBuffer.<span class="function">read</span>()
+});
+
+process.on(<span class="string">'SIGTERM'</span>, <span class="keyword">async</span> () => {
+  scheduler.<span class="function">stop</span>();
+  <span class="keyword">await</span> subscription.<span class="function">unsubscribe</span>();
+  <span class="keyword">await</span> setup.<span class="function">disconnect</span>();
+  <span class="keyword">await</span> distributedBuffer.<span class="function">disconnect</span>();
+  <span class="keyword">await</span> coordinator.<span class="function">disconnect</span>();
+  process.exit(<span class="number">0</span>);
+});
 
 })();</code></pre>
           </div>
