@@ -16,7 +16,8 @@ import {
   PHASE_METRICS_TO_VALIDATE_KEYS,
   BRANCH_METRICS_TO_VALIDATE_KEYS,
   SCHEDULER_METRICS_TO_VALIDATE_KEYS,
-  STABLE_BUFFER_METRICS_TO_VALIDATE_KEYS
+  STABLE_BUFFER_METRICS_TO_VALIDATE_KEYS,
+  DISTRIBUTED_INFRASTRUCTURE_METRICS_TO_VALIDATE_KEYS
 } from '../constants/index.js';
 
 export class MetricsValidator {
@@ -473,6 +474,49 @@ export class MetricsValidator {
     const metricsToValidate: Array<{ name: string; value: number | undefined; guardrail: MetricGuardrail | undefined }> = [
       { name: STABLE_BUFFER_METRICS_TO_VALIDATE_KEYS[0], value: metrics.totalTransactions, guardrail: bufferGuardrails.totalTransactions },
       { name: STABLE_BUFFER_METRICS_TO_VALIDATE_KEYS[1], value: metrics.averageQueueWaitMs, guardrail: bufferGuardrails.averageQueueWaitMs }
+    ];
+
+    for (const { name, value, guardrail } of metricsToValidate) {
+      if (value !== undefined && guardrail) {
+        const anomaly = this.validateMetric(name, value, guardrail);
+        if (anomaly) anomalies.push(anomaly);
+      }
+    }
+
+    return {
+      isValid: anomalies.length === 0,
+      anomalies,
+      validatedAt: new Date().toISOString()
+    };
+  }
+
+  static validateDistributedInfrastructureMetrics(
+    metrics: {
+      connectedNodes?: number;
+      lockAcquisitions?: number;
+      lockReleases?: number;
+      lockConflicts?: number;
+      stateOperations?: number;
+      messagesSent?: number;
+      messagesReceived?: number;
+      lastSyncTimestamp?: number;
+      averageSyncLatencyMs?: number;
+    },
+    guardrails: MetricsGuardrails
+  ): MetricsValidationResult {
+    const anomalies: MetricAnomaly[] = [];
+    const distributedGuardrails = guardrails.distributed || {};
+
+    const metricsToValidate: Array<{ name: string; value: number | undefined; guardrail: MetricGuardrail | undefined }> = [
+      { name: DISTRIBUTED_INFRASTRUCTURE_METRICS_TO_VALIDATE_KEYS[0], value: metrics.connectedNodes, guardrail: distributedGuardrails.connectedNodes },
+      { name: DISTRIBUTED_INFRASTRUCTURE_METRICS_TO_VALIDATE_KEYS[1], value: metrics.lockAcquisitions, guardrail: distributedGuardrails.lockAcquisitions },
+      { name: DISTRIBUTED_INFRASTRUCTURE_METRICS_TO_VALIDATE_KEYS[2], value: metrics.lockReleases, guardrail: distributedGuardrails.lockReleases },
+      { name: DISTRIBUTED_INFRASTRUCTURE_METRICS_TO_VALIDATE_KEYS[3], value: metrics.lockConflicts, guardrail: distributedGuardrails.lockConflicts },
+      { name: DISTRIBUTED_INFRASTRUCTURE_METRICS_TO_VALIDATE_KEYS[4], value: metrics.stateOperations, guardrail: distributedGuardrails.stateOperations },
+      { name: DISTRIBUTED_INFRASTRUCTURE_METRICS_TO_VALIDATE_KEYS[5], value: metrics.messagesSent, guardrail: distributedGuardrails.messagesSent },
+      { name: DISTRIBUTED_INFRASTRUCTURE_METRICS_TO_VALIDATE_KEYS[6], value: metrics.messagesReceived, guardrail: distributedGuardrails.messagesReceived },
+      { name: DISTRIBUTED_INFRASTRUCTURE_METRICS_TO_VALIDATE_KEYS[7], value: metrics.lastSyncTimestamp, guardrail: distributedGuardrails.lastSyncTimestamp },
+      { name: DISTRIBUTED_INFRASTRUCTURE_METRICS_TO_VALIDATE_KEYS[8], value: metrics.averageSyncLatencyMs, guardrail: distributedGuardrails.averageSyncLatencyMs }
     ];
 
     for (const { name, value, guardrail } of metricsToValidate) {

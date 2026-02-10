@@ -159,6 +159,8 @@ export type {
     MetricsGuardrailsConcurrencyLimiter,
     MetricsGuardrailsCommon,
     MetricsGuardrailsScheduler,
+    MetricsGuardrailsStableBuffer,
+    MetricsGuardrailsDistributedInfrastructure,
     MetricsGuardrails,
     MetricAnomaly,
     MetricsValidationResult,

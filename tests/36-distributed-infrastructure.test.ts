@@ -229,6 +229,22 @@ describe('Distributed Infrastructure', () => {
       expect(metrics.stateOperations).toBeGreaterThan(0);
       expect(metrics.nodeId).toBe(coordinator.nodeId);
     });
+
+    it('should validate coordinator metrics against distributed guardrails', async () => {
+      const { MetricsValidator } = await import('../src/utilities/metrics-validator.js');
+      const metrics = coordinator.getMetrics();
+      const guardrails = {
+        distributed: {
+          stateOperations: { min: 0 },
+          lockAcquisitions: { max: 1000 },
+          averageSyncLatencyMs: { max: 5000 }
+        }
+      };
+      const validation = MetricsValidator.validateDistributedInfrastructureMetrics(metrics, guardrails);
+      expect(validation.validatedAt).toBeDefined();
+      expect(typeof validation.isValid).toBe('boolean');
+      expect(Array.isArray(validation.anomalies)).toBe(true);
+    });
   });
 });
 

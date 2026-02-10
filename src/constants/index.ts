@@ -148,4 +148,16 @@ export const STABLE_BUFFER_METRICS_TO_VALIDATE_KEYS = [
     'averageQueueWaitMs'
 ] as const;
 
+export const DISTRIBUTED_INFRASTRUCTURE_METRICS_TO_VALIDATE_KEYS = [
+    'connectedNodes',
+    'lockAcquisitions',
+    'lockReleases',
+    'lockConflicts',
+    'stateOperations',
+    'messagesSent',
+    'messagesReceived',
+    'lastSyncTimestamp',
+    'averageSyncLatencyMs'
+] as const;
+
 export const DEFAULT_STATE_KEY_PREFIX = 'infra' as const;

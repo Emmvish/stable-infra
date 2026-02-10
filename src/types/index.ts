@@ -150,6 +150,18 @@ export interface MetricsGuardrailsStableBuffer {
   averageQueueWaitMs?: MetricGuardrail;
 }
 
+export interface MetricsGuardrailsDistributedInfrastructure {
+  connectedNodes?: MetricGuardrail;
+  lockAcquisitions?: MetricGuardrail;
+  lockReleases?: MetricGuardrail;
+  lockConflicts?: MetricGuardrail;
+  stateOperations?: MetricGuardrail;
+  messagesSent?: MetricGuardrail;
+  messagesReceived?: MetricGuardrail;
+  lastSyncTimestamp?: MetricGuardrail;
+  averageSyncLatencyMs?: MetricGuardrail;
+}
+
 export interface MetricsGuardrails {
   request?: MetricsGuardrailsRequest;
   apiGateway?: MetricsGuardrailsApiGateway;
@@ -160,6 +172,7 @@ export interface MetricsGuardrails {
   common?: MetricsGuardrailsCommon;
   scheduler?: MetricsGuardrailsScheduler;
   stableBuffer?: MetricsGuardrailsStableBuffer;
+  distributed?: MetricsGuardrailsDistributedInfrastructure;
 }
 
 export interface MetricAnomaly {

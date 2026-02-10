@@ -336,6 +336,78 @@ describe('Metrics Guardrails Validation', () => {
             });
         });
 
+        describe('Distributed Infrastructure Metrics Validation', () => {
+            it('should pass validation when distributed metrics are within guardrails', () => {
+                const metrics = {
+                    connectedNodes: 3,
+                    lockAcquisitions: 100,
+                    lockReleases: 98,
+                    lockConflicts: 2,
+                    stateOperations: 500,
+                    messagesSent: 200,
+                    messagesReceived: 200,
+                    lastSyncTimestamp: Date.now(),
+                    averageSyncLatencyMs: 15
+                };
+
+                const guardrails: MetricsGuardrails = {
+                    distributed: {
+                        connectedNodes: { min: 1, max: 10 },
+                        lockConflicts: { max: 5 },
+                        averageSyncLatencyMs: { max: 50 }
+                    }
+                };
+
+                const result = MetricsValidator.validateDistributedInfrastructureMetrics(metrics, guardrails);
+
+                expect(result.isValid).toBe(true);
+                expect(result.anomalies).toHaveLength(0);
+                expect(result.validatedAt).toBeDefined();
+            });
+
+            it('should detect lockConflicts above max threshold', () => {
+                const metrics = {
+                    lockConflicts: 50,
+                    averageSyncLatencyMs: 20
+                };
+
+                const guardrails: MetricsGuardrails = {
+                    distributed: {
+                        lockConflicts: { max: 10 },
+                        averageSyncLatencyMs: { max: 100 }
+                    }
+                };
+
+                const result = MetricsValidator.validateDistributedInfrastructureMetrics(metrics, guardrails);
+
+                expect(result.isValid).toBe(false);
+                expect(result.anomalies).toHaveLength(1);
+                expect(result.anomalies[0].metricName).toBe('lockConflicts');
+                expect(result.anomalies[0].violationType).toBe(ViolationType.ABOVE_MAX);
+            });
+
+            it('should detect averageSyncLatencyMs and connectedNodes violations', () => {
+                const metrics = {
+                    connectedNodes: 0,
+                    averageSyncLatencyMs: 500
+                };
+
+                const guardrails: MetricsGuardrails = {
+                    distributed: {
+                        connectedNodes: { min: 1 },
+                        averageSyncLatencyMs: { max: 200 }
+                    }
+                };
+
+                const result = MetricsValidator.validateDistributedInfrastructureMetrics(metrics, guardrails);
+
+                expect(result.isValid).toBe(false);
+                expect(result.anomalies).toHaveLength(2);
+                const names = result.anomalies.map((a) => a.metricName).sort();
+                expect(names).toEqual(['averageSyncLatencyMs', 'connectedNodes']);
+            });
+        });
+
         describe('Infrastructure Metrics Validation', () => {
             it('should validate circuit breaker metrics', () => {
                 const metrics = {
