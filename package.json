@@ -1,6 +1,6 @@
 {
   "name": "@emmvish/stable-infra",
-  "version": "2.0.4",
+  "version": "2.1.0",
   "description": "A production-grade stable & flexible execution engine for resilient workflows, API integrations, and batch processing.",
   "type": "module",
   "main": "dist/index.js",
