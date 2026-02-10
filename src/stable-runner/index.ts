@@ -11,8 +11,10 @@ import {
   stableWorkflow,
   stableWorkflowGraph
 } from '../core/index.js';
+import { runAsDistributedScheduler } from '../utilities/index.js';
 import type {
   BufferLike,
+  DistributedConfig,
   RunnerConfig,
   RunnerJob,
   RunnerScheduledJob,
@@ -40,6 +42,12 @@ let scheduledRunCount = 0;
 let scheduler: StableScheduler<RunnerScheduledJob> | null = null;
 let writeOutputQueue = Promise.resolve();
 let activeSchedulerConfig: SchedulerConfig | null = null;
+
+type DistributedRunner = Awaited<ReturnType<typeof runAsDistributedScheduler>>;
+let distributedRunner: DistributedRunner | null = null;
+let lastDistributedConfig: DistributedConfig | null = null;
+let lastDistributedSchedulerConfig: SchedulerConfig | null = null;
+let lastDistributedJobs: RunnerScheduledJob[] | null = null;
 
 const envFallbackCache: Record<string, string> = {};
 
@@ -321,6 +329,49 @@ const runOnce = async () => {
     if (jobs.length > 0) {
       const schedulerConfig = await resolveSchedulerConfig(config.scheduler);
       currentJobId = config.jobId ?? null;
+
+      if (config.distributed) {
+        const shouldRecreateDistributed =
+          !distributedRunner ||
+          config.distributed !== lastDistributedConfig ||
+          !isSchedulerConfigEqual(lastDistributedSchedulerConfig, schedulerConfig) ||
+          !deepEqual(lastDistributedJobs, jobs);
+        if (shouldRecreateDistributed) {
+          if (distributedRunner) {
+            await distributedRunner.stop();
+            distributedRunner = null;
+          }
+          if (scheduler) {
+            scheduler.stop();
+            scheduler = null;
+            activeSchedulerConfig = null;
+          }
+          distributedRunner = await runAsDistributedScheduler({
+            distributed: config.distributed,
+            scheduler: schedulerConfig,
+            createScheduler: (c) => {
+              const s = new StableScheduler<RunnerScheduledJob>(c, async (job, context) => {
+                await executeScheduledJob(job, context, outputPath, c.sharedBuffer);
+              });
+              s.setJobs(jobs);
+              return s;
+            }
+          });
+          await distributedRunner.start();
+          lastDistributedConfig = config.distributed;
+          lastDistributedSchedulerConfig = schedulerConfig;
+          lastDistributedJobs = jobs;
+        }
+        return;
+      }
+
+      if (distributedRunner) {
+        await distributedRunner.stop();
+        distributedRunner = null;
+        lastDistributedConfig = null;
+        lastDistributedSchedulerConfig = null;
+        lastDistributedJobs = null;
+      }
       const shouldRecreate = !scheduler || !isSchedulerConfigEqual(activeSchedulerConfig, schedulerConfig);
       if (shouldRecreate) {
         if (scheduler) {
@@ -343,6 +394,13 @@ const runOnce = async () => {
       return;
     }
 
+    if (distributedRunner) {
+      await distributedRunner.stop();
+      distributedRunner = null;
+      lastDistributedConfig = null;
+      lastDistributedSchedulerConfig = null;
+      lastDistributedJobs = null;
+    }
     if (scheduler) {
       scheduler.stop();
       scheduler = null;
@@ -412,5 +470,20 @@ if (RUN_ON_START) {
 
 setInterval(tick, Math.max(250, POLL_INTERVAL_MS));
 
-process.on('SIGINT', () => process.exit(0));
-process.on('SIGTERM', () => process.exit(0));
+const shutdown = async (signal: string) => {
+  if (distributedRunner) {
+    try {
+      await distributedRunner.stop();
+    } catch (e) {
+      console.error(`stable-infra runner: error stopping distributed runner (${signal}).`, e);
+    }
+    distributedRunner = null;
+  }
+  if (scheduler) {
+    scheduler.stop();
+    scheduler = null;
+  }
+  process.exit(0);
+};
+process.on('SIGINT', () => void shutdown('SIGINT'));
+process.on('SIGTERM', () => void shutdown('SIGTERM'));

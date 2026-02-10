@@ -743,7 +743,37 @@ if (isLeader) scheduler.start();
 
 ## Stable Runner
 
-Config-driven runner that executes core module jobs from JSON/ESM configs and can use StableScheduler for scheduled jobs.
+Config-driven runner that executes core module jobs from JSON or ESM config files. Use a single `job` for one-off runs or `jobs` with an optional `scheduler` for scheduled execution. Set `CONFIG_PATH` to your config file; the runner polls for changes and reloads.
+
+**Environment:** `CONFIG_PATH` (required), `OUTPUT_PATH`, `POLL_INTERVAL_MS`, `RUN_ON_START`, `MAX_RUNS`, `SCHEDULER_MAX_PARALLEL`, `SCHEDULER_TICK_INTERVAL_MS`, `SCHEDULER_QUEUE_LIMIT`, `SCHEDULER_TIMEZONE`.
+
+### Distributed mode (high availability)
+
+When you run **multiple runner processes** (e.g. multiple pods) for the same workload, you can ensure only one runs the scheduler by enabling **distributed mode**. Set `distributed` in your config together with `jobs`; the runner will use leader election so that only the elected leader runs the scheduler. State and scheduler persistence are stored in the distributed backend (via the adapter), so failover is seamless.
+
+- **Requires a JS/TS config module** that exports `distributed: { adapter, namespace?, ... }`. JSON config cannot provide an adapter instance.
+- Use the same `scheduler` and `jobs` shape as non-distributed; the runner wires them into `runAsDistributedScheduler` and reloads infra state when a new leader is elected.
+
+Example (ESM config that provides an adapter):
+
+```typescript
+// config.mjs
+import { InMemoryDistributedAdapter } from '@emmvish/stable-infra';
+
+export default {
+  jobs: [
+    { id: 'daily-sync', schedule: { type: 'interval', everyMs: 86400000 }, kind: 'stable-request', options: { ... } }
+  ],
+  scheduler: { maxParallel: 2 },
+  distributed: {
+    adapter: new InMemoryDistributedAdapter(process.env.NODE_ID || 'runner-1'),
+    namespace: 'my-app',
+    enableLeaderElection: true
+  }
+};
+```
+
+For production, use an adapter backed by Redis, PostgreSQL, or another shared backend. See [Distributed Infrastructure](/docs/api-references/distributed-infrastructure.md) for adapter requirements and leader election.
 
 ---
 

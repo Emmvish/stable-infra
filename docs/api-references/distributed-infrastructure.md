@@ -911,6 +911,10 @@ await runner.stop();
 
 When using `runAsDistributedScheduler`, the runner restores persisted state (via the scheduler’s `restoreState()` when available) before starting the scheduler on the new leader, so queued and remaining jobs are executed after failover.
 
+#### Stable Runner (config-driven)
+
+The **Stable Runner** (config file executed via `CONFIG_PATH`) supports distributed mode: when your config exports both `jobs` and `distributed` (with an `adapter`), the runner uses `runAsDistributedScheduler` internally. Only the elected leader runs the scheduler; other instances stand by. Use a **JS/TS config module** (not JSON) so you can provide an adapter instance. See [Stable Runner](../../README.md#stable-runner) in the main README.
+
 ---
 
 ## Distributed Infrastructure Bundle

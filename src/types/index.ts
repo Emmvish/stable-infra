@@ -1756,6 +1756,7 @@ export type RunnerConfig<T extends RunnerJob = RunnerJob> = {
   job?: T;
   jobs?: RunnerScheduledJob<T>[];
   scheduler?: SchedulerConfig;
+  distributed?: DistributedConfig;
 };
 
 // ============================================================================
