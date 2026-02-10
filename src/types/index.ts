@@ -1586,6 +1586,7 @@ export interface SchedulerSharedInfrastructure {
   rateLimiter?: RateLimiter;
   concurrencyLimiter?: ConcurrencyLimiter;
   cacheManager?: CacheManager;
+  functionCacheManager?: FunctionCacheManager;
 }
 
 export interface SchedulerExecutionContext {

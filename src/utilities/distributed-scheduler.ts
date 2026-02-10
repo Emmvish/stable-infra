@@ -166,6 +166,23 @@ export const createDistributedSchedulerConfig = async <TJob = unknown>(
   };
 };
 
+async function reloadSharedInfrastructureFromPersistence<TJob>(config: SchedulerConfig<TJob>): Promise<void> {
+  const infra = config.sharedInfrastructure;
+  if (!infra) return;
+  const reloadables = [
+    infra.circuitBreaker,
+    infra.rateLimiter,
+    infra.concurrencyLimiter,
+    infra.cacheManager,
+    infra.functionCacheManager
+  ].filter((x): x is NonNullable<typeof x> => x != null);
+  await Promise.all(
+    reloadables.map((r) => (typeof (r as { reloadFromPersistence?: () => Promise<void> }).reloadFromPersistence === 'function'
+      ? (r as { reloadFromPersistence: () => Promise<void> }).reloadFromPersistence()
+      : Promise.resolve()))
+  );
+}
+
 export const runAsDistributedScheduler = async <TJob = unknown>(
   options: RunAsDistributedSchedulerOptions<TJob>
 ): Promise<DistributedSchedulerRunner> => {
@@ -182,6 +199,13 @@ export const runAsDistributedScheduler = async <TJob = unknown>(
     }
   };
 
+  const startLeaderScheduler = async (): Promise<void> => {
+    await reloadSharedInfrastructureFromPersistence(setup.config);
+    scheduler = createScheduler(setup.config);
+    await restoreSchedulerState(scheduler);
+    scheduler.start();
+  };
+
   const checkLeadershipInterval = setInterval(async () => {
     if (!running) return;
     
@@ -190,9 +214,7 @@ export const runAsDistributedScheduler = async <TJob = unknown>(
     const isNowLeader = setup.isLeader();
     
     if (!wasLeader && isNowLeader) {
-      scheduler = createScheduler(setup.config);
-      await restoreSchedulerState(scheduler);
-      scheduler.start();
+      await startLeaderScheduler();
     }
     
     if (wasLeader && !isNowLeader && scheduler) {
@@ -208,9 +230,7 @@ export const runAsDistributedScheduler = async <TJob = unknown>(
       await setup.campaignForLeader();
       
       if (setup.isLeader()) {
-        scheduler = createScheduler(setup.config);
-        await restoreSchedulerState(scheduler);
-        scheduler.start();
+        await startLeaderScheduler();
       }
     },
     stop: async () => {

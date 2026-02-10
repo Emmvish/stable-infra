@@ -10,13 +10,17 @@ import {
   createDistributedSchedulerConfig,
   createDistributedStableBuffer,
   createDistributedSharedBuffer,
-  withDistributedBufferLock
+  withDistributedBufferLock,
+  runAsDistributedScheduler
 } from '../src/utilities/index.js';
+import { StableScheduler, ScheduleTypes } from '../src/index.js';
+import { CircuitBreaker } from '../src/utilities/circuit-breaker.js';
 import { 
   DistributedLockStatus,
   DistributedLeaderStatus,
   DistributedConflictResolution,
-  DistributedBufferKey
+  DistributedBufferKey,
+  CircuitBreakerState
 } from '../src/enums/index.js';
 
 describe('Distributed Infrastructure', () => {
@@ -408,6 +412,82 @@ describe('Distributed Scheduler Config', () => {
     });
     
     expect(setup.config.sharedBuffer).toBe(mockBuffer);
+  });
+
+  describe('New leader infra state reload', () => {
+    it('should call reloadFromPersistence on shared infra when new leader starts', async () => {
+      const adapter = new InMemoryDistributedAdapter();
+      const reloadSpy = jest.spyOn(CircuitBreaker.prototype, 'reloadFromPersistence');
+
+      const runner = await runAsDistributedScheduler({
+        distributed: { adapter, namespace: 'reload-spy-test' },
+        circuitBreaker: {
+          failureThresholdPercentage: 50,
+          minimumRequests: 5,
+          recoveryTimeoutMs: 10000
+        },
+        createScheduler: (config) => new StableScheduler(config, async () => {})
+      });
+
+      reloadSpy.mockClear();
+      await runner.start();
+      expect(reloadSpy).toHaveBeenCalled();
+
+      await runner.stop();
+      reloadSpy.mockRestore();
+    });
+
+    it('should restore circuit breaker state from backend when new leader takes over', async () => {
+      const adapter = new InMemoryDistributedAdapter();
+      const namespace = 'new-leader-cb-restore';
+      const cbConfig = {
+        failureThresholdPercentage: 50,
+        minimumRequests: 5,
+        recoveryTimeoutMs: 10000
+      };
+
+      let node2CircuitBreaker: CircuitBreaker | undefined;
+
+      const runner1 = await runAsDistributedScheduler({
+        distributed: { adapter, namespace },
+        circuitBreaker: cbConfig,
+        createScheduler: (config) => {
+          const s = new StableScheduler(config, async (_job, ctx) => {
+            for (let i = 0; i < 10; i++) {
+              ctx.sharedInfrastructure?.circuitBreaker?.recordFailure();
+            }
+          });
+          s.addJobs([
+            {
+              id: 'open-cb',
+              schedule: { type: ScheduleTypes.INTERVAL, everyMs: 100 }
+            }
+          ]);
+          return s;
+        }
+      });
+
+      const runner2 = await runAsDistributedScheduler({
+        distributed: { adapter, namespace },
+        circuitBreaker: cbConfig,
+        createScheduler: (config) => {
+          node2CircuitBreaker = config.sharedInfrastructure?.circuitBreaker;
+          return new StableScheduler(config, async () => {});
+        }
+      });
+
+      await runner1.start();
+      await new Promise((r) => setTimeout(r, 350));
+      await runner1.stop();
+
+      await runner2.start();
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(node2CircuitBreaker).toBeDefined();
+      expect(node2CircuitBreaker!.getState().state).toBe(CircuitBreakerState.OPEN);
+
+      await runner2.stop();
+    });
   });
 });
 

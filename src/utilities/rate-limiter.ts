@@ -41,6 +41,11 @@ export class RateLimiter {
     async initialize(): Promise<void> {
         if (this.initialized) return;
         
+        await this.reloadFromPersistence();
+        this.initialized = true;
+    }
+
+    async reloadFromPersistence(): Promise<void> {
         if (this.persistenceCoordinator) {
             try {
                 const persistedState = await this.persistenceCoordinator.load();
@@ -51,7 +56,6 @@ export class RateLimiter {
                 console.warn('stable-infra: Unable to load rate limiter state from persistence.');
             }
         }
-        this.initialized = true;
     }
 
     private restoreState(persistedState: RateLimiterPersistedState): void {

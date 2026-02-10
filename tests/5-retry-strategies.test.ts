@@ -37,7 +37,6 @@ describe('Retry Strategies', () => {
 
     const elapsed = Date.now() - startTime;
     
-    // Fixed: 100ms + 100ms = 200ms minimum
     expect(elapsed).toBeGreaterThanOrEqual(180);
     expect(elapsed).toBeLessThan(400);
   });
