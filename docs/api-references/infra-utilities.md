@@ -1145,7 +1145,7 @@ The `MetricsValidator` class provides real-time validation of metrics against us
 
 - ✅ **Automatic Anomaly Detection**: Identifies metrics outside acceptable ranges
 - ✅ **Severity Classification**: CRITICAL, WARNING, INFO based on deviation
-- ✅ **Multi-Level Validation**: Request, Function, API Gateway, Workflow, Phase, Branch, Infrastructure
+- ✅ **Multi-Level Validation**: Request, Function, API Gateway, Workflow, Phase, Branch, Infrastructure, Scheduler, Stable Buffer, Distributed Infrastructure
 - ✅ **Flexible Guardrails**: Min/max thresholds or expected value with tolerance
 - ✅ **Type-Safe Enums**: ViolationType and AnomalySeverity for consistent handling
 
@@ -1161,6 +1161,10 @@ interface MetricsGuardrails {
   phase?: PhaseMetricsGuardrails;
   branch?: BranchMetricsGuardrails;
   infrastructure?: InfrastructureMetricsGuardrails;
+  common?: MetricsGuardrailsCommon;
+  scheduler?: MetricsGuardrailsScheduler;
+  stableBuffer?: MetricsGuardrailsStableBuffer;
+  distributed?: MetricsGuardrailsDistributedInfrastructure;
 }
 ```
 
@@ -1402,6 +1406,39 @@ const validation = MetricsValidator.validateInfrastructureMetrics(
   }
 );
 ```
+
+#### validateDistributedInfrastructureMetrics(metrics, guardrails): MetricsValidationResult
+
+Validate distributed infrastructure metrics (from `DistributedCoordinator.getMetrics()`). Use this to enforce guardrails on coordinator metrics such as lock conflicts, sync latency, and message counts.
+
+```typescript
+import { DistributedCoordinator, MetricsValidator } from '@emmvish/stable-infra';
+
+const metrics = coordinator.getMetrics();
+const validation = MetricsValidator.validateDistributedInfrastructureMetrics(metrics, {
+  distributed: {
+    connectedNodes: { min: 1 },
+    lockConflicts: { max: 10 },
+    averageSyncLatencyMs: { max: 200 },
+    stateOperations: { max: 10000 }
+  }
+});
+
+if (!validation.isValid) {
+  validation.anomalies.forEach(a => console.warn(a.reason));
+}
+```
+
+**Validated Metrics:**
+- `connectedNodes`
+- `lockAcquisitions`
+- `lockReleases`
+- `lockConflicts`
+- `stateOperations`
+- `messagesSent`
+- `messagesReceived`
+- `lastSyncTimestamp`
+- `averageSyncLatencyMs`
 
 ### Severity Calculation
 

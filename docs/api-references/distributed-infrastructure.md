@@ -1512,12 +1512,37 @@ const coordinator = new DistributedCoordinator({
 });
 ```
 
-### 6. Monitor Metrics
+### 6. Monitor Metrics and Guardrails
+
+Collect metrics from the coordinator and optionally validate them against guardrails for alerting and SLA monitoring.
 
 ```typescript
 const metrics = coordinator.getMetrics();
-// Track: lockConflicts, stateOperations, averageSyncLatencyMs
+// Metrics: nodeId, isLeader, connectedNodes, lockAcquisitions, lockReleases,
+//          lockConflicts, stateOperations, messagesSent, messagesReceived,
+//          lastSyncTimestamp, averageSyncLatencyMs
 ```
+
+To enforce thresholds (e.g. cap lock conflicts, max sync latency), use `MetricsValidator.validateDistributedInfrastructureMetrics`:
+
+```typescript
+import { DistributedCoordinator, MetricsValidator } from '@emmvish/stable-infra';
+
+const metrics = coordinator.getMetrics();
+const validation = MetricsValidator.validateDistributedInfrastructureMetrics(metrics, {
+  distributed: {
+    connectedNodes: { min: 1 },
+    lockConflicts: { max: 10 },
+    averageSyncLatencyMs: { max: 200 }
+  }
+});
+
+if (!validation.isValid) {
+  validation.anomalies.forEach(a => console.warn(`${a.metricName}: ${a.reason}`));
+}
+```
+
+See [Metrics Validator](/docs/api-references/infra-utilities.md#metrics-validator) for guardrail options (`min`, `max`, `expected`, `tolerance`) and severity levels.
 
 ### 7. Implement Proper Cleanup
 
